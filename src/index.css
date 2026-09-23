@@ -1,0 +1,280 @@
+@import "tailwindcss";
+
+/* ========================================================
+   Standardized Canonical Coptic Orthodox Church Palette
+   Unifies Light & Dark modes under a single semantic system
+   ======================================================== */
+
+:root,
+:root[data-theme="light"] {
+  /* Canonical Brand Color Tokens */
+  --brand-burgundy: #6F1D2A;
+  --brand-burgundy-dark: #4E111B;
+  --brand-blue: #0B2E5C;
+  --brand-gold: #B58A3A;
+  --brand-gold-dark: #7A5A1E;
+  
+  /* Neutral & Base Tokens */
+  --text-ink: #241F1C;
+  --text-muted-stone: #A99D8C;
+  --bg-ivory: #F7F2E8;
+  --bg-parchment: #EEE3CF;
+  --border-stone: #D8CCB8;
+
+  /* Semantic Feedback Tokens */
+  --color-success: #2F6B4F;
+  --color-warning: #8A5A00;
+  --color-danger: #A33D35;
+  --color-info: #0B2E5C;
+  --color-neutral: #6B6258;
+
+  /* Elevated Surfaces */
+  --surface-ground: #F7F2E8;
+  --surface-card: #FFFFFF;
+  --surface-elevated: #FAF6EE;
+  --surface-border: #D8CCB8;
+
+  /* Typography Tokens */
+  --font-coptic-ui: 'Noto Sans Coptic', 'Segoe UI Historic', 'Antinoou', sans-serif;
+  --font-coptic-sacred: 'Athanasius', 'Antinoou', 'Noto Sans Coptic', 'Segoe UI Historic', 'Coptic Unicode', serif;
+  --font-arabic-ui: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  --font-arabic-sacred: 'Amiri', 'Traditional Arabic', serif;
+  --font-english-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Semantic Church Color Mappings */
+  --color-church-blue: #0B2E5C;
+  --color-church-blue-light: #1B365D;
+  --color-church-gold: #B58A3A;
+  --color-church-gold-light: #D4A84E;
+  --color-church-burgundy: #6F1D2A;
+  --color-church-cream: #F7F2E8;
+  --color-church-cream-dark: #D8CCB8;
+  --color-church-card: #FFFFFF;
+  --color-church-card-hover: #FAF6EE;
+  --color-church-text-main: #241F1C;
+  --color-church-text-muted: #6B6258;
+  --color-church-input-bg: #FFFFFF;
+}
+
+:root[data-theme="dark"],
+.dark {
+  /* Canonical Dark Mode Palette (Standardized) */
+  --brand-burgundy: #8D2938;
+  --brand-burgundy-dark: #3F1118;
+  --brand-blue: #52718C;
+  --brand-gold: #D0A85E;
+  --brand-gold-dark: #916F2C;
+
+  /* Dark Neutral & Surface Tokens */
+  --text-ink: #F5EFE4;
+  --text-muted-stone: #C9BFAF;
+  --bg-ivory: #171411;
+  --bg-parchment: #211C18;
+  --border-stone: #3B332C;
+
+  /* Elevated Surfaces */
+  --surface-ground: #171411;
+  --surface-elevated: #211C18;
+  --surface-card: #28211C;
+  --surface-border: #3B332C;
+
+  /* Semantic Feedback Tokens */
+  --color-success: #3E8B67;
+  --color-warning: #C78B24;
+  --color-danger: #C04F46;
+  --color-info: #7093B5;
+  --color-neutral: #C9BFAF;
+
+  /* Standardized Dark Church Mappings (Old Blue in Dark: #7093B5 & #52718C) */
+  --color-church-blue: #7093B5;
+  --color-church-blue-light: #8BA8C8;
+  --color-church-gold: #D0A85E;
+  --color-church-gold-light: #E0BA41;
+  --color-church-burgundy: #8D2938;
+  --color-church-cream: #171411;
+  --color-church-cream-dark: #3B332C;
+  --color-church-card: #28211C;
+  --color-church-card-hover: #332B25;
+  --color-church-text-main: #F5EFE4;
+  --color-church-text-muted: #C9BFAF;
+  --color-church-input-bg: #211C18;
+}
+
+@theme {
+  --color-church-blue: var(--color-church-blue);
+  --color-church-blue-light: var(--color-church-blue-light);
+  --color-church-gold: var(--color-church-gold);
+  --color-church-gold-light: var(--color-church-gold-light);
+  --color-church-burgundy: var(--color-church-burgundy);
+  --color-church-cream: var(--color-church-cream);
+  --color-church-cream-dark: var(--color-church-cream-dark);
+}
+
+@layer base {
+  body {
+    background-color: var(--surface-ground);
+    color: var(--text-ink);
+    font-family: var(--font-arabic-ui);
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  /* Dual Coptic Typography Roles */
+  .coptic-ui {
+    font-family: var(--font-coptic-ui);
+    direction: ltr;
+    unicode-bidi: isolate;
+    letter-spacing: 0.01em;
+  }
+
+  .coptic-sacred {
+    font-family: var(--font-coptic-sacred);
+    direction: ltr;
+    unicode-bidi: isolate;
+    line-height: 1.85;
+    letter-spacing: 0.015em;
+  }
+
+  /* Arabic Typography Roles */
+  .arabic-ui {
+    font-family: var(--font-arabic-ui);
+    direction: rtl;
+    line-height: 1.6;
+  }
+
+  .arabic-sacred {
+    font-family: var(--font-arabic-sacred);
+    direction: rtl;
+    line-height: 1.8;
+  }
+
+  .english-ui {
+    font-family: var(--font-english-ui);
+    direction: ltr;
+  }
+
+  /* Standardize Church Borders globally */
+  .border-church {
+    border-color: var(--border-stone);
+  }
+  .dark .border-church {
+    border-color: var(--border-stone);
+  }
+
+  /* Standardize Church Primary, Gold, and Burgundy Button States */
+  .btn-church-primary {
+    background-color: var(--brand-burgundy);
+    color: #FFFFFF;
+    border: 1px solid var(--brand-burgundy-dark);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-church-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 12px rgba(111, 29, 42, 0.25);
+  }
+  .btn-church-primary:focus-visible {
+    outline: none;
+    ring: 2px solid var(--brand-gold);
+  }
+
+  .btn-church-gold {
+    background-color: var(--brand-gold);
+    color: #FFFFFF;
+    font-weight: 700;
+    border: 1px solid var(--brand-gold-dark);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-church-gold:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 4px 12px rgba(181, 138, 58, 0.25);
+  }
+
+  .btn-church-burgundy {
+    background-color: var(--brand-burgundy);
+    color: #FFFFFF;
+    font-weight: 700;
+    border: 1px solid var(--brand-burgundy-dark);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-church-burgundy:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 12px rgba(111, 29, 42, 0.3);
+  }
+
+  /* Standardized Card */
+  .card-church {
+    background-color: var(--surface-card);
+    border: 1px solid var(--border-stone);
+    border-radius: 1rem;
+    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .dark .card-church {
+    background-color: var(--surface-card);
+    border-color: var(--border-stone);
+  }
+
+  /* Standardized Text States */
+  .text-church-main {
+    color: var(--text-ink);
+  }
+  .text-church-muted {
+    color: var(--color-neutral);
+  }
+  .text-church-gold {
+    color: var(--brand-gold-dark);
+  }
+  .text-church-burgundy {
+    color: var(--brand-burgundy);
+  }
+  .text-church-blue {
+    color: var(--brand-blue);
+  }
+
+  /* Low-light Church Dark Mode Overrides for pristine contrast and comfort */
+  .dark .bg-white {
+    background-color: var(--surface-card) !important;
+    color: var(--text-ink);
+  }
+
+  .dark .bg-gray-50 {
+    background-color: var(--surface-elevated) !important;
+    color: var(--text-ink);
+  }
+
+  .dark .bg-gray-100 {
+    background-color: var(--surface-elevated) !important;
+    color: var(--text-ink);
+  }
+
+  .dark .text-gray-800, .dark .text-gray-900 {
+    color: #F5EFE4 !important;
+  }
+
+  .dark .text-gray-700 {
+    color: #E6DCce !important;
+  }
+
+  .dark .text-gray-600 {
+    color: #C9BFAF !important;
+  }
+
+  .dark .text-gray-500 {
+    color: #A99D8C !important;
+  }
+
+  .dark .border-gray-100, .dark .border-gray-200 {
+    border-color: var(--border-stone) !important;
+  }
+
+  .dark input:not([type="checkbox"]):not([type="radio"]), 
+  .dark select, 
+  .dark textarea {
+    background-color: var(--color-church-input-bg) !important;
+    color: #F5EFE4 !important;
+    border-color: var(--border-stone) !important;
+  }
+
+  .dark input::placeholder {
+    color: #A99D8C !important;
+  }
+}
+

@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Mic, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
+import { VerseRecitalModal } from '../student/VerseRecitalModal';
+import { Language } from '../../types';
+
+const fallbackVerses = [
+  {
+    en: "I can do all things through Christ who strengthens me.",
+    ar: "أَسْتَطِيعُ كُلَّ شَيْءٍ فِي الْمَسِيحِ الَّذِي يُقَوِّينِي.",
+    copt: "Ϯϣ̀ϫⲉⲙϫⲟⲙ ⲛ̀ϩⲱⲃ ⲛⲓⲃⲉⲛ ϧⲉⲛ Ⲡⲭ̅ⲥ̅ ⲫⲏⲉⲧϯϫⲟⲙ ⲛⲏⲓ.",
+    referenceEn: "Philippians 4:13",
+    referenceAr: "فيلبي ٤: ١٣",
+    referenceCopt: "Ⲫⲓⲗⲓⲡⲡⲏⲥⲓⲟⲓⲥ ⲇ̅:ⲓ̅ⲅ̅",
+    type: "ambition"
+  },
+  {
+    en: "The Lord is close to the brokenhearted and saves those who are crushed in spirit.",
+    ar: "قَرِيبٌ هُوَ الرَّبُّ مِنَ الْمُنْكَسِرِي الْقُلُوبِ، وَيُخَلِّصُ الْمُنْسَحِقِي الرُّوحِ.",
+    copt: "Ϥϧⲉⲛⲧ ⲛ̀ϫⲉ Ⲡϭⲟⲓⲥ ⲉ̀ⲛⲏⲉⲧϧⲉⲙϧⲱⲙ ϧⲉⲛ ⲡⲟⲩϩⲏⲧ.",
+    referenceEn: "Psalm 34:18",
+    referenceAr: "مزمور ٣٤: ١٨",
+    referenceCopt: "Ⲯⲁⲗⲙⲟⲥ ⲗ̅ⲇ̅:ⲓ̅ⲏ̅",
+    type: "sad"
+  },
+  {
+    en: "Be strong and courageous. Do not be afraid or terrified... for the Lord your God goes with you.",
+    ar: "تَشَدَّدُوا وَتَشَجَّعُوا. لاَ تَخَافُوا وَلاَ تَرْهَبُوا وُجُوهَهُمْ، لأَنَّ الرَّبَّ إِلهَكَ سَائِرٌ مَعَكَ.",
+    copt: "Ϫⲉⲙϫⲟⲙ ⲟⲩⲟϩ ⲁⲣⲓϫⲱⲣⲓ: ⲙ̀ⲡⲉⲣⲉⲣϩⲟϯ: ϫⲉ Ⲡϭⲟⲓⲥ Ⲡⲉⲕⲛⲟⲩϯ ⲙⲟϣⲓ ⲛⲉⲙⲁⲕ.",
+    referenceEn: "Deuteronomy 31:6",
+    referenceAr: "تثنية ٣١: ٦",
+    referenceCopt: "Ⲇⲉⲩⲧⲉⲣⲟⲛⲟⲙⲓⲟⲛ ⲗ̅ⲁ̅:ⲋ̅",
+    type: "ambition"
+  },
+  {
+    en: "Cast your cares on the Lord and he will sustain you; he will never let the righteous be shaken.",
+    ar: "أَلْقِ عَلَى الرَّبِّ هَمَّكَ فَهُوَ يَعُولُكَ. لاَ يَدَعُ الصِّدِّيقَ يَتَزَعْزَعُ إِلَى الأَبَدِ.",
+    copt: "Ⲃⲱⲣⲡ ⲙ̀ⲡⲉⲕⲣⲱⲟⲩϣ ⲉ̀ϫⲉⲛ Ⲡϭⲟⲓⲥ ⲟⲩⲟϩ ⲛ̀ⲑⲟϥ ϥⲛⲁϣⲁⲛⲟⲩϣⲕ.",
+    referenceEn: "Psalm 55:22",
+    referenceAr: "مزمور ٥٥: ٢٢",
+    referenceCopt: "Ⲯⲁⲗⲙⲟⲥ ⲛ̅ⲉ̅:ⲕ̅ⲃ̅",
+    type: "sad"
+  }
+];
+
+export function BibleVerseCard({ lang }: { lang: Language }) {
+  const [verse, setVerse] = useState(fallbackVerses[0]);
+  const [loading, setLoading] = useState(true);
+  const [showRecitalModal, setShowRecitalModal] = useState(false);
+
+  useEffect(() => {
+    // Pick random verse
+    const picked = fallbackVerses[Math.floor(Math.random() * fallbackVerses.length)];
+    setVerse(picked);
+    setLoading(false);
+  }, []);
+
+  return (
+    <>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-linear-to-br from-amber-400 via-amber-500 to-amber-600 text-amber-950 dark:text-slate-900 p-5 rounded-3xl shadow-sm relative overflow-hidden min-h-[140px]"
+      >
+        <div className="absolute -right-4 -top-4 opacity-15 pointer-events-none">
+          <BookOpen size={110} />
+        </div>
+
+        <div className="relative z-10 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-950">
+              <BookOpen size={16} />
+              <span>{lang === 'copt' ? 'Ϯⲣⲏϯ ⲛ̀ⲧⲉ ⲡⲓⲉϩⲟⲟⲩ' : lang === 'ar' ? 'آية اليوم للحفظ والتأمل' : 'Verse of the Day'}</span>
+            </div>
+
+            {/* AI Verse Recital Trigger Button */}
+            <button
+              onClick={() => setShowRecitalModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 hover:bg-white text-[var(--color-church-burgundy)] font-extrabold text-xs shadow-xs transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <Mic size={14} className="text-[var(--color-church-burgundy)] animate-pulse" />
+              <span>{lang === 'copt' ? 'Ⲧⲁϫⲣⲟ ⲛ̀ϯⲣⲏϯ (+١٠٠)' : lang === 'ar' ? 'تسميع الآية بالذكاء الاصطناعي (+١٠٠)' : 'AI Voice Recital (+100)'}</span>
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="animate-pulse space-y-2 py-2">
+              <div className="h-4 bg-amber-900/20 rounded-sm w-3/4"></div>
+              <div className="h-4 bg-amber-900/20 rounded-sm w-1/2"></div>
+            </div>
+          ) : (
+            <div>
+              <p className="font-bold leading-relaxed text-base sm:text-lg italic text-amber-950">
+                "{lang === 'copt' ? verse.copt : lang === 'ar' ? verse.ar : verse.en}"
+              </p>
+              <span className="inline-block mt-1 font-extrabold text-xs text-amber-900">
+                ({lang === 'copt' ? verse.referenceCopt : lang === 'ar' ? verse.referenceAr : verse.referenceEn})
+              </span>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Autonomous AI Recital Modal */}
+      <VerseRecitalModal
+        isOpen={showRecitalModal}
+        onClose={() => setShowRecitalModal(false)}
+        targetVerse={{
+          ar: verse.ar,
+          en: verse.en,
+          copt: verse.copt,
+          referenceAr: verse.referenceAr,
+          referenceEn: verse.referenceEn,
+          referenceCopt: verse.referenceCopt,
+        }}
+        lang={lang}
+      />
+    </>
+  );
+}
