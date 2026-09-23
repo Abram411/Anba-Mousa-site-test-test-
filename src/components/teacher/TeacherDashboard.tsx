@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import { useLessons } from '../../context/LessonsContext';
-import { Lesson, QuizQuestion, LessonSource, PresentationSlide } from '../../types';
+import { Lesson, QuizQuestion, LessonSource, PresentationSlide, ServantComment } from '../../types';
 import { LessonEditModal } from './LessonEditModal';
 import { AttendanceVisitationTracker } from './AttendanceVisitationTracker';
 import { UserCheck } from 'lucide-react';
@@ -85,15 +85,20 @@ export function TeacherDashboard({
   const [selectedSessionId, setSelectedSessionId] = useState<string>(() => classSessions[0]?.id || 'cs-2026-09-27');
   
   // Active session and lesson resolution
-  const activeSession = classSessions.find(s => s.id === selectedSessionId) || classSessions[0];
+  const activeSession = (classSessions || []).find(s => s.id === selectedSessionId) || classSessions?.[0];
   const activeLessonId = activeSession?.activeLessonId || 'l-cross-01';
-  const activeLesson = lessons.find(l => l.id === activeLessonId) || lessons[0];
+  const activeLesson = (lessons || []).find(l => l.id === activeLessonId) || lessons?.[0];
 
   // Domain records for active lesson
-  const activeSources = lessonSources.filter(s => s.sessionId === activeSession?.id || s.lessonId === activeLessonId);
-  const activeEvidenceMap = evidenceMaps[activeLessonId];
-  const activeOutline = lessonOutlines[activeLessonId];
-  const activeVersions = lessonVersions[activeLessonId] || [];
+  const activeSources = (lessonSources || []).filter(s => s.sessionId === activeSession?.id || s.lessonId === activeLessonId);
+  const activeEvidenceMap = evidenceMaps ? evidenceMaps[activeLessonId] : undefined;
+  const activeOutline = lessonOutlines ? lessonOutlines[activeLessonId] : undefined;
+  const activeVersions = (lessonVersions && lessonVersions[activeLessonId]) || [];
+  const activeCommentsList: ServantComment[] = Array.isArray(servantComments)
+    ? servantComments
+    : servantComments && typeof servantComments === 'object'
+    ? Object.values(servantComments).flat()
+    : [];
 
   // Viewer Modals
   const [viewingSource, setViewingSource] = useState<LessonSource | null>(null);
@@ -364,7 +369,7 @@ export function TeacherDashboard({
             versions={activeVersions}
             evidenceMap={activeEvidenceMap}
             sources={activeSources}
-            servantComments={servantComments}
+            servantComments={activeCommentsList}
             onApproveOutline={() => approveLessonOutline(activeLessonId)}
             onSaveVersion={saveLessonVersion}
             onApproveVersion={(verId, servant, note) => approveLessonVersion(activeLessonId, verId, servant, note)}

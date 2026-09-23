@@ -193,11 +193,12 @@ export function AttendanceVisitationTracker({ lang }: { lang: 'en' | 'ar' }) {
     }
     // Default everyone to present initially for quick one-tap changes
     const def: Record<string, AttendanceStatus> = {};
-    students.filter(s => s.stageId === selectedStage).forEach(s => {
+    const safeStudents = Array.isArray(students) ? students : INITIAL_STUDENTS;
+    safeStudents.filter(s => s.stageId === selectedStage).forEach(s => {
       def[s.id] = 'present';
     });
     setAttendanceMap(def);
-  }, [selectedStage, selectedDate]);
+  }, [selectedStage, selectedDate, students]);
 
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
     const updated = { ...attendanceMap, [studentId]: status };
@@ -262,7 +263,8 @@ export function AttendanceVisitationTracker({ lang }: { lang: 'en' | 'ar' }) {
   };
 
   // Filter students by selected stage & search query
-  const stageStudents = students.filter(s => {
+  const safeStudents = Array.isArray(students) ? students : INITIAL_STUDENTS;
+  const stageStudents = safeStudents.filter(s => {
     const matchesStage = s.stageId === selectedStage;
     const matchesSearch = s.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStage && matchesSearch;

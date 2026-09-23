@@ -95,7 +95,8 @@ export function ChildrenLessonsProgress({
   };
 
   // Filter lessons
-  const filteredLessons = selectedChild.lessons.filter(lesson => {
+  const lessonsList = selectedChild?.lessons || [];
+  const filteredLessons = lessonsList.filter(lesson => {
     const matchesCategory = selectedCategory === 'all' || lesson.category === selectedCategory;
     const matchesSearch = searchQuery.trim() === '' || 
       lesson.lessonTitleEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,14 +105,14 @@ export function ChildrenLessonsProgress({
   });
 
   // Calculate stats
-  const completedCount = selectedChild.lessons.filter(l => l.status === 'completed').length;
-  const inProgressCount = selectedChild.lessons.filter(l => l.status === 'in_progress').length;
-  const completionPercentage = Math.round((completedCount / selectedChild.lessons.length) * 100) || 0;
+  const completedCount = lessonsList.filter(l => l.status === 'completed').length;
+  const inProgressCount = lessonsList.filter(l => l.status === 'in_progress').length;
+  const completionPercentage = Math.round((completedCount / (lessonsList.length || 1)) * 100) || 0;
 
   // Category completion rates
   const categoriesList: LessonCategory[] = ['bible_stories', 'hymns_rituals', 'church_history', 'ethics_prayers'];
   const categoryStats = categoriesList.map(cat => {
-    const catLessons = selectedChild.lessons.filter(l => l.category === cat);
+    const catLessons = lessonsList.filter(l => l.category === cat);
     const catCompleted = catLessons.filter(l => l.status === 'completed').length;
     const percent = catLessons.length > 0 ? Math.round((catCompleted / catLessons.length) * 100) : 0;
     return {

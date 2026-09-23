@@ -40,13 +40,13 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
   if (!lesson) return <div>Lesson not found</div>;
 
   const currentStudentId = userData?.id || 'u1';
-  const versions = lessonVersions[lessonId] || [];
+  const versions = (lessonVersions && lessonVersions[lessonId]) || [];
   const latestApprovedVersion = versions.find(v => v.status === 'APPROVED') || versions[versions.length - 1];
-  const activeSources = lessonSources.filter(s => s.lessonId === lessonId);
+  const activeSources = (lessonSources || []).filter(s => s.lessonId === lessonId);
   const userProgressKey = `${currentStudentId}_${lessonId}`;
-  const currentProgress = studentProgress[userProgressKey];
-  const userQuizAttempts = quizAttempts[userProgressKey] || [];
-  const currentMastery = studentMasteries[userProgressKey];
+  const currentProgress = studentProgress ? studentProgress[userProgressKey] : undefined;
+  const userQuizAttempts = (quizAttempts && quizAttempts[userProgressKey]) || [];
+  const currentMastery = studentMasteries ? studentMasteries[userProgressKey] : undefined;
 
   // If Sunday School lesson version exists, render rich Sunday School experience
   if (latestApprovedVersion) {

@@ -92,7 +92,12 @@ export const LessonVersionStudio: React.FC<LessonVersionStudioProps> = ({
   const isOutlineApproved = outline?.isApprovedByTeacher ?? false;
 
   // Servant Comments for current version
-  const currentComments = servantComments.filter(c => c.lessonVersionId === currentVersion?.id);
+  const commentsList: ServantComment[] = Array.isArray(servantComments)
+    ? servantComments
+    : servantComments && typeof servantComments === 'object'
+    ? Object.values(servantComments).flat()
+    : [];
+  const currentComments = commentsList.filter(c => c.lessonVersionId === currentVersion?.id);
   const unresolvedComments = currentComments.filter(c => !c.resolved);
 
   // Approval Gate evaluation

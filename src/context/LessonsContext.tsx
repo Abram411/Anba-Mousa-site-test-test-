@@ -91,6 +91,20 @@ interface LessonsContextType {
   searchAuditLogs: SearchAuditLog[];
   addSearchAuditLog: (log: SearchAuditLog) => void;
 
+  // Aliases & Convenience Helpers
+  lessonSources: LessonSource[];
+  lessonOutlines: Record<string, LessonOutline>;
+  studentProgress: Record<string, StudentContentProgress>;
+  studentMasteries: Record<string, StudentMastery>;
+  addClassSession: (data: Partial<ClassSession>) => ClassSession;
+  addLessonSource: (source: Omit<LessonSource, 'id' | 'createdAt'>) => LessonSource;
+  deleteLessonSource: (id: string) => void;
+  saveLessonOutline: (lessonId: string, outline: LessonOutline) => void;
+  approveLessonOutline: (lessonId: string) => void;
+  publishLessonVersion: (lessonId: string, versionId: string) => void;
+  updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => void;
+  updateStudentMastery: (studentId: string, lessonId: string, status: MasteryStatus, notes?: string) => void;
+
   // Global Reset
   resetToDefault: () => void;
 }
@@ -611,6 +625,36 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
       getStudentMastery,
       searchAuditLogs,
       addSearchAuditLog,
+      lessonSources: sources,
+      lessonOutlines: outlines,
+      studentProgress: contentProgress,
+      studentMasteries: masteries,
+      addClassSession: createClassSession,
+      addLessonSource: addSource,
+      deleteLessonSource: deleteSource,
+      saveLessonOutline: saveOutline,
+      approveLessonOutline: approveOutline,
+      publishLessonVersion: (lessonId: string, _versionId: string) => {
+        publishLesson(lessonId);
+      },
+      updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => {
+        const key = `${studentId}_${lessonId}`;
+        setContentProgress(prev => ({
+          ...prev,
+          [key]: {
+            studentId,
+            lessonId,
+            status: pct >= 100 ? 'COMPLETED' : 'IN_PROGRESS',
+            sectionsCompleted: sections,
+            totalSections: Math.max(sections.length, 3),
+            completionPercent: pct,
+            completedAt: pct >= 100 ? new Date().toISOString() : undefined
+          }
+        }));
+      },
+      updateStudentMastery: (studentId: string, lessonId: string, status: MasteryStatus, notes?: string) => {
+        setStudentMastery(studentId, lessonId, status, 'Servant', notes);
+      },
       resetToDefault
     }}>
       {children}
