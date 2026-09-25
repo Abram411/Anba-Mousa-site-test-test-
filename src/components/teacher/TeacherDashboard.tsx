@@ -28,6 +28,8 @@ import { Lesson, QuizQuestion, LessonSource, PresentationSlide, ServantComment }
 import { LessonEditModal } from './LessonEditModal';
 import { AttendanceVisitationTracker } from './AttendanceVisitationTracker';
 import { UserCheck } from 'lucide-react';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { createLessonDraft } from '../../lib/lessonAuthoringService';
 
 import { SessionManager } from '../sunday-school/teacher/SessionManager';
 import { SourceIngestionStudio } from '../sunday-school/teacher/SourceIngestionStudio';
@@ -50,13 +52,15 @@ export function TeacherDashboard({
   onPreviewLesson,
   lang = 'en' 
 }: TeacherDashboardProps) {
-  const { userData } = useAuth();
+  const { userData, isGuest } = useAuth();
+  const isOnlineAuth = !isGuest && Boolean(userData) && isSupabaseConfigured;
   const { 
     lessons, 
     addLesson, 
     updateLesson, 
     deleteLesson, 
     togglePublish,
+    refreshCurriculum,
     classSessions,
     lessonSources,
     evidenceMaps,
@@ -198,7 +202,7 @@ export function TeacherDashboard({
     }
   };
 
-  const handlePublishGeneratedLesson = () => {
+  const handleSaveGeneratedDraft = async () => {
     if (!generatedData) return;
     
     // Transform AI quiz into standard QuizQuestion structure
@@ -209,16 +213,70 @@ export function TeacherDashboard({
       type: 'multiple_choice'
     }));
 
+    if (isOnlineAuth) {
+      const quizDraft = {
+        id: `quiz-gen-${Date.now()}`,
+        lessonId: '',
+        titleEn: `Quiz: ${generatedData.title || 'New Sunday School Lesson'}`,
+        titleAr: 'تقييم الدرس',
+        instructionsEn: 'Complete the quiz to test your comprehension.',
+        instructionsAr: 'أكمل التقييم لاختبار فهمك لمحتوى الدرس.',
+        status: 'DRAFT' as const,
+        questions: formattedQuiz.map((q, idx) => ({
+          id: `q-${idx + 1}`,
+          type: 'multiple_choice' as const,
+          questionEn: q.question,
+          questionAr: q.question,
+          optionsEn: q.options,
+          optionsAr: q.options,
+          correctIndex: q.correctIndex,
+          explanationEn: '',
+          explanationAr: '',
+          sourceRef: {
+            sectionId: '',
+            sectionTitle: '',
+            sourceId: '',
+            location: ''
+          }
+        }))
+      };
+
+      const result = await createLessonDraft({
+        titleEn: generatedData.title || (lang === 'ar' ? 'درس جديد' : 'New Sunday School Lesson'),
+        titleAr: generatedData.title || (lang === 'ar' ? 'درس جديد' : 'New Sunday School Lesson'),
+        summaryEn: generatedData.summary || '',
+        summaryAr: generatedData.summary || '',
+        quizDraft
+      });
+
+      if (result.error) {
+        alert(lang === 'ar' ? `تعذر حفظ مسودة الدرس: ${result.error.message}` : `Failed to save draft: ${result.error.message}`);
+        return;
+      }
+
+      if (refreshCurriculum) {
+        await refreshCurriculum();
+      }
+
+      alert(lang === 'ar' 
+        ? 'تم إنشاء مسودة الدرس بنجاح بحالة (AI_DRAFT). لن يظهر الدرس للطلاب حتى يتم مراجعته واعتماده رسمياً.' 
+        : 'Lesson draft created safely as AI_DRAFT! It is NOT student-visible until servant review and approval.');
+      setGeneratedData(null);
+      setAiStatus('idle');
+      setActiveTab('lessons');
+      return;
+    }
+
     addLesson({
       title: generatedData.title || (lang === 'ar' ? 'درس جديد' : 'New Sunday School Lesson'),
       summary: generatedData.summary || '',
-      status: 'published',
+      status: 'draft',
       date: new Date().toISOString().split('T')[0],
       pointsAvailable: 150,
       quiz: formattedQuiz.length > 0 ? formattedQuiz : undefined
     });
 
-    alert(lang === 'ar' ? 'تم اعتماد الدرس ونشره بنجاح للطلاب!' : 'Lesson approved and published to students!');
+    alert(lang === 'ar' ? 'تم حفظ مسودة الدرس محلياً!' : 'Lesson draft saved locally!');
     setGeneratedData(null);
     setAiStatus('idle');
     setActiveTab('lessons');
@@ -374,6 +432,12 @@ export function TeacherDashboard({
             onSaveVersion={saveLessonVersion}
             onApproveVersion={(verId, servant, note) => approveLessonVersion(activeLessonId, verId, servant, note)}
             onPublishLesson={() => {
+              if (isOnlineAuth) {
+                alert(lang === 'ar' 
+                  ? 'حماية النشر: سيتم تفعيل نشر المناهج الرسمية في مرحلة الاعتماد (Phase 2B.4).' 
+                  : 'Publication Protection: Official curriculum publication will be activated in Phase 2B.4.');
+                return;
+              }
               const latestApproved = activeVersions.find(v => v.status === 'APPROVED') || activeVersions[activeVersions.length - 1];
               if (latestApproved) {
                 publishLessonVersion(activeLessonId, latestApproved.id);
@@ -526,11 +590,11 @@ export function TeacherDashboard({
               
               <div className="flex gap-3 pt-3 border-t border-gray-100 dark:border-slate-800">
                 <button 
-                  onClick={handlePublishGeneratedLesson}
+                  onClick={handleSaveGeneratedDraft}
                   className="flex-1 bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
                 >
-                  <CheckCircle2 size={16} />
-                  <span>{lang === 'ar' ? 'اعتماد ونشر لصفوف مدارس الأحد' : 'Approve & Publish to Students'}</span>
+                  <FileText size={16} />
+                  <span>{lang === 'ar' ? 'حفظ كمسودة بالذكاء الاصطناعي (AI_DRAFT)' : 'Save as AI Draft (AI_DRAFT)'}</span>
                 </button>
                 <button 
                   className="px-5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-gray-300 font-bold py-3 rounded-xl transition-colors cursor-pointer text-xs sm:text-sm" 
@@ -578,13 +642,21 @@ export function TeacherDashboard({
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-base text-[var(--color-church-blue)] dark:text-white">{lesson.title}</h3>
                     <button
-                      onClick={() => togglePublish(lesson.id)}
+                      onClick={() => {
+                        if (isOnlineAuth) {
+                          alert(lang === 'ar' 
+                            ? 'حماية النشر: لا يمكن تبديل النشر مباشرة للمناهج الإلكترونية. النشر محمي ويتطلب اعتماد رسمي في مرحلة الاعتماد.' 
+                            : 'Publication Protection: Online lessons cannot be published directly. Publication is protected and requires servant review and approval.');
+                          return;
+                        }
+                        togglePublish(lesson.id);
+                      }}
                       className={`text-[10px] px-2 py-0.5 rounded-full font-bold cursor-pointer transition-colors ${
                         lesson.status === 'published' 
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' 
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
                       }`}
-                      title={lang === 'ar' ? 'اضغط لتبديل حالة النشر' : 'Click to toggle publish status'}
+                      title={lang === 'ar' ? 'حالة النشر' : 'Publish status'}
                     >
                       {lesson.status === 'published' 
                         ? (lang === 'ar' ? 'منشور ✅' : 'Published') 
@@ -698,7 +770,12 @@ export function TeacherDashboard({
           lesson={editingLesson}
           isOpen={Boolean(editingLesson)}
           onClose={() => setEditingLesson(null)}
-          onSave={(updates) => updateLesson(editingLesson.id, updates)}
+          onSave={async (updates) => {
+            updateLesson(editingLesson.id, updates);
+            if (isOnlineAuth && refreshCurriculum) {
+              await refreshCurriculum();
+            }
+          }}
           lang={lang}
         />
       )}

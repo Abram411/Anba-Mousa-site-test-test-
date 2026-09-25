@@ -6,6 +6,7 @@ import { playSound } from '../../utils/audio';
 import { useAuth } from '../../context/AuthContext';
 import { useLessons } from '../../context/LessonsContext';
 import { recordLessonProgress } from '../../lib/supabaseDatabase';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import { Language, LessonVersion, LessonSource, StudentContentProgress, StudentQuizAttempt, StudentMastery } from '../../types';
 import { SundaySchoolLessonView } from '../sunday-school/student/SundaySchoolLessonView';
 import { SundaySchoolQuizView } from '../sunday-school/student/SundaySchoolQuizView';
@@ -13,7 +14,7 @@ import { SundaySchoolQuizView } from '../sunday-school/student/SundaySchoolQuizV
 type QuizState = 'intro' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'complete';
 
 export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string, onBack: () => void, lang?: Language }) {
-  const { userData, addPoints } = useAuth();
+  const { userData, isGuest, addPoints } = useAuth();
   const { 
     lessons, 
     markCompleted,
@@ -41,7 +42,66 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
 
   const currentStudentId = userData?.id || 'u1';
   const versions = (lessonVersions && lessonVersions[lessonId]) || [];
-  const latestApprovedVersion = versions.find(v => v.status === 'APPROVED') || versions[versions.length - 1];
+  const isOnlineAuth = Boolean(!isGuest && userData && isSupabaseConfigured);
+
+  // Active Version Rule (Phase 2A.2):
+  // For authenticated online users:
+  // - Authoritative pointer is lessons.active_version_id (lesson.currentVersionId)
+  // - Require version status = 'PUBLISHED'
+  // - NEVER use 'APPROVED' as fallback
+  // - NEVER use array order or versions[versions.length - 1]
+  // - NEVER silently substitute another version
+  // For Demo/Guest/Offline mode:
+  // - Preserve existing fallback logic
+  let activePublishedVersion: LessonVersion | null = null;
+  if (isOnlineAuth) {
+    if (lesson.currentVersionId) {
+      if (lesson.latestVersion && lesson.latestVersion.id === lesson.currentVersionId && lesson.latestVersion.status === 'PUBLISHED') {
+        activePublishedVersion = lesson.latestVersion;
+      } else {
+        activePublishedVersion = versions.find(v => v.id === lesson.currentVersionId && v.status === 'PUBLISHED') || null;
+      }
+    }
+  } else {
+    // Offline / Demo / Guest fallback
+    activePublishedVersion = (lesson.currentVersionId ? versions.find(v => v.id === lesson.currentVersionId) : null) ||
+      lesson.latestVersion ||
+      versions.find(v => v.status === 'APPROVED') ||
+      versions[versions.length - 1] ||
+      null;
+  }
+
+  // If online authenticated user and no active published version is available, present clean informative screen
+  if (isOnlineAuth && !activePublishedVersion) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-amber-50 border border-amber-200 flex items-center justify-center text-2xl text-amber-600 shadow-sm">
+          📜
+        </div>
+        <h2 className="text-xl font-bold text-gray-800">
+          {lang === 'copt' || lang === 'cop'
+            ? 'Ⲙ̀ⲙⲟⲛ ⲟⲩⲥⲃⲱ ⲉⲧϩⲓⲱⲓϣ ⲧⲏⲛⲟⲩ'
+            : lang === 'ar'
+              ? 'لا يوجد إصدار منشور متاح لهذا الدرس حالياً'
+              : 'No active published version available for this lesson'}
+        </h2>
+        <p className="text-xs sm:text-sm text-gray-500 max-w-md leading-relaxed">
+          {lang === 'copt' || lang === 'cop'
+            ? 'Ⲛⲓⲇⲓⲁⲕⲟⲛ ⲥⲉⲥⲟⲃϯ ⲙ̀ⲡⲁⲓⲥⲃⲱ.'
+            : lang === 'ar'
+              ? 'يقوم خدام مدارس الأحد بإعداد ونشر المحتوى المعتمد لمرحلتك الدراسية قريباً.'
+              : 'Sunday School servants are preparing and reviewing the active curriculum for your grade.'}
+        </p>
+        <button
+          onClick={onBack}
+          className="px-5 py-2.5 rounded-xl bg-[var(--color-church-blue)] text-white text-xs sm:text-sm font-bold shadow-sm hover:opacity-95 transition-all cursor-pointer"
+        >
+          {lang === 'copt' || lang === 'cop' ? 'Ⲕⲟⲧⲕ ⲉ̀ⲛⲓⲥⲃⲱ' : lang === 'ar' ? 'الرجوع للدروس' : 'Back to Lessons'}
+        </button>
+      </div>
+    );
+  }
+
   const activeSources = (lessonSources || []).filter(s => s.lessonId === lessonId);
   const userProgressKey = `${currentStudentId}_${lessonId}`;
   const currentProgress = studentProgress ? studentProgress[userProgressKey] : undefined;
@@ -49,12 +109,12 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
   const currentMastery = studentMasteries ? studentMasteries[userProgressKey] : undefined;
 
   // If Sunday School lesson version exists, render rich Sunday School experience
-  if (latestApprovedVersion) {
-    if (isTakingQuiz && latestApprovedVersion.quizDraft) {
+  if (activePublishedVersion) {
+    if (isTakingQuiz && activePublishedVersion.quizDraft) {
       return (
         <div className="px-4 pt-4">
           <SundaySchoolQuizView
-            quiz={latestApprovedVersion.quizDraft}
+            quiz={activePublishedVersion.quizDraft}
             lessonId={lessonId}
             studentId={currentStudentId}
             onBackToLesson={() => setIsTakingQuiz(false)}
@@ -81,12 +141,14 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
       <div className="px-4 pt-4">
         <SundaySchoolLessonView
           lesson={lesson}
-          version={latestApprovedVersion}
+          version={activePublishedVersion}
           sources={activeSources}
           progress={currentProgress}
           quizAttempts={userQuizAttempts}
           mastery={currentMastery}
           onBack={onBack}
+          lang={lang}
+          isOnlineAuth={isOnlineAuth}
           targetSectionId={targetSectionId}
           onMarkSectionRead={(sectionId, totalSections) => {
             const existingSections = currentProgress?.sectionsCompleted || [];
@@ -97,7 +159,7 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
             updateStudentContentProgress(currentStudentId, lessonId, newSections, pct);
           }}
           onCompleteContent={async () => {
-            const allSecIds = latestApprovedVersion.sections.map(s => s.id);
+            const allSecIds = activePublishedVersion.sections.map(s => s.id);
             updateStudentContentProgress(currentStudentId, lessonId, allSecIds, 100);
             markCompleted(lessonId);
             if (userData) {

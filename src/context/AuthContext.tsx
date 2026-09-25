@@ -124,10 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { error } = await updateSupabaseProfile(userData.id, {
           name: updates.fullName,
           avatar: updates.avatarUrl,
-          parent_email: updates.parentEmail,
-          phone: updates.phone,
           grade: updates.grade,
-          parent_pin: updates.parentPin,
           push_notifications_enabled: updates.pushNotificationsEnabled,
           notify_lesson_completion: updates.notifyLessonCompletion,
           notify_event_reminders: updates.notifyEventReminders,
@@ -290,23 +287,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('id', uid)
             .single();
 
+          let cachedAuthUser: any = {};
+          try {
+            const raw = localStorage.getItem('church_auth_user');
+            if (raw) cachedAuthUser = JSON.parse(raw);
+          } catch (e) {}
+
           const loadedUser: User = {
             id: uid,
             fullName: profile?.name || session.user.user_metadata?.full_name || 'User',
             role: (profile?.role as any) || (session.user.user_metadata?.role as any) || 'student',
             avatarUrl: profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`,
-            points: profile?.points ?? 0,
-            currentStreak: profile?.current_streak ?? 0,
-            longestStreak: profile?.longest_streak ?? 0,
-            parentEmail: profile?.parent_email || session.user.email,
-            phone: profile?.phone,
-            grade: profile?.grade,
-            parentPin: profile?.parent_pin,
+            points: profile?.points ?? cachedAuthUser.points ?? 0,
+            currentStreak: profile?.current_streak ?? cachedAuthUser.currentStreak ?? 0,
+            longestStreak: profile?.longest_streak ?? cachedAuthUser.longestStreak ?? 0,
+            parentEmail: cachedAuthUser.parentEmail || profile?.email || session.user.email,
+            phone: cachedAuthUser.phone,
+            grade: profile?.grade || cachedAuthUser.grade,
+            parentPin: cachedAuthUser.parentPin,
             requireRewardApproval: profile?.require_reward_approval ?? true,
             pushNotificationsEnabled: profile?.push_notifications_enabled ?? true,
             notifyLessonCompletion: profile?.notify_lesson_completion ?? true,
             notifyEventReminders: profile?.notify_event_reminders ?? true,
-            screenTimeSeconds: profile?.screen_time_seconds ?? 0,
+            screenTimeSeconds: profile?.screen_time_seconds ?? cachedAuthUser.screenTimeSeconds ?? 0,
           };
           setUserDirectly(loadedUser);
         } else {
@@ -337,23 +340,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('id', uid)
             .single();
 
+          let cachedAuthUser: any = {};
+          try {
+            const raw = localStorage.getItem('church_auth_user');
+            if (raw) cachedAuthUser = JSON.parse(raw);
+          } catch (e) {}
+
           const loadedUser: User = {
             id: uid,
             fullName: profile?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
             role: (profile?.role as any) || (session.user.user_metadata?.role as any) || 'student',
             avatarUrl: profile?.avatar || session.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`,
-            points: profile?.points ?? 0,
-            currentStreak: profile?.current_streak ?? 0,
-            longestStreak: profile?.longest_streak ?? 0,
-            parentEmail: profile?.parent_email || session.user.email,
-            phone: profile?.phone,
-            grade: profile?.grade,
-            parentPin: profile?.parent_pin,
+            points: profile?.points ?? cachedAuthUser.points ?? 0,
+            currentStreak: profile?.current_streak ?? cachedAuthUser.currentStreak ?? 0,
+            longestStreak: profile?.longest_streak ?? cachedAuthUser.longestStreak ?? 0,
+            parentEmail: cachedAuthUser.parentEmail || profile?.email || session.user.email,
+            phone: cachedAuthUser.phone,
+            grade: profile?.grade || cachedAuthUser.grade,
+            parentPin: cachedAuthUser.parentPin,
             requireRewardApproval: profile?.require_reward_approval ?? true,
             pushNotificationsEnabled: profile?.push_notifications_enabled ?? true,
             notifyLessonCompletion: profile?.notify_lesson_completion ?? true,
             notifyEventReminders: profile?.notify_event_reminders ?? true,
-            screenTimeSeconds: profile?.screen_time_seconds ?? 0,
+            screenTimeSeconds: profile?.screen_time_seconds ?? cachedAuthUser.screenTimeSeconds ?? 0,
           };
           setUserDirectly(loadedUser);
         }

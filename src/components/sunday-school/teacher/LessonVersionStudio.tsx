@@ -153,8 +153,14 @@ export const LessonVersionStudio: React.FC<LessonVersionStudioProps> = ({
         })
       });
 
-      if (!response.ok) throw new Error('Regeneration failed');
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => null);
+        throw new Error(errJson?.message || 'Regeneration failed');
+      }
       const data = await response.json();
+      if (data.success === false) {
+        throw new Error(data.message || 'AI section regeneration unavailable');
+      }
 
       const updatedSections = currentVersion.sections.map(sec => {
         if (sec.id === section.id) {

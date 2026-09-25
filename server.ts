@@ -3,8 +3,8 @@ import express from "express";
 import path from "path";
 import multer from "multer";
 import { GoogleGenAI } from "@google/genai";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const PORT = 3000;
@@ -15,8 +15,281 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 app.use(express.json({ limit: '20mb' }));
-// Serve persistent local media uploads
-app.use("/uploads", express.static(uploadsDir));
+
+interface ServerAuthContext {
+  userId: string | null;
+  role: 'student' | 'teacher' | 'admin' | 'parent' | null;
+  isAuthenticated: boolean;
+}
+
+/**
+ * Server-side helper to verify JWT authentication token from Bearer header or query parameter
+ */
+async function verifyServerRequestAuth(req: express.Request): Promise<ServerAuthContext> {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { userId: null, role: null, isAuthenticated: false };
+  }
+
+  let token = "";
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7).trim();
+  } else if (typeof req.query.token === "string" && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return { userId: null, role: null, isAuthenticated: false };
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
+
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user) {
+      return { userId: null, role: null, isAuthenticated: false };
+    }
+
+    const userId = userData.user.id;
+    let role: 'student' | 'teacher' | 'admin' | 'parent' = 'student';
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile?.role) {
+        role = profile.role as any;
+      } else if (userData.user.user_metadata?.role) {
+        role = userData.user.user_metadata.role as any;
+      }
+    } catch {
+      if (userData.user.user_metadata?.role) {
+        role = userData.user.user_metadata.role as any;
+      }
+    }
+
+    return {
+      userId,
+      role,
+      isAuthenticated: true
+    };
+  } catch (err) {
+    console.error("Auth verification error:", err);
+    return { userId: null, role: null, isAuthenticated: false };
+  }
+}
+
+async function checkFileBelongsToPublishedLesson(
+  filename: string,
+  lessonId: string | null | undefined
+): Promise<boolean> {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    if (lessonId) {
+      const { data: lesson } = await client
+        .from('lessons')
+        .select('id, lesson_status, active_version_id')
+        .eq('id', lessonId)
+        .maybeSingle();
+
+      if (lesson && (lesson.lesson_status === 'published' || lesson.active_version_id)) {
+        return true;
+      }
+    }
+
+    const { data: sources } = await client
+      .from('lesson_sources')
+      .select('id, lesson_id, file_url')
+      .ilike('file_url', `%${filename}%`)
+      .limit(5);
+
+    if (sources && sources.length > 0) {
+      for (const src of sources) {
+        if (!src.lesson_id) continue;
+        const { data: lesson } = await client
+          .from('lessons')
+          .select('id, lesson_status, active_version_id')
+          .eq('id', src.lesson_id)
+          .maybeSingle();
+
+        if (lesson && (lesson.lesson_status === 'published' || lesson.active_version_id)) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Published lesson check error:", err);
+  }
+
+  return false;
+}
+
+async function checkTeacherOwnership(
+  filename: string,
+  meta: any,
+  userId: string
+): Promise<boolean> {
+  // 1. Check local metadata
+  if (meta?.uploadedBy && meta.uploadedBy === userId) {
+    return true;
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    const { data: sources } = await client
+      .from('lesson_sources')
+      .select('id, lesson_id, uploaded_by, file_url')
+      .ilike('file_url', `%${filename}%`)
+      .limit(5);
+
+    if (sources && sources.length > 0) {
+      for (const src of sources) {
+        if (src.uploaded_by === userId) {
+          return true;
+        }
+        if (src.lesson_id) {
+          const { data: lesson } = await client
+            .from('lessons')
+            .select('id, created_by')
+            .eq('id', src.lesson_id)
+            .maybeSingle();
+
+          if (lesson && lesson.created_by === userId) {
+            return true;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Teacher ownership check error:", err);
+  }
+
+  return false;
+}
+
+// Protected local media uploads endpoint
+// Replaces insecure open static serving to protect private draft teacher sources
+app.get("/uploads/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const safeFilename = path.basename(filename);
+
+    if (!safeFilename || safeFilename !== filename || safeFilename.includes("..")) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
+
+    const filePath = path.join(uploadsDir, safeFilename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // 1. Intentionally public / sample files (e.g. sample_cross_lesson_handout.pdf)
+    const isSampleFile = safeFilename.startsWith("sample_") || 
+                         safeFilename.startsWith("demo_") || 
+                         safeFilename.startsWith("public_");
+
+    // Offline / Demo fallback: if Supabase is unconfigured, allow local demo viewing
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const isOfflineDemo = !supabaseUrl || !supabaseAnonKey;
+
+    if (isSampleFile || isOfflineDemo) {
+      return res.sendFile(filePath);
+    }
+
+    // Check local metadata
+    const metaPath = path.join(uploadsDir, `.${safeFilename}.meta.json`);
+    let fileMeta: any = null;
+    if (fs.existsSync(metaPath)) {
+      try {
+        fileMeta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+      } catch (e) {
+        console.warn("Failed to parse file metadata:", e);
+      }
+    }
+
+    // If file is explicitly marked public (e.g. community activity feed photos)
+    if (fileMeta?.isPublic === true) {
+      return res.sendFile(filePath);
+    }
+
+    // 2. Authenticate the caller
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || !authContext.userId) {
+      return res.status(401).json({
+        error: "Authentication required to access private curriculum source files"
+      });
+    }
+
+    // 3. Authorization rules:
+    // a) Admins have universal oversight
+    if (authContext.role === "admin") {
+      return res.sendFile(filePath);
+    }
+
+    // b) Check if the source belongs to a published lesson
+    const isPublished = await checkFileBelongsToPublishedLesson(safeFilename, fileMeta?.lessonId);
+    if (isPublished) {
+      return res.sendFile(filePath);
+    }
+
+    // c) If NOT published, it is a private teacher draft:
+    // Students and parents must NEVER access private draft materials
+    if (authContext.role === "student" || authContext.role === "parent") {
+      return res.status(403).json({
+        error: "Access denied: students and parents cannot access private teacher draft materials"
+      });
+    }
+
+    // d) Teachers may only access their own draft sources
+    if (authContext.role === "teacher") {
+      const isOwner = await checkTeacherOwnership(safeFilename, fileMeta, authContext.userId);
+      if (isOwner) {
+        return res.sendFile(filePath);
+      } else {
+        return res.status(403).json({
+          error: "Access denied: teachers cannot access another teacher's private draft source"
+        });
+      }
+    }
+
+    // Default deny
+    return res.status(403).json({ error: "Access denied" });
+  } catch (error: any) {
+    console.error("Error serving uploaded file:", error);
+    res.status(500).json({ error: "Failed to process file request" });
+  }
+});
 
 // Setup multer for file uploads with 150MB limit for church videos, audio hymns, and photos
 const storage = multer.diskStorage({
@@ -32,40 +305,16 @@ const upload = multer({
   limits: { fileSize: 150 * 1024 * 1024 } // 150 MB max per file
 });
 
-/**
- * Helper to initialize S3 or Cloudflare R2 client
- */
-function getCloudStorageClient() {
-  const r2AccountId = process.env.R2_ACCOUNT_ID?.trim();
-  const r2AccessKey = process.env.R2_ACCESS_KEY_ID?.trim();
-  const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
-  const r2Bucket = process.env.R2_BUCKET_NAME?.trim();
-
-  const s3Endpoint = process.env.S3_ENDPOINT?.trim() || (r2AccountId ? `https://${r2AccountId}.r2.cloudflarestorage.com` : undefined);
-  const accessKeyId = r2AccessKey || process.env.S3_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = r2SecretKey || process.env.S3_SECRET_ACCESS_KEY?.trim();
-  const bucketName = r2Bucket || process.env.S3_BUCKET_NAME?.trim();
-  const region = process.env.S3_REGION?.trim() || "auto";
-
-  if (s3Endpoint && accessKeyId && secretAccessKey && bucketName) {
-    const client = new S3Client({
-      region,
-      endpoint: s3Endpoint,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-    });
-    return {
-      client,
-      bucketName,
-      provider: r2AccountId ? 'cloudflare-r2' : 's3-compatible',
-      publicDomain: process.env.R2_PUBLIC_URL?.trim() || process.env.S3_PUBLIC_URL?.trim()
-    };
-  }
-
-  return null;
-}
+// Supabase Public Config endpoint (safely exposes public URL and anon key from server env if set)
+app.get("/api/supabase/config", (_req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+  res.json({
+    configured: Boolean(url && anonKey),
+    url,
+    anonKey
+  });
+});
 
 // ==============================================================================
 // Coptic Sunday School Closed-Source & Teacher-Controlled AI Endpoints
@@ -232,40 +481,10 @@ app.post("/api/church/build-evidence-map", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.json({
-        facts: [
-          {
-            id: "f-1",
-            claimEn: "Queen Helena journeyed to Jerusalem in 326 AD following Emperor Constantine's vision of the Cross.",
-            claimAr: "سافرت الملكة هيلانة إلى أورشليم عام ٣٢٦م بتشجيع وإيمان بعد رؤية قسطنطين للصليب.",
-            sourceId: sources?.[0]?.id || "src-curriculum-pdf-01",
-            sourceName: sources?.[0]?.originalFilename || "Coptic_Sunday_School_Curriculum_Grade5.pdf",
-            sourceLocation: "Page 42, Paragraph 2",
-            verified: true
-          },
-          {
-            id: "f-2",
-            claimEn: "The true Cross was identified when a deceased man was raised to life upon touching it.",
-            claimAr: "تم التعرف على الصليب المحيي الحقيقي عندما أقيم ميت بمجرد لمسه للصليب المقدس.",
-            sourceId: sources?.[1]?.id || "src-presentation-01",
-            sourceName: sources?.[1]?.originalFilename || "Queen_Helena_Classroom_Slides.pptx",
-            sourceLocation: "Slide 5, Bullet 2",
-            verified: true
-          }
-        ],
-        bibleReferences: [
-          {
-            reference: "1 Corinthians 1:18",
-            textEn: "For the message of the cross is foolishness to those who are perishing, but to us who are being saved it is the power of God.",
-            textAr: "فإن كلمة الصليب عند الهالكين جهالة، وأما عندنا نحن المخلصين فهي قوة الله.",
-            sourceId: sources?.[0]?.id || "src-curriculum-pdf-01"
-          }
-        ],
-        teacherExplanations: [
-          "Servant emphasized making the sign of the cross with reverence, thumb and two fingers together confessing the Holy Trinity."
-        ],
-        conflicts: [],
-        unsupportedClaims: []
+      return res.status(503).json({
+        success: false,
+        error: "AI_PROCESSING_UNAVAILABLE",
+        message: "AI evidence mapping requires an active Gemini configuration."
       });
     }
 
@@ -355,7 +574,11 @@ Return valid JSON matching:
     res.json(result);
   } catch (error: any) {
     console.error("Evidence map error:", error);
-    res.status(500).json({ error: "Failed to build evidence map", details: error?.message });
+    res.status(500).json({
+      success: false,
+      error: "AI_PROCESSING_FAILED",
+      message: error?.message || "Failed to build evidence map"
+    });
   }
 });
 
@@ -366,39 +589,10 @@ app.post("/api/church/create-outline", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.json({
-        sections: [
-          {
-            id: "sec-1",
-            order: 1,
-            titleEn: "Queen Helena's Journey to Jerusalem",
-            titleAr: "رحلة الملكة هيلانة إلى أورشليم",
-            titleCop: "Ϯⲟⲩⲏⲣ ⲙ̀ⲙⲏϣ ⲛ̀ⲧⲉ ϯⲟⲩⲣⲱ Ϩⲉⲗⲉⲛⲏ",
-            objectiveEn: "Learn why Queen Helena searched for the Cross and her unwavering faith.",
-            objectiveAr: "معرفة سبب بحث الملكة هيلانة عن الصليب وإيمانها الراسخ.",
-            sourceRefs: [{ sourceId: sources?.[0]?.id || "src-curriculum-pdf-01", sourceName: "Class Curriculum", location: "Page 42" }]
-          },
-          {
-            id: "sec-2",
-            order: 2,
-            titleEn: "Finding the Three Crosses & The Miracle",
-            titleAr: "اكتشاف الصلبان الثلاثة ومعجزة القيامة",
-            titleCop: "Ⲡⲓϫⲓⲛϫⲓⲙⲓ ⲙ̀ⲡⲓⲥⲧⲁⲩⲣⲟⲥ",
-            objectiveEn: "Understand how the life-giving Cross was identified through the resurrection miracle.",
-            objectiveAr: "فهم كيف تميز عود الصليب المحيي بمعجزة إقامة الميت.",
-            sourceRefs: [{ sourceId: sources?.[1]?.id || "src-presentation-01", sourceName: "Classroom Slides", location: "Slide 5" }]
-          },
-          {
-            id: "sec-3",
-            order: 3,
-            titleEn: "The Power of the Cross in Our Daily Life",
-            titleAr: "قوة الصليب في حياتنا اليومية",
-            titleCop: "Ⲡⲓⲥⲧⲁⲩⲣⲟⲥ ϧⲉⲛ ⲡⲉⲛⲱⲛϧ",
-            objectiveEn: "Memorize 1 Corinthians 1:18 and apply the sign of the cross in our daily prayers.",
-            objectiveAr: "حفظ آية (١ كورنثوس ١: ١٨) ورشم الصليب بحب وخشوع كل يوم.",
-            sourceRefs: [{ sourceId: sources?.[0]?.id || "src-curriculum-pdf-01", sourceName: "Class Curriculum", location: "Page 44" }]
-          }
-        ]
+      return res.status(503).json({
+        success: false,
+        error: "AI_PROCESSING_UNAVAILABLE",
+        message: "AI outline creation requires an active Gemini configuration."
       });
     }
 
@@ -458,7 +652,11 @@ Return valid JSON:
     res.json(result);
   } catch (error: any) {
     console.error("Outline error:", error);
-    res.status(500).json({ error: "Failed to create outline", details: error?.message });
+    res.status(500).json({
+      success: false,
+      error: "AI_PROCESSING_FAILED",
+      message: error?.message || "Failed to create outline"
+    });
   }
 });
 
@@ -477,165 +675,10 @@ app.post("/api/church/generate-lesson-pipeline", async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      const fallbackSections = (outline?.sections || []).map((sec: any, idx: number) => ({
-        id: sec.id || `sec-${idx + 1}`,
-        order: sec.order || idx + 1,
-        titleEn: sec.titleEn || `Section ${idx + 1}`,
-        titleAr: sec.titleAr || `القسم ${idx + 1}`,
-        titleCop: sec.titleCop || "",
-        contentEn: `In this section on ${sec.titleEn}, we learn from our church sources the spiritual meaning and ecclesiastical history recorded in the Synaxarium and class curriculum. Queen Helena's search demonstrates faith and diligence.`,
-        contentAr: `في هذا القسم عن ${sec.titleAr}، نتعلم من مصادر كنيستنا المعنى الروحي والتاريخ الكنسي الموثق في السنكسار ومناهج مدارس الأحد. بحث الملكة هيلانة يعلمنا المحبة والاجتهاد والتمسك بالصليب.`,
-        contentCop: "Ⲡⲓⲥⲧⲁⲩⲣⲟⲥ ⲡⲉ ⲧⲉⲛϫⲟⲙ ⲛⲉⲙ ⲡⲉⲛⲟⲩϫⲁⲓ",
-        sourceRefs: sec.sourceRefs || [{ sourceId: sources?.[0]?.id || "src-1", sourceName: "Church Source", location: "Classroom packet" }],
-        teacherNotes: "Grounded in teacher curriculum sources"
-      }));
-
-      return res.json({
-        lessonData: {
-          summaryEn: `Sunday School curriculum draft on ${lessonTitle}. Grounded strictly in servant sources.`,
-          summaryAr: `مسودة درس مدارس الأحد عن ${lessonTitle}. مستندة بالكامل إلى مصادر الخادم الكنسية.`,
-          summaryCop: "Ϯⲥⲃⲱ ⲛ̀ⲧⲉ ϯⲕⲩⲣⲓⲁⲕⲏ",
-          bigIdeaEn: "The Cross is our spiritual power and sign of salvation.",
-          bigIdeaAr: "الصليب هو قوتنا الروحية وعلامة خلاصنا الدائمة.",
-          objectivesEn: [
-            "Learn the historical account of Queen Helena finding the Cross",
-            "Memorize 1 Corinthians 1:18 in English and Arabic",
-            "Understand the life-giving miracle performed by Christ through the Cross"
-          ],
-          objectivesAr: [
-            "معرفة قصة عثور الملكة هيلانة على الصليب وتكريمها له",
-            "حفظ آية (١ كو ١: ١٨) باللغة القبطية والعربية",
-            "فهم معجزة إقامة الميت التي أظهرت الصليب المحيي الحقيقي"
-          ],
-          sections: fallbackSections.length > 0 ? fallbackSections : [
-            {
-              id: "sec-1",
-              order: 1,
-              titleEn: "Queen Helena's Journey to Jerusalem",
-              titleAr: "رحلة الملكة هيلانة إلى أورشليم",
-              titleCop: "Ϯⲟⲩⲏⲣ ⲙ̀ⲙⲏϣ ⲛ̀ⲧⲉ ϯⲟⲩⲣⲱ Ϩⲉⲗⲉⲛⲏ",
-              contentEn: "Queen Helena, the mother of King Constantine, had an ardent desire to discover the holy Cross of our Lord Jesus Christ. In the year 326 AD, she traveled to Jerusalem filled with spiritual devotion.",
-              contentAr: "كانت الملكة هيلانة والدة الملك قسطنطين مشتاقة بشدة للعثور على صليب ربنا يسوع المسيح المحيي. في عام ٣٢٦م سافرت إلى أورشليم ممتلئة بالرجاء والإيمان.",
-              contentCop: "Ϯⲟⲩⲣⲱ Ϩⲉⲗⲉⲛⲏ ⲁⲥⲓ ⲉ̀Ⲓⲗⲏⲙ ϧⲉⲛ ⲟⲩⲛⲁϩϯ",
-              sourceRefs: [{ sourceId: sources?.[0]?.id || "src-1", sourceName: "Class Curriculum", location: "Page 42" }],
-              teacherNotes: "Emphasize her age (about 80 years old) yet filled with youth in spirit."
-            }
-          ],
-          recapEn: "Today we learned how God rewarded Queen Helena's faith and how the Cross brings life and strength.",
-          recapAr: "تعلمنا اليوم كيف كافأ الله إيمان الملكة هيلانة وكيف يمنحنا الصليب حياة وقوة يومية.",
-          flashcards: [
-            {
-              id: "fc-1",
-              frontEn: "Who found the Holy Cross in Jerusalem?",
-              frontAr: "من هي الملكة التي عثرت على الصليب المقدس؟",
-              backEn: "Queen Helena, mother of King Constantine, in 326 AD.",
-              backAr: "الملكة هيلانة أم الملك قسطنطين عام ٣٢٦م."
-            },
-            {
-              id: "fc-2",
-              frontEn: "What is our Memory Verse for this lesson?",
-              frontAr: "ما هي آية الحفظ لهذا الدرس؟",
-              backEn: "1 Corinthians 1:18 - 'For the message of the cross is foolishness to those who are perishing, but to us who are being saved it is the power of God.'",
-              backAr: "١ كورنثوس ١: ١٨ - 'فإن كلمة الصليب عند الهالكين جهالة، وأما عندنا نحن المخلصين فهي قوة الله.'"
-            }
-          ],
-          slides: [
-            {
-              number: 1,
-              titleEn: "Feast of the Holy Cross",
-              titleAr: "عيد الصليب المجيد",
-              bulletsEn: [
-                "Queen Helena journeys to Jerusalem in 326 AD",
-                "Spiritual longing to honor the wood of the Cross",
-                "Faith persevering through difficulties"
-              ],
-              bulletsAr: [
-                "رحلة الملكة هيلانة لأورشليم عام ٣٢٦م",
-                "محبة مقدسة للبحث عن عود الصليب المكرم",
-                "إيمان وصلاة وإصرار حتى نيل البركة"
-              ],
-              speakerNotesEn: "Remind students that genuine faith requires prayer and action.",
-              speakerNotesAr: "تذكير الأولاد بأن الإيمان يحتاج إلى صلاة ومحبة عملية.",
-              sourceRefs: [{ sourceId: sources?.[0]?.id || "src-1", sourceName: "Class Curriculum", location: "Page 42" }]
-            },
-            {
-              number: 2,
-              titleEn: "The Miracle of the True Cross",
-              titleAr: "معجزة التعرف على الصليب المحيي",
-              bulletsEn: [
-                "Three crosses were uncovered on Golgotha",
-                "Macarius, Bishop of Jerusalem, prayed with faith",
-                "A deceased man was restored to life when touched by the true Cross"
-              ],
-              bulletsAr: [
-                "العثور على ثلاثة صلبان في الجلجثة",
-                "الأنبا مكاريوس أسقف أورشليم يصلي بإيمان",
-                "إقامة الميت بملامسة صليب مخلصنا الصالح"
-              ],
-              speakerNotesEn: "Contrast the life-giving Cross of Christ with the other two crosses.",
-              speakerNotesAr: "توضيح الفرق بين صليب الفداء والصلبين الآخرين.",
-              sourceRefs: [{ sourceId: sources?.[1]?.id || "src-2", sourceName: "Classroom Slides", location: "Slide 5" }]
-            }
-          ],
-          quizDraft: {
-            id: `quiz-${Date.now()}`,
-            lessonId: "l-cross-01",
-            titleEn: `Review Assessment: ${lessonTitle}`,
-            titleAr: `تقييم المراجعة: ${lessonTitle}`,
-            instructionsEn: "Test your understanding of the lesson taught in church.",
-            instructionsAr: "اختبر فهمك للدرس المشروح في الكنيسة.",
-            status: "APPROVED",
-            questions: [
-              {
-                id: "q-1",
-                type: "multiple_choice",
-                questionEn: "In what year did Queen Helena journey to Jerusalem to find the Cross?",
-                questionAr: "في أي عام سافرت الملكة هيلانة إلى أورشليم للبحث عن الصليب؟",
-                optionsEn: ["326 AD", "100 AD", "500 AD", "70 AD"],
-                optionsAr: ["٣٢٦ ميلادية", "١٠٠ ميلادية", "٥٠٠ ميلادية", "٧٠ ميلادية"],
-                correctIndex: 0,
-                explanationEn: "Queen Helena traveled to Jerusalem in 326 AD following Emperor Constantine's reign.",
-                explanationAr: "سافرت الملكة هيلانة إلى أورشليم عام ٣٢٦م في عهد ابنها الملك قسطنطين.",
-                sourceRef: {
-                  sectionId: "sec-1",
-                  sectionTitle: "Queen Helena's Journey",
-                  sourceId: sources?.[0]?.id || "src-1",
-                  location: "Page 42"
-                }
-              },
-              {
-                id: "q-2",
-                type: "multiple_choice",
-                questionEn: "How was the true life-giving Cross of Christ distinguished from the other two?",
-                questionAr: "كيف ميزت الكنيسة صليب المسيح المحيي من بين الصلبان الثلاثة؟",
-                optionsEn: [
-                  "A deceased man was brought back to life upon touching it",
-                  "It was made of pure gold",
-                  "It had Constantine's name written on it",
-                  "It was found inside the palace"
-                ],
-                optionsAr: [
-                  "أقيم ميت بمجرد ملامسته للصليب الحقيقي",
-                  "كان مصنوعاً من الذهب الخالص",
-                  "كان مكتوباً عليه اسم قسطنطين",
-                  "وُجد داخل القصر الملكي"
-                ],
-                correctIndex: 0,
-                explanationEn: "God confirmed the life-giving wood of the Cross through the miracle of raising the dead man.",
-                explanationAr: "أكد الله بركة عود الصليب المحيي بمعجزة إقامة الميت التي أظهرت قوة الفداء.",
-                sourceRef: {
-                  sectionId: "sec-2",
-                  sectionTitle: "The Miracle of the True Cross",
-                  sourceId: sources?.[1]?.id || "src-2",
-                  location: "Slide 5"
-                }
-              }
-            ]
-          },
-          narrationScriptEn: `Beloved Sunday school students, in this lesson we contemplate the Feast of the Holy Cross. We learn from our church history how Queen Helena traveled to Jerusalem in 326 AD seeking the cross of our Lord Jesus Christ. May the power of the holy cross be with all of you.`,
-          narrationScriptAr: `يا أحبائي طلاب مدارس الأحد، نحتفل اليوم بعيد الصليب المقدس ونتأمل في محبة وإيمان الملكة البارة هيلانة التي ذهبت إلى أورشليم باحثة عن عود الصليب المحيي. بركة الصليب وقوته تكون معكم دائماً.`
-        },
-        searchAudit: null
+      return res.status(503).json({
+        success: false,
+        error: "AI_PROCESSING_UNAVAILABLE",
+        message: "AI lesson pipeline generation requires an active Gemini configuration."
       });
     }
 
@@ -818,7 +861,11 @@ Return ONLY valid JSON matching this schema:
     });
   } catch (error: any) {
     console.error("Lesson generation pipeline error:", error);
-    res.status(500).json({ error: "Failed to generate lesson pipeline", details: error?.message });
+    res.status(500).json({
+      success: false,
+      error: "AI_PROCESSING_FAILED",
+      message: error?.message || "Failed to generate lesson pipeline"
+    });
   }
 });
 
@@ -829,17 +876,10 @@ app.post("/api/church/regenerate-section", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.json({
-        id: section.id,
-        order: section.order || 1,
-        titleEn: section.titleEn,
-        titleAr: section.titleAr,
-        titleCop: section.titleCop || "",
-        contentEn: `${section.contentEn}\n\n[Servant Revision Note: Corrected to clarify that ${teacherComment}]`,
-        contentAr: `${section.contentAr}\n\n[ملاحظة مراجعة الخادم: تم توضيح وتدقيق النص وفق توجيه الخادم: ${teacherComment}]`,
-        contentCop: section.contentCop || "Ⲡⲓⲥⲧⲁⲩⲣⲟⲥ ⲡⲉ ⲡⲉⲛⲟⲩϫⲁⲓ",
-        sourceRefs: section.sourceRefs || [],
-        teacherNotes: `Addressed servant feedback (${commentType}): "${teacherComment.slice(0, 80)}"`
+      return res.status(503).json({
+        success: false,
+        error: "AI_PROCESSING_UNAVAILABLE",
+        message: "AI section regeneration requires an active Gemini configuration."
       });
     }
 
@@ -903,7 +943,11 @@ Return valid JSON:
     res.json(result);
   } catch (error: any) {
     console.error("Regenerate section error:", error);
-    res.status(500).json({ error: "Failed to regenerate section", details: error?.message });
+    res.status(500).json({
+      success: false,
+      error: "AI_PROCESSING_FAILED",
+      message: error?.message || "Failed to regenerate section"
+    });
   }
 });
 
@@ -971,26 +1015,12 @@ app.post("/api/church/generate-tts", async (req, res) => {
   }
 });
 app.get("/api/storage/status", (_req, res) => {
-  const cloud = getCloudStorageClient();
-  if (cloud) {
-    return res.json({
-      configured: true,
-      provider: cloud.provider,
-      bucket: cloud.bucketName,
-      publicDomain: cloud.publicDomain || 'Standard S3 bucket URL',
-      unlimited: true,
-      notes: cloud.provider === 'cloudflare-r2' 
-        ? 'Connected to Cloudflare R2: Unlimited capacity with 0 egress/bandwidth fees.' 
-        : 'Connected to S3-compatible cloud storage.'
-    });
-  }
-
   res.json({
-    configured: false,
+    configured: true,
     provider: 'local-server',
-    bucket: 'local-disk',
+    bucket: 'uploads',
     unlimited: false,
-    notes: 'Using server uploads directory. For perpetual multi-year storage with no caps and 0 bandwidth fees, configure Cloudflare R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) in .env.'
+    notes: 'Local media uploads directory (/uploads).'
   });
 });
 
@@ -1002,54 +1032,39 @@ app.post("/api/upload-media", upload.single("media"), async (req, res) => {
       return res.status(400).json({ error: "No media file uploaded" });
     }
 
-    const cloud = getCloudStorageClient();
     const isImage = file.mimetype.startsWith("image/");
     const isVideo = file.mimetype.startsWith("video/");
     const isAudio = file.mimetype.startsWith("audio/");
-    const mediaCategory = isImage ? "image" : isVideo ? "video" : isAudio ? "audio" : "file";
 
-    // 1. If Cloudflare R2 or S3 is configured, upload directly to the unlimited bucket
-    if (cloud) {
-      try {
-        const fileStream = fs.readFileSync(file.path);
-        const objectKey = `church-feed/${mediaCategory}s/${Date.now()}_${path.basename(file.filename)}`;
+    // Server Persistence (/uploads/...)
+    // File already safely stored on disk in uploadsDir by multer
+    const authContext = await verifyServerRequestAuth(req);
+    const uploaderId = authContext.userId || (typeof req.body.userId === "string" ? req.body.userId : null);
+    const uploadType = req.body.type || (req.body.isFeed ? "feed" : "source");
+    const lessonId = typeof req.body.lessonId === "string" ? req.body.lessonId : null;
+    const isPublic = uploadType === "feed" || req.body.isPublic === "true" || req.body.isPublic === true;
 
-        await cloud.client.send(new PutObjectCommand({
-          Bucket: cloud.bucketName,
-          Key: objectKey,
-          Body: fileStream,
-          ContentType: file.mimetype,
-          CacheControl: "public, max-age=31536000, immutable"
-        }));
+    // Persist local metadata alongside file for zero-latency, schema-frozen authorization
+    const metaData = {
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedBy: uploaderId || "anonymous",
+      uploaderRole: authContext.role || null,
+      lessonId: lessonId || null,
+      isPublic: Boolean(isPublic),
+      uploadType: uploadType,
+      uploadedAt: new Date().toISOString()
+    };
 
-        // Clean up temporary local upload file
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-
-        // Generate public URL
-        let publicUrl = "";
-        if (cloud.publicDomain) {
-          publicUrl = `${cloud.publicDomain.replace(/\/$/, "")}/${objectKey}`;
-        } else {
-          publicUrl = `https://${cloud.bucketName}.r2.cloudflarestorage.com/${objectKey}`;
-        }
-
-        return res.json({
-          success: true,
-          mediaUrl: publicUrl,
-          mediaType: isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'file',
-          provider: cloud.provider,
-          sizeKb: Math.round(file.size / 1024),
-          originalName: file.originalname
-        });
-      } catch (cloudErr: any) {
-        console.error("Cloud storage upload error, falling back to local server file:", cloudErr);
-      }
+    const metaPath = path.join(uploadsDir, `.${file.filename}.meta.json`);
+    try {
+      fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), "utf-8");
+    } catch (metaErr) {
+      console.warn("Failed to write upload metadata:", metaErr);
     }
 
-    // 2. Default Local Server Persistence (/uploads/...)
-    // File already safely stored on disk in uploadsDir by multer
     const fileUrl = `/uploads/${file.filename}`;
 
     return res.json({

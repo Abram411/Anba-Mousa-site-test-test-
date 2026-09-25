@@ -5,6 +5,7 @@ import { useLessons } from '../../context/LessonsContext';
 import { useAuth } from '../../context/AuthContext';
 import { Lesson, Language } from '../../types';
 import { LessonEditModal } from '../teacher/LessonEditModal';
+import { formatStudentClassDisplay } from '../../lib/classGroups';
 
 interface LessonsTabProps {
   onStartLesson: (id: string) => void;
@@ -14,7 +15,7 @@ interface LessonsTabProps {
 
 export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: LessonsTabProps) {
   const { userData } = useAuth();
-  const { lessons, updateLesson } = useLessons();
+  const { lessons, updateLesson, refreshCurriculum } = useLessons();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'published' | 'drafts'>('all');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -40,7 +41,9 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
     const query = searchQuery.toLowerCase();
     return result.filter(lesson => 
       lesson.title.toLowerCase().includes(query) ||
-      (lesson.summary && lesson.summary.toLowerCase().includes(query))
+      (lesson.titleAr && lesson.titleAr.toLowerCase().includes(query)) ||
+      (lesson.summary && lesson.summary.toLowerCase().includes(query)) ||
+      (lesson.summaryAr && lesson.summaryAr.toLowerCase().includes(query))
     );
   }, [lessons, searchQuery, filterMode, isTeacher]);
 
@@ -146,7 +149,11 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-base md:text-lg text-[var(--color-church-blue)] leading-snug">
-                        {lesson.title}
+                        {lang === 'ar' 
+                          ? (lesson.titleAr || lesson.title) 
+                          : lang === 'copt' || lang === 'cop'
+                            ? (lesson.titleCop || lesson.title)
+                            : lesson.title}
                       </h3>
                       {isTeacher && (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
@@ -155,8 +162,14 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                             : 'bg-amber-100 text-amber-800'
                         }`}>
                           {lesson.status === 'published' 
-                            ? (lang === 'copt' ? 'Ⲉⲧϩⲓⲱⲓϣ ✅' : lang === 'ar' ? 'منشور ✅' : 'Published') 
-                            : (lang === 'copt' ? 'Ϩⲁⲛⲥϧⲁⲓ 📝' : lang === 'ar' ? 'مسودة 📝' : 'Draft')}
+                            ? (lang === 'copt' || lang === 'cop' ? 'Ⲉⲧϩⲓⲱⲓϣ ✅' : lang === 'ar' ? 'منشور ✅' : 'Published') 
+                            : (lang === 'copt' || lang === 'cop' ? 'Ϩⲁⲛⲥϧⲁⲓ 📝' : lang === 'ar' ? 'مسودة 📝' : 'Draft')}
+                        </span>
+                      )}
+                      {lesson.grade && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-900 border border-amber-200/80 flex items-center gap-1">
+                          <span>{formatStudentClassDisplay(lesson.grade, lang).icon}</span>
+                          <span>{formatStudentClassDisplay(lesson.grade, lang).fullDisplay}</span>
                         </span>
                       )}
                     </div>
@@ -166,14 +179,18 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                     <CheckCircle className="text-green-500 shrink-0" size={22} fill="currentColor" stroke="white" />
                   ) : (
                     <div className="bg-[var(--color-church-cream)] text-[var(--color-church-gold)] text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-2xs">
-                      {lesson.pointsAvailable || 150} {lang === 'copt' ? 'ⲧⲁⲓⲟ' : 'pts'}
+                      {lesson.pointsAvailable || 150} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'}
                     </div>
                   )}
                 </div>
                 
                 {/* Summary */}
-                <p className="text-gray-600 text-xs md:text-sm mb-5 flex-1 leading-relaxed line-clamp-3">
-                  {lesson.summary}
+                <p className="text-gray-600 text-xs md:text-sm mb-5 flex-1 leading-relaxed line-clamp-3" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                  {lang === 'ar' 
+                    ? (lesson.summaryAr || lesson.summary) 
+                    : lang === 'copt' || lang === 'cop'
+                      ? (lesson.summaryCop || lesson.summary)
+                      : lesson.summary}
                 </p>
                 
                 {/* Footer Actions */}
@@ -243,7 +260,12 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
           lesson={editingLesson}
           isOpen={Boolean(editingLesson)}
           onClose={() => setEditingLesson(null)}
-          onSave={(updates) => updateLesson(editingLesson.id, updates)}
+          onSave={async (updates) => {
+            updateLesson(editingLesson.id, updates);
+            if (refreshCurriculum) {
+              await refreshCurriculum();
+            }
+          }}
           lang={lang}
         />
       )}

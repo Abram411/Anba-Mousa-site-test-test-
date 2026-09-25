@@ -26,6 +26,23 @@ import {
   mockStudentQuizAttempts, 
   mockStudentMastery 
 } from '../data';
+import { useAuth } from './AuthContext';
+import { 
+  getPublishedLessonsForCurrentUser, 
+  getTeacherLessonVersions,
+  getLessonSourcesForLesson
+} from '../lib/curriculumService';
+import { 
+  getTeacherCurriculumLessons, 
+  updateLessonDraft, 
+  updateLessonSection 
+} from '../lib/lessonAuthoringService';
+import { 
+  addLessonSource, 
+  removeLessonSource, 
+  updateLessonSource 
+} from '../lib/lessonSourceService';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 interface LessonsContextType {
   // Class Sessions
@@ -104,6 +121,11 @@ interface LessonsContextType {
   publishLessonVersion: (lessonId: string, versionId: string) => void;
   updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => void;
   updateStudentMastery: (studentId: string, lessonId: string, status: MasteryStatus, notes?: string) => void;
+
+  // Normalized Curriculum Online Status
+  curriculumLoading?: boolean;
+  curriculumError?: string | null;
+  refreshCurriculum?: () => Promise<void>;
 
   // Global Reset
   resetToDefault: () => void;
@@ -231,6 +253,83 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
   // 11. Search Audit Logs
   const [searchAuditLogs, setSearchAuditLogs] = useState<SearchAuditLog[]>([]);
 
+  // 12. Online Normalized Curriculum State
+  const { userData, isGuest } = useAuth();
+  const [curriculumLoading, setCurriculumLoading] = useState<boolean>(false);
+  const [curriculumError, setCurriculumError] = useState<string | null>(null);
+
+  const loadOnlineCurriculum = React.useCallback(async () => {
+    // Only attempt online fetch if user is authenticated and not in guest/demo mode
+    if (isGuest || !userData || !isSupabaseConfigured || !supabase) {
+      return;
+    }
+
+    setCurriculumLoading(true);
+    setCurriculumError(null);
+
+    try {
+      const isTeacher = userData.role === 'teacher' || userData.role === 'admin';
+      const result = isTeacher 
+        ? await getTeacherCurriculumLessons()
+        : await getPublishedLessonsForCurrentUser();
+
+      if (result.error) {
+        console.error('Online curriculum load error from Supabase:', result.error);
+        setCurriculumError(result.error.message);
+        setCurriculumLoading(false);
+        // Do NOT silently fall back to mock curriculum data for authenticated online users!
+        return;
+      }
+
+      const onlineLessons = result.data || [];
+      setLessons(onlineLessons);
+
+      // Hydrate version map and sources from normalized database
+      const newVersionMap: Record<string, LessonVersion[]> = {};
+      const newSourcesList: LessonSource[] = [];
+
+      for (const l of onlineLessons) {
+        if (isTeacher) {
+          const versionsResult = await getTeacherLessonVersions(l.id);
+          if (versionsResult.data && versionsResult.data.length > 0) {
+            newVersionMap[l.id] = versionsResult.data;
+          } else if (l.latestVersion) {
+            newVersionMap[l.id] = [l.latestVersion];
+          }
+        } else if (l.latestVersion) {
+          // For students/parents: strictly the authoritative active version
+          newVersionMap[l.id] = [l.latestVersion];
+        }
+
+        const srcResult = await getLessonSourcesForLesson(l.id);
+        if (srcResult.data) {
+          newSourcesList.push(...srcResult.data);
+        }
+      }
+
+      setLessonVersions((prev) => ({
+        ...prev,
+        ...newVersionMap,
+      }));
+
+      if (newSourcesList.length > 0) {
+        setSources((prev) => {
+          const existingIds = new Set(newSourcesList.map((s) => s.id));
+          return [...newSourcesList, ...prev.filter((s) => !existingIds.has(s.id))];
+        });
+      }
+    } catch (e: any) {
+      console.error('Failed to load online curriculum:', e);
+      setCurriculumError(e?.message || 'Failed to load online curriculum');
+    } finally {
+      setCurriculumLoading(false);
+    }
+  }, [userData?.id, userData?.role, isGuest]);
+
+  useEffect(() => {
+    loadOnlineCurriculum();
+  }, [loadOnlineCurriculum]);
+
   // LocalStorage sync
   useEffect(() => {
     try {
@@ -297,11 +396,21 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
     setLessons(prev => prev.filter(l => l.id !== id));
   };
 
+  const isOnlineAuth = !isGuest && Boolean(userData) && isSupabaseConfigured;
+
   const togglePublish = (id: string) => {
+    if (isOnlineAuth) {
+      console.warn('Publication protection: direct publishing is prohibited for online curriculum');
+      return;
+    }
     setLessons(prev => prev.map(l => l.id === id ? { ...l, status: l.status === 'published' ? 'draft' : 'published' } : l));
   };
 
   const publishLesson = (id: string) => {
+    if (isOnlineAuth) {
+      console.warn('Publication protection: direct publishing is prohibited for online curriculum');
+      return;
+    }
     setLessons(prev => prev.map(l => l.id === id ? { ...l, status: 'published' } : l));
     // Also update associated class session status
     setClassSessions(prev => prev.map(cs => cs.activeLessonId === id ? { ...cs, status: 'PUBLISHED' } : cs));
@@ -313,21 +422,64 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
 
   // Source Helpers
   const addSource = (sourceData: Omit<LessonSource, 'id' | 'createdAt'>): LessonSource => {
+    const tempId = `src-${Date.now()}`;
     const newSource: LessonSource = {
       ...sourceData,
-      id: `src-${Date.now()}`,
+      id: tempId,
       createdAt: new Date().toISOString()
     };
     setSources(prev => [...prev, newSource]);
+
+    if (isOnlineAuth && sourceData.lessonId) {
+      addLessonSource({
+        lessonId: sourceData.lessonId,
+        sessionId: sourceData.sessionId,
+        type: sourceData.type,
+        originalFilename: sourceData.originalFilename,
+        mimeType: sourceData.mimeType,
+        fileUrl: sourceData.fileUrl,
+        fileSize: sourceData.fileSize,
+        description: sourceData.description,
+        teacherNotes: sourceData.teacherNotes,
+        rightsStatus: sourceData.rightsStatus,
+        processingStatus: sourceData.processingStatus,
+        priority: sourceData.priority,
+        transcript: sourceData.transcript,
+        extractedContent: sourceData.extractedContent,
+        pageCount: sourceData.pageCount,
+        slideCount: sourceData.slideCount,
+        durationSeconds: sourceData.durationSeconds,
+        youtubeId: sourceData.youtubeId
+      }).then((res) => {
+        if (res.data) {
+          setSources(prev => prev.map(s => s.id === tempId ? res.data! : s));
+        } else if (res.error) {
+          console.warn('Note on online source persistence:', res.error.message);
+        }
+      }).catch(err => {
+        console.warn('Error persisting online source:', err);
+      });
+    }
+
     return newSource;
   };
 
   const updateSource = (id: string, updates: Partial<LessonSource>) => {
     setSources(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    if (isOnlineAuth) {
+      updateLessonSource(id, updates as any).catch(err => {
+        console.warn('Note on online source update:', err);
+      });
+    }
   };
 
   const deleteSource = (id: string) => {
     setSources(prev => prev.filter(s => s.id !== id));
+    if (isOnlineAuth) {
+      removeLessonSource(id).catch(err => {
+        console.warn('Note on online source removal:', err);
+      });
+    }
   };
 
   const getLessonSources = (lessonId: string) => {
@@ -362,69 +514,113 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
   // Version Helpers
   const saveLessonVersion = (lessonId: string, version: LessonVersion) => {
     setLessonVersions(prev => {
-      const existing = prev[lessonId] || [];
-      const index = existing.findIndex(v => v.id === version.id);
-      if (index >= 0) {
-        const copy = [...existing];
-        copy[index] = version;
-        return { ...prev, [lessonId]: copy };
-      }
-      return { ...prev, [lessonId]: [...existing, version] };
-    });
+       const existing = prev[lessonId] || [];
+       const index = existing.findIndex(v => v.id === version.id);
+       if (index >= 0) {
+         const copy = [...existing];
+         copy[index] = version;
+         return { ...prev, [lessonId]: copy };
+       }
+       return { ...prev, [lessonId]: [...existing, version] };
+     });
 
-    // Also update the lesson object with latest version reference
-    updateLesson(lessonId, {
-      currentVersionId: version.id,
-      latestVersion: version,
-      versionsCount: (lessonVersions[lessonId]?.length || 0) + 1
-    });
-  };
+    if (isOnlineAuth) {
+      updateLessonDraft(lessonId, {
+        versionId: version.id,
+        summaryEn: version.summaryEn,
+        summaryAr: version.summaryAr,
+        summaryCop: version.summaryCop,
+        bigIdeaEn: version.bigIdeaEn,
+        bigIdeaAr: version.bigIdeaAr,
+        objectivesEn: version.objectivesEn,
+        objectivesAr: version.objectivesAr,
+        recapEn: version.recapEn,
+        recapAr: version.recapAr,
+        narrationScriptEn: version.narrationScriptEn,
+        narrationScriptAr: version.narrationScriptAr,
+        quizDraft: version.quizDraft,
+        slides: version.slides,
+        flashcards: version.flashcards,
+        sections: version.sections?.map(s => ({
+          id: s.id,
+          titleEn: s.titleEn,
+          titleAr: s.titleAr,
+          titleCop: s.titleCop,
+          contentEn: s.contentEn,
+          contentAr: s.contentAr,
+          contentCop: s.contentCop,
+          order: s.order,
+          teacherNotes: s.teacherNotes
+        }))
+      }).catch(err => console.warn('Note on online draft version sync:', err));
+    }
 
-  const approveLessonVersion = (lessonId: string, versionId: string, approvedBy: string, approvalNote?: string) => {
-    setLessonVersions(prev => {
-      const existing = prev[lessonId] || [];
-      const updated = existing.map(v => {
-        if (v.id === versionId) {
-          return {
-            ...v,
-            status: 'APPROVED' as const,
-            approvedBy,
-            approvedAt: new Date().toISOString(),
-            approvalNote: approvalNote || 'Approved by servant.'
-          };
-        }
-        return v;
-      });
-      return { ...prev, [lessonId]: updated };
-    });
+     // Also update the lesson object with latest version reference
+     updateLesson(lessonId, {
+       currentVersionId: version.id,
+       latestVersion: version,
+       versionsCount: (lessonVersions[lessonId]?.length || 0) + 1
+     });
+   };
 
-    // Update lesson metadata
-    updateLesson(lessonId, {
-      approvedServantName: approvedBy,
-      approvedAt: new Date().toISOString()
-    });
+   const approveLessonVersion = (lessonId: string, versionId: string, approvedBy: string, approvalNote?: string) => {
+     setLessonVersions(prev => {
+       const existing = prev[lessonId] || [];
+       const updated = existing.map(v => {
+         if (v.id === versionId) {
+           return {
+             ...v,
+             status: 'APPROVED' as const,
+             approvedBy,
+             approvedAt: new Date().toISOString(),
+             approvalNote: approvalNote || 'Approved by servant.'
+           };
+         }
+         return v;
+       });
+       return { ...prev, [lessonId]: updated };
+     });
 
-    // Update class session
-    setClassSessions(prev => prev.map(cs => cs.activeLessonId === lessonId ? { ...cs, status: 'APPROVED' } : cs));
-  };
+     // Update lesson metadata
+     updateLesson(lessonId, {
+       approvedServantName: approvedBy,
+       approvedAt: new Date().toISOString()
+     });
 
-  const updateSectionInVersion = (lessonId: string, versionId: string, updatedSection: any) => {
-    setLessonVersions(prev => {
-      const existing = prev[lessonId] || [];
-      const updated = existing.map(v => {
-        if (v.id === versionId) {
-          const newSections = v.sections.map(sec => sec.id === updatedSection.id ? updatedSection : sec);
-          return {
-            ...v,
-            sections: newSections,
-            status: 'SERVANT_REVIEW' as const
-          };
-        }
-        return v;
-      });
-      return { ...prev, [lessonId]: updated };
-    });
-  };
+     // Update class session
+     setClassSessions(prev => prev.map(cs => cs.activeLessonId === lessonId ? { ...cs, status: 'APPROVED' } : cs));
+   };
+
+   const updateSectionInVersion = (lessonId: string, versionId: string, updatedSection: any) => {
+     setLessonVersions(prev => {
+       const existing = prev[lessonId] || [];
+       const updated = existing.map(v => {
+         if (v.id === versionId) {
+           const newSections = v.sections.map(sec => sec.id === updatedSection.id ? updatedSection : sec);
+           return {
+             ...v,
+             sections: newSections,
+             status: 'SERVANT_REVIEW' as const
+           };
+         }
+         return v;
+       });
+       return { ...prev, [lessonId]: updated };
+     });
+
+    if (isOnlineAuth && updatedSection.id) {
+      updateLessonSection(updatedSection.id, {
+        titleEn: updatedSection.titleEn,
+        titleAr: updatedSection.titleAr,
+        titleCop: updatedSection.titleCop,
+        contentEn: updatedSection.contentEn,
+        contentAr: updatedSection.contentAr,
+        contentCop: updatedSection.contentCop,
+        order: updatedSection.order,
+        teacherNotes: updatedSection.teacherNotes
+      }).catch(err => console.warn('Note on online section update sync:', err));
+    }
+   };
 
   // Servant Comments Helpers
   const addServantComment = (commentData: Omit<ServantComment, 'id' | 'createdAt'>): ServantComment => {
@@ -635,6 +831,10 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
       saveLessonOutline: saveOutline,
       approveLessonOutline: approveOutline,
       publishLessonVersion: (lessonId: string, _versionId: string) => {
+        if (isOnlineAuth) {
+          console.warn('Publication protection: publishing lesson versions is deferred to Phase 2B.4');
+          return;
+        }
         publishLesson(lessonId);
       },
       updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => {
@@ -655,6 +855,9 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
       updateStudentMastery: (studentId: string, lessonId: string, status: MasteryStatus, notes?: string) => {
         setStudentMastery(studentId, lessonId, status, 'Servant', notes);
       },
+      curriculumLoading,
+      curriculumError,
+      refreshCurriculum: loadOnlineCurriculum,
       resetToDefault
     }}>
       {children}

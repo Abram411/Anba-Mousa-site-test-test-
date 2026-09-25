@@ -10,12 +10,15 @@ import {
   Trash2, 
   Eye, 
   CheckCircle2, 
-  Clock, 
   AlertCircle,
-  FileAudio,
-  BookOpen
+  BookOpen,
+  Link as LinkIcon,
+  Loader2
 } from 'lucide-react';
-import { LessonSource, ClassSession, EvidenceMap, LessonOutline } from '../../../types';
+import { LessonSource, ClassSession, EvidenceMap, LessonOutline, SourceType } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
+import { isSupabaseConfigured } from '../../../lib/supabase';
+import { uploadSourceMedia } from '../../../lib/lessonSourceService';
 
 interface SourceIngestionStudioProps {
   session: ClassSession;
@@ -34,6 +37,10 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
   onViewSource,
   onPipelineComplete
 }) => {
+  const { userData, isGuest } = useAuth();
+  const isOnlineAuth = !isGuest && Boolean(userData) && isSupabaseConfigured;
+  const servantId = (isOnlineAuth && userData?.id) ? userData.id : session.teacherId;
+
   // Voice recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
@@ -44,12 +51,21 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
   const [textNoteTitle, setTextNoteTitle] = useState<string>('');
   const [textNoteContent, setTextNoteContent] = useState<string>('');
 
+  // Web link / external video modal
+  const [showLinkModal, setShowLinkModal] = useState<boolean>(false);
+  const [linkTitle, setLinkTitle] = useState<string>('');
+  const [linkUrl, setLinkUrl] = useState<string>('');
+  const [linkDescription, setLinkDescription] = useState<string>('');
+
+  // Uploading state
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStage, setProcessingStage] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // Voice recording mock / real handler
+  // Voice recording handler
   const startRecording = () => {
     setIsRecording(true);
     setRecordingSeconds(0);
@@ -66,7 +82,7 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
     onAddSource({
       sessionId: session.id,
       lessonId: session.activeLessonId || 'l-cross-01',
-      uploadedBy: session.teacherId,
+      uploadedBy: servantId,
       type: 'TEACHER_VOICE',
       originalFilename: `Teacher_Classroom_Recording_${new Date().toLocaleTimeString().replace(/:/g, '-')}.m4a`,
       mimeType: 'audio/mp4',
@@ -81,27 +97,44 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'PDF' | 'PPTX' | 'IMAGE' | 'TEACHER_VOICE') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: SourceType) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setIsUploading(true);
+    setErrorMsg('');
 
     let sampleContent = '';
     if (type === 'PDF') {
       sampleContent = `[Page 1] Church Curriculum Handout: The Discovery of the Holy Cross. Saint Helena traveled in 326 AD. The true cross was verified by Bishop Macarius through the miraculous resurrection of a young man.`;
     } else if (type === 'PPTX') {
       sampleContent = `[Slide 1] The Feast of the Holy Cross. [Slide 2] Queen Helena and Judas the Guide. [Slide 3] Bishop Macarius & The Miracle. [Slide 4] 1 Cor 1:18 Memory Verse.`;
+    } else if (type === 'DOCX') {
+      sampleContent = `Document excerpt: St. Helena's search for the True Cross in Golgotha under the temple of Venus. Verified by Bishop Macarius.`;
     } else if (type === 'IMAGE') {
       sampleContent = `Coptic Icon of Queen Helena and Constantine holding the Glorious Cross. Traditional Byzantine-Coptic iconography.`;
+    }
+
+    let fileUrl = URL.createObjectURL(file);
+
+    // If online, upload to persistent local server storage (/uploads)
+    if (isOnlineAuth) {
+      const uploadRes = await uploadSourceMedia(file, session.activeLessonId || 'l-cross-01');
+      if (uploadRes.success && uploadRes.fileUrl) {
+        fileUrl = uploadRes.fileUrl;
+      } else if (uploadRes.error) {
+        console.warn('Local media upload notice:', uploadRes.error);
+      }
     }
 
     onAddSource({
       sessionId: session.id,
       lessonId: session.activeLessonId || 'l-cross-01',
-      uploadedBy: session.teacherId,
+      uploadedBy: servantId,
       type,
       originalFilename: file.name,
       mimeType: file.type || 'application/octet-stream',
-      fileUrl: URL.createObjectURL(file),
+      fileUrl,
       fileSize: file.size,
       pageCount: type === 'PDF' ? 3 : undefined,
       slideCount: type === 'PPTX' ? 4 : undefined,
@@ -112,6 +145,7 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
       extractedContent: sampleContent
     });
 
+    setIsUploading(false);
     e.target.value = '';
   };
 
@@ -122,8 +156,8 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
     onAddSource({
       sessionId: session.id,
       lessonId: session.activeLessonId || 'l-cross-01',
-      uploadedBy: session.teacherId,
-      type: 'TEXT_NOTE',
+      uploadedBy: servantId,
+      type: 'TEACHER_TEXT',
       originalFilename: `${textNoteTitle.trim()}.txt`,
       mimeType: 'text/plain',
       fileUrl: '#',
@@ -139,6 +173,35 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
     setTextNoteTitle('');
     setTextNoteContent('');
     setShowTextModal(false);
+  };
+
+  const handleAddLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkUrl.trim()) return;
+
+    const trimmedUrl = linkUrl.trim();
+    const isYoutube = trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be');
+    const type: SourceType = isYoutube ? 'YOUTUBE_VIDEO' : 'OTHER_APPROVED_RESOURCE';
+
+    onAddSource({
+      sessionId: session.id,
+      lessonId: session.activeLessonId || 'l-cross-01',
+      uploadedBy: servantId,
+      type,
+      originalFilename: linkTitle.trim() || trimmedUrl,
+      mimeType: isYoutube ? 'video/youtube' : 'text/html',
+      fileUrl: trimmedUrl,
+      description: linkDescription.trim() || 'Teacher-provided curriculum reference',
+      rightsStatus: 'PERMISSION_PENDING',
+      processingStatus: 'PENDING',
+      priority: 'SUPPLEMENTARY',
+      extractedContent: `Teacher provided external reference: ${trimmedUrl}`
+    });
+
+    setLinkTitle('');
+    setLinkUrl('');
+    setLinkDescription('');
+    setShowLinkModal(false);
   };
 
   // Run AI Source Analysis Pipeline
@@ -173,11 +236,15 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+        const errorJson = await response.json().catch(() => null);
+        throw new Error(errorJson?.message || `Server returned ${response.status}`);
       }
 
       const evidenceData = await response.json();
-      const evidenceMap: EvidenceMap = evidenceData.evidenceMap;
+      if (evidenceData.success === false) {
+        throw new Error(evidenceData.message || 'AI processing unavailable');
+      }
+      const evidenceMap: EvidenceMap = evidenceData.evidenceMap || evidenceData;
 
       // Step 2: Generate Outline based on Evidence Map
       setProcessingStage('Synthesizing structured lesson outline for teacher review...');
@@ -194,16 +261,20 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
       });
 
       if (!outlineRes.ok) {
-        throw new Error('Failed to synthesize outline');
+        const errorJson = await outlineRes.json().catch(() => null);
+        throw new Error(errorJson?.message || 'Failed to synthesize outline');
       }
 
       const outlineData = await outlineRes.json();
-      const outline: LessonOutline = outlineData.outline;
+      if (outlineData.success === false) {
+        throw new Error(outlineData.message || 'AI outline creation unavailable');
+      }
+      const outline: LessonOutline = outlineData.outline || outlineData;
 
       onPipelineComplete(evidenceMap, outline);
     } catch (err: any) {
       console.error('Pipeline error', err);
-      setErrorMsg('AI processing encountered a network error. Using server-grounded fallback.');
+      setErrorMsg(err?.message || 'AI processing requires an active Gemini configuration.');
     } finally {
       setIsProcessing(false);
       setProcessingStage('');
@@ -236,7 +307,7 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
             {isRecording ? (
               <button
                 onClick={stopRecording}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse shadow-lg"
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse shadow-lg cursor-pointer"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />
                 Stop & Save Audio ({formatSeconds(recordingSeconds)})
@@ -244,21 +315,25 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
             ) : (
               <button
                 onClick={startRecording}
-                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
               >
-                <Mic className="w-4 h-4" /> Record Classroom Audio
+                <Mic className="w-4 h-4" /> Record Audio
               </button>
             )}
 
-            {/* PDF Upload */}
+            {/* PDF / DOCX Upload */}
             <label className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer border border-stone-700 transition-colors">
               <FileText className="w-4 h-4 text-red-400" />
-              Upload PDF
+              Upload PDF/DOCX
               <input
                 type="file"
-                accept=".pdf,application/pdf"
+                accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
-                onChange={(e) => handleFileUpload(e, 'PDF')}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  const type: SourceType = f?.name.endsWith('.docx') ? 'DOCX' : 'PDF';
+                  handleFileUpload(e, type);
+                }}
               />
             </label>
 
@@ -286,16 +361,33 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
               />
             </label>
 
+            {/* External Link / Video Button */}
+            <button
+              onClick={() => setShowLinkModal(true)}
+              className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-stone-700 transition-colors cursor-pointer"
+            >
+              <LinkIcon className="w-4 h-4 text-purple-400" />
+              Add Link
+            </button>
+
             {/* Text Note Button */}
             <button
               onClick={() => setShowTextModal(true)}
-              className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-stone-700 transition-colors"
+              className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-stone-700 transition-colors cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-amber-400" />
               Add Notes
             </button>
           </div>
         </div>
+
+        {/* Upload In Progress Indicator */}
+        {isUploading && (
+          <div className="mt-3 p-2.5 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300 flex items-center gap-2 font-medium">
+            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+            <span>Uploading source to server storage (/uploads)...</span>
+          </div>
+        )}
 
         {/* Source Cards List */}
         <div className="mt-4 space-y-3">
@@ -304,15 +396,16 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
               <Upload className="w-10 h-10 text-stone-600 mx-auto mb-2" />
               <p className="text-sm font-semibold text-stone-300">No classroom sources uploaded yet</p>
               <p className="text-xs text-stone-500 max-w-md mx-auto mt-1">
-                Record your voice explanation in church, or upload your curriculum PDF, presentation slides, and notes to begin.
+                Record your voice explanation in church, or upload your curriculum PDF, presentation slides, links, and notes to begin.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sources.map((source) => {
                 const isVoice = source.type === 'TEACHER_VOICE';
-                const isPdf = source.type === 'PDF';
+                const isPdf = source.type === 'PDF' || source.type === 'DOCX';
                 const isSlides = source.type === 'PPTX';
+                const isLink = source.type === 'YOUTUBE_VIDEO' || source.type === 'OTHER_APPROVED_RESOURCE';
 
                 return (
                   <div
@@ -325,11 +418,15 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                             isVoice ? 'bg-amber-950 text-amber-400' :
                             isPdf ? 'bg-red-950 text-red-400' :
-                            isSlides ? 'bg-blue-950 text-blue-400' : 'bg-emerald-950 text-emerald-400'
+                            isSlides ? 'bg-blue-950 text-blue-400' : 
+                            isLink ? 'bg-purple-950 text-purple-400' :
+                            'bg-emerald-950 text-emerald-400'
                           }`}>
                             {isVoice ? <Mic className="w-4 h-4" /> :
                              isPdf ? <FileText className="w-4 h-4" /> :
-                             isSlides ? <Layers className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
+                             isSlides ? <Layers className="w-4 h-4" /> :
+                             isLink ? <LinkIcon className="w-4 h-4" /> :
+                             <ImageIcon className="w-4 h-4" />}
                           </div>
                           <div>
                             <h4 className="text-xs font-bold text-stone-100 truncate max-w-[200px]">
@@ -344,14 +441,14 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => onViewSource(source)}
-                            className="p-1.5 hover:bg-stone-800 text-stone-300 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-stone-800 text-stone-300 rounded-lg transition-colors cursor-pointer"
                             title="Open in Viewer"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => onDeleteSource(source.id)}
-                            className="p-1.5 hover:bg-stone-800 text-red-400 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-stone-800 text-red-400 rounded-lg transition-colors cursor-pointer"
                             title="Remove Source"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -401,7 +498,7 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
           <button
             onClick={runAiPipeline}
             disabled={isProcessing || sources.length === 0}
-            className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+            className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-amber-200" />
             {isProcessing ? 'Processing Teacher Sources...' : 'Analyze Sources & Build Evidence Map'}
@@ -463,15 +560,80 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowTextModal(false)}
-                  className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl font-medium"
+                  className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold shadow-md"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold shadow-md cursor-pointer"
                 >
                   Save Note
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Web Link / Video Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-white mb-1">Add Web Link or Video Reference</h3>
+            <p className="text-xs text-stone-400 mb-4">
+              Attach an external church link or YouTube video reference for this lesson.
+            </p>
+
+            <form onSubmit={handleAddLink} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-stone-300 font-semibold mb-1">Title / Resource Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., Coptic Heritage Cross History Video"
+                  value={linkTitle}
+                  onChange={(e) => setLinkTitle(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-300 font-semibold mb-1">URL / Link</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-300 font-semibold mb-1">Description / Notes</label>
+                <textarea
+                  rows={3}
+                  placeholder="Why this resource is relevant to this Sunday School lesson..."
+                  value={linkDescription}
+                  onChange={(e) => setLinkDescription(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-stone-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkModal(false)}
+                  className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold shadow-md cursor-pointer"
+                >
+                  Add Link
                 </button>
               </div>
             </form>

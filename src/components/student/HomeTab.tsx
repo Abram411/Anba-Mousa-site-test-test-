@@ -5,9 +5,11 @@ import { mockLessons } from '../../data';
 import { BibleVerseCard } from '../shared/BibleVerseCard';
 import { FamilyAltarCard } from './FamilyAltarCard';
 import { useAuth } from '../../context/AuthContext';
+import { useLessons } from '../../context/LessonsContext';
 import { useStage } from '../../context/StageContext';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import { getUserRank } from '../../lib/pointsService';
-import { Language } from '../../types';
+import { Language, Lesson } from '../../types';
 import { CopticCard } from '../design-system/CopticCard';
 import { CopticBadge } from '../design-system/CopticBadge';
 import { CopticButton } from '../design-system/CopticButton';
@@ -20,9 +22,25 @@ interface HomeTabProps {
 }
 
 export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, lang }: HomeTabProps) {
-  const { userData } = useAuth();
+  const { userData, isGuest } = useAuth();
+  const { lessons, curriculumLoading, curriculumError, refreshCurriculum } = useLessons();
   const { currentStage } = useStage();
-  const nextLesson = mockLessons.find(l => !l.isCompleted);
+
+  const isOnlineAuth = Boolean(!isGuest && userData && isSupabaseConfigured);
+
+  // Fallback Rule (Phase 2A.2 correction):
+  // mockLessons are used as fallback ONLY for Demo, Guest, or Offline/local mode.
+  // For an authenticated online user, a Supabase/curriculum failure must NOT silently replace real curriculum with mockLessons.
+  // If the online query fails, preserve the existing curriculumError/loading behavior instead.
+  let nextLesson: Lesson | null = null;
+  if (!isOnlineAuth) {
+    const demoLessons = mockLessons;
+    nextLesson = demoLessons.find(l => !l.isCompleted) || demoLessons[0];
+  } else if (!curriculumLoading && !curriculumError) {
+    const onlineLessons = lessons || [];
+    nextLesson = onlineLessons.find(l => !l.isCompleted) || onlineLessons[0] || null;
+  }
+
   const userRank = userData ? getUserRank(userData.id, userData) : null;
 
   if (!userData) return null;
@@ -233,35 +251,128 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
 
       <div className="md:grid md:grid-cols-2 md:gap-8 space-y-6 md:space-y-0">
         {/* Main Action - Next Lesson */}
-        {nextLesson && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: -10 }} 
-            transition={{ duration: 0.3, delay: 0.25 }} 
-            className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-xl"></div>
-            <div className="absolute -bottom-10 -left-10 text-[var(--color-church-gold)] opacity-10">
-              <Cross size={160} strokeWidth={1} />
+        {isOnlineAuth ? (
+          curriculumLoading ? (
+            <div className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-3 min-h-[220px]">
+              <div className="w-8 h-8 border-3 border-[var(--color-church-gold)] border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs sm:text-sm text-blue-100 font-medium">
+                {lang === 'copt' || lang === 'cop'
+                  ? 'Ⲥⲉⲓⲛⲓ ⲛ̀ⲛⲓⲥⲃⲱ ⲉ̀ⲃⲟⲗ...'
+                  : lang === 'ar'
+                    ? 'جاري تحميل منهج الفصل...'
+                    : 'Loading online curriculum...'}
+              </p>
             </div>
-            
-            <h2 className="text-[var(--color-church-gold-light)] font-bold text-sm md:text-base uppercase tracking-wider mb-2">
-              {lang === 'copt' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'درس النهاردة' : "Today's Lesson"}
-            </h2>
-            <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 leading-tight">{nextLesson.title}</h3>
-            <p className="text-blue-100 mb-6 md:text-lg text-sm line-clamp-2 md:line-clamp-none">{nextLesson.summary}</p>
-            
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onNavigate('lessons', nextLesson.id)}
-              className="w-full bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold py-4 md:py-5 md:text-lg rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm relative z-10 mt-auto cursor-pointer border border-red-700/50"
+          ) : curriculumError ? (
+            <div className="bg-stone-900 border border-red-900/60 text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-3 min-h-[220px]">
+              <div className="text-2xl text-amber-500">⚠️</div>
+              <h3 className="text-base font-bold text-amber-200">
+                {lang === 'copt' || lang === 'cop'
+                  ? 'Ⲡⲓⲥⲱⲣⲉⲙ ϧⲉⲛ ⲡⲓⲱϣ'
+                  : lang === 'ar'
+                    ? 'تعذر تحميل منهج الخدام أونلاين'
+                    : 'Unable to Load Online Curriculum'}
+              </h3>
+              <p className="text-xs text-stone-400 max-w-sm">
+                {curriculumError}
+              </p>
+              {refreshCurriculum && (
+                <button
+                  onClick={() => refreshCurriculum()}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                >
+                  {lang === 'copt' || lang === 'cop' ? 'Ⲟⲩⲁϩⲙⲉϥ' : lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                </button>
+              )}
+            </div>
+          ) : nextLesson ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -10 }} 
+              transition={{ duration: 0.3, delay: 0.25 }} 
+              className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center"
             >
-              <Play size={20} fill="currentColor" />
-              {lang === 'copt' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'ابدأ الدرس' : 'Start Lesson'} (+{nextLesson.pointsAvailable} {lang === 'copt' ? 'ⲧⲁⲓⲟ' : 'pts'})
-            </motion.button>
-          </motion.div>
+              <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-xl"></div>
+              <div className="absolute -bottom-10 -left-10 text-[var(--color-church-gold)] opacity-10">
+                <Cross size={160} strokeWidth={1} />
+              </div>
+              
+              <h2 className="text-[var(--color-church-gold-light)] font-bold text-sm md:text-base uppercase tracking-wider mb-2">
+                {lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'درس النهاردة' : "Today's Lesson"}
+              </h2>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 leading-tight">
+                {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
+              </h3>
+              <p className="text-blue-100 mb-6 md:text-lg text-sm line-clamp-2 md:line-clamp-none" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
+              </p>
+              
+              <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onNavigate('lessons', nextLesson.id)}
+                className="w-full bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold py-4 md:py-5 md:text-lg rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm relative z-10 mt-auto cursor-pointer border border-red-700/50"
+              >
+                <Play size={20} fill="currentColor" />
+                {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'ابدأ الدرس' : 'Start Lesson'} (+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'})
+              </motion.button>
+            </motion.div>
+          ) : (
+            <div className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-2 min-h-[220px]">
+              <BookOpen size={32} className="text-[var(--color-church-gold)]" />
+              <h3 className="text-lg font-bold text-white">
+                {lang === 'copt' || lang === 'cop'
+                  ? 'Ⲙ̀ⲙⲟⲛ ϩⲁⲛⲥⲃⲱ ⲉⲧϩⲓⲱⲓϣ'
+                  : lang === 'ar'
+                    ? 'لا توجد دروس منشورة بعد'
+                    : 'No Published Lessons Yet'}
+              </h3>
+              <p className="text-xs text-blue-200 max-w-xs">
+                {lang === 'copt' || lang === 'cop'
+                  ? 'Ⲛⲓⲇⲓⲁⲕⲟⲛ ⲥⲉⲥⲟⲃϯ ⲛ̀ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ⲡⲉⲕⲧⲁⲝⲓⲥ.'
+                  : lang === 'ar'
+                    ? 'يقوم الخدام بتحضير ونشر الدروس لمرحلتك قريباً.'
+                    : 'Your Sunday School servants will publish lessons for your class soon.'}
+              </p>
+            </div>
+          )
+        ) : (
+          /* Demo / Guest / Offline mode nextLesson */
+          nextLesson && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -10 }} 
+              transition={{ duration: 0.3, delay: 0.25 }} 
+              className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-xl"></div>
+              <div className="absolute -bottom-10 -left-10 text-[var(--color-church-gold)] opacity-10">
+                <Cross size={160} strokeWidth={1} />
+              </div>
+              
+              <h2 className="text-[var(--color-church-gold-light)] font-bold text-sm md:text-base uppercase tracking-wider mb-2">
+                {lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'درس النهاردة' : "Today's Lesson"}
+              </h2>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 leading-tight">
+                {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
+              </h3>
+              <p className="text-blue-100 mb-6 md:text-lg text-sm line-clamp-2 md:line-clamp-none" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
+              </p>
+              
+              <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onNavigate('lessons', nextLesson.id)}
+                className="w-full bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold py-4 md:py-5 md:text-lg rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm relative z-10 mt-auto cursor-pointer border border-red-700/50"
+              >
+                <Play size={20} fill="currentColor" />
+                {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'ابدأ الدرس' : 'Start Lesson'} (+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'})
+              </motion.button>
+            </motion.div>
+          )
         )}
 
         {/* Leaderboard Preview */}

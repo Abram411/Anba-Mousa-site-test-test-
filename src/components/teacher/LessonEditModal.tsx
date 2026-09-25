@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2, Save, CheckCircle, AlertCircle, BookOpen } from 'lucide-react';
-import { Lesson, QuizQuestion, Language } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Trash2, Save, AlertCircle, BookOpen, Lock, Loader2 } from 'lucide-react';
+import { Lesson, QuizQuestion, Language, QuizDraft } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { getEditableLessonVersion, updateLessonDraft } from '../../lib/lessonAuthoringService';
 
 interface LessonEditModalProps {
   lesson: Lesson;
@@ -12,6 +15,9 @@ interface LessonEditModalProps {
 
 export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: LessonEditModalProps) {
   if (!isOpen) return null;
+
+  const { userData, isGuest } = useAuth();
+  const isOnlineAuth = !isGuest && Boolean(userData) && isSupabaseConfigured;
 
   const [title, setTitle] = useState(lesson.title);
   const [summary, setSummary] = useState(lesson.summary);
@@ -32,6 +38,51 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
       }
     ];
   });
+
+  const [editableVersionId, setEditableVersionId] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // For online lessons, fetch the authorized editable draft version
+  useEffect(() => {
+    let isMounted = true;
+    if (isOnlineAuth && lesson.id) {
+      setLoadingDraft(true);
+      setErrorMsg(null);
+      getEditableLessonVersion(lesson.id)
+        .then((res) => {
+          if (!isMounted) return;
+          setLoadingDraft(false);
+          if (res.error) {
+            setErrorMsg(res.error.message);
+          } else if (res.data) {
+            setEditableVersionId(res.data.id);
+            if (res.data.summaryEn) {
+              setSummary(res.data.summaryEn);
+            }
+            if (res.data.quizDraft?.questions && res.data.quizDraft.questions.length > 0) {
+              const adaptedQuestions: QuizQuestion[] = res.data.quizDraft.questions.map((q) => ({
+                question: q.questionEn,
+                options: q.optionsEn,
+                correctIndex: q.correctIndex,
+                type: 'multiple_choice'
+              }));
+              setQuizQuestions(adaptedQuestions);
+            }
+          }
+        })
+        .catch((err) => {
+          if (isMounted) {
+            setLoadingDraft(false);
+            setErrorMsg(err?.message || 'Failed to load editable draft');
+          }
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [lesson.id, isOnlineAuth]);
 
   const handleAddQuestion = () => {
     setQuizQuestions([
@@ -71,12 +122,71 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
     setQuizQuestions(quizQuestions.filter((_, i) => i !== qIndex));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert(lang === 'ar' ? 'يرجى إدخال عنوان الدرس' : 'Please provide a lesson title');
       return;
     }
+
+    // Online authenticated authoring path
+    if (isOnlineAuth) {
+      setSaving(true);
+      setErrorMsg(null);
+
+      const quizDraft: QuizDraft = {
+        id: `quiz-${editableVersionId || lesson.id}`,
+        lessonId: lesson.id,
+        titleEn: `Quiz: ${title}`,
+        titleAr: `تقييم: ${title}`,
+        instructionsEn: 'Complete the quiz to test your comprehension.',
+        instructionsAr: 'أكمل التقييم لاختبار فهمك لمحتوى الدرس.',
+        status: 'DRAFT',
+        questions: quizQuestions.map((q, idx) => ({
+          id: `q-${idx + 1}`,
+          type: 'multiple_choice' as const,
+          questionEn: q.question,
+          questionAr: q.question,
+          optionsEn: q.options,
+          optionsAr: q.options,
+          correctIndex: q.correctIndex,
+          explanationEn: '',
+          explanationAr: '',
+          sourceRef: {
+            sectionId: '',
+            sectionTitle: '',
+            sourceId: '',
+            location: ''
+          }
+        }))
+      };
+
+      const result = await updateLessonDraft(lesson.id, {
+        versionId: editableVersionId || undefined,
+        titleEn: title.trim(),
+        summaryEn: summary.trim(),
+        quizDraft
+      });
+
+      setSaving(false);
+
+      if (result.error) {
+        setErrorMsg(result.error.message);
+        return;
+      }
+
+      // Safe update to parent state without mutating publication fields
+      onSave({
+        title: title.trim(),
+        summary: summary.trim(),
+        quiz: quizQuestions,
+        status: 'draft' // Safe draft status for online curriculum
+      });
+      onClose();
+      return;
+    }
+
+    // Legacy Demo / Guest / Offline mode authoring (untouched)
     onSave({
       title,
       summary,
@@ -102,10 +212,12 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
             </div>
             <div>
               <h3 className="text-lg font-bold text-[var(--color-church-blue)] dark:text-white">
-                {lang === 'ar' ? 'تعديل الدرس وإدارته' : 'Edit & Manage Lesson'}
+                {lang === 'ar' ? 'تعديل مسودة الدرس وإدارتها' : 'Edit & Manage Lesson Draft'}
               </h3>
               <p className="text-xs text-gray-500">
-                {lang === 'ar' ? 'صلاحيات المعلم / خادم مدارس الأحد' : 'Teacher & Servant Privileges'}
+                {isOnlineAuth 
+                  ? (lang === 'ar' ? 'مسودة الإصدار المحمية • تعديل آمن' : 'Versioned Draft Foundation • Safe Authoring')
+                  : (lang === 'ar' ? 'صلاحيات المعلم / خادم مدارس الأحد' : 'Teacher & Servant Privileges')}
               </p>
             </div>
           </div>
@@ -117,12 +229,28 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
           </button>
         </div>
 
+        {/* Loading Draft Indicator */}
+        {loadingDraft && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl text-blue-700 dark:text-blue-300 text-xs flex items-center gap-2 font-medium">
+            <Loader2 size={16} className="animate-spin shrink-0" />
+            <span>{lang === 'ar' ? 'جاري تحميل مسودة الإصدار القابلة للتعديل...' : 'Loading authorized editable draft version...'}</span>
+          </div>
+        )}
+
+        {/* Error notification */}
+        {errorMsg && (
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-300 text-xs flex items-center gap-2 font-bold">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Title & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-                {lang === 'ar' ? 'عنوان الدرس' : 'Lesson Title'}
+                {lang === 'ar' ? 'عنوان الدرس (بيانات المسودة)' : 'Lesson Title (Draft Metadata)'}
               </label>
               <input
                 type="text"
@@ -134,16 +262,28 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-                {lang === 'ar' ? 'حالة النشر' : 'Status'}
+                {lang === 'ar' ? 'حالة النشر' : 'Publication Status'}
               </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full text-sm font-semibold px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-church-gold)] text-gray-900 dark:text-white"
-              >
-                <option value="published">{lang === 'ar' ? 'منشور للطلاب ✅' : 'Published ✅'}</option>
-                <option value="draft">{lang === 'ar' ? 'مسودة قيد الإعداد 📝' : 'Draft 📝'}</option>
-              </select>
+              {isOnlineAuth ? (
+                <div>
+                  <div className="w-full text-xs font-bold px-3 py-2.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                    <Lock size={12} className="shrink-0" />
+                    <span>{lang === 'ar' ? 'مسودة قيد الإعداد 📝' : 'Draft 📝'}</span>
+                  </div>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block mt-1">
+                    {lang === 'ar' ? 'النشر محمي بنظام الاعتماد' : 'Publication protected'}
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="w-full text-sm font-semibold px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-church-gold)] text-gray-900 dark:text-white"
+                >
+                  <option value="published">{lang === 'ar' ? 'منشور للطلاب ✅' : 'Published ✅'}</option>
+                  <option value="draft">{lang === 'ar' ? 'مسودة قيد الإعداد 📝' : 'Draft 📝'}</option>
+                </select>
+              )}
             </div>
           </div>
 
@@ -152,21 +292,35 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
               {lang === 'ar' ? 'النقاط الممنوحة' : 'Points Available'}
             </label>
-            <input
-              type="number"
-              min={10}
-              max={500}
-              step={10}
-              value={pointsAvailable}
-              onChange={(e) => setPointsAvailable(Number(e.target.value))}
-              className="w-36 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-gray-900 dark:text-white"
-            />
+            {isOnlineAuth ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={100}
+                  disabled
+                  className="w-36 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 text-gray-500 cursor-not-allowed"
+                />
+                <span className="text-[11px] text-gray-400 italic">
+                  {lang === 'ar' ? '(محددة بنظام الاعتماد الرسمي)' : '(Governed by publication rules)'}
+                </span>
+              </div>
+            ) : (
+              <input
+                type="number"
+                min={10}
+                max={500}
+                step={10}
+                value={pointsAvailable}
+                onChange={(e) => setPointsAvailable(Number(e.target.value))}
+                className="w-36 text-sm font-semibold px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-gray-900 dark:text-white"
+              />
+            )}
           </div>
 
           {/* Summary */}
           <div>
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-              {lang === 'ar' ? 'ملخص ومحتوى الدرس' : 'Lesson Summary & Content'}
+              {lang === 'ar' ? 'ملخص ومحتوى الإصدار (محتوى الدرس)' : 'Version Summary & Content (Curriculum)'}
             </label>
             <textarea
               rows={3}
@@ -209,7 +363,7 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
                     <button
                       type="button"
                       onClick={() => handleDeleteQuestion(qIdx)}
-                      className="text-red-500 hover:text-red-700 p-1"
+                      className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
                       title={lang === 'ar' ? 'حذف السؤال' : 'Delete Question'}
                     >
                       <Trash2 size={16} />
@@ -251,10 +405,11 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
           <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
             <button
               type="submit"
-              className="flex-1 py-3 px-4 rounded-xl bg-[var(--color-church-blue)] hover:opacity-95 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+              disabled={saving}
+              className="flex-1 py-3 px-4 rounded-xl bg-[var(--color-church-blue)] hover:opacity-95 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              <Save size={16} />
-              <span>{lang === 'ar' ? 'حفظ التعديلات' : 'Save Changes'}</span>
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              <span>{saving ? (lang === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ مسودة الدرس' : 'Save Lesson Draft')}</span>
             </button>
             <button
               type="button"

@@ -16,6 +16,7 @@ import {
 import { ChildProfile, User } from '../../types';
 import { 
   linkChildByCode, 
+  linkChildByCodeAsync,
   extractSecretCodeFromInput,
   sundaySchoolRoster,
   RosterStudent,
@@ -173,7 +174,7 @@ export function AddChildModal({
     }
   };
 
-  const submitLink = (rawInput: string, isFromUrlTab: boolean = false) => {
+  const submitLink = async (rawInput: string, isFromUrlTab: boolean = false) => {
     const code = extractSecretCodeFromInput(rawInput);
     if (!code) {
       const msg = lang === 'ar' ? 'من فضلك أدخل الرمز السري أو رابط الربط' : 'Please enter child secret code or connect link';
@@ -186,8 +187,8 @@ export function AddChildModal({
     if (isFromUrlTab) setLinkError(null);
     else setCodeError(null);
 
-    setTimeout(() => {
-      const res = linkChildByCode(parentId, parentName, parentEmail, code, userData);
+    try {
+      const res = await linkChildByCodeAsync(parentId, parentName, parentEmail, code, userData);
       setIsLinking(false);
 
       if (res.success && res.child) {
@@ -201,7 +202,12 @@ export function AddChildModal({
         if (isFromUrlTab) setLinkError(errorMsg);
         else setCodeError(errorMsg);
       }
-    }, 450);
+    } catch (err: any) {
+      setIsLinking(false);
+      const errorMsg = err?.message || (lang === 'ar' ? 'حدث خطأ أثناء الربط' : 'An error occurred while linking');
+      if (isFromUrlTab) setLinkError(errorMsg);
+      else setCodeError(errorMsg);
+    }
   };
 
   // Called when QR Scanner successfully reads a code

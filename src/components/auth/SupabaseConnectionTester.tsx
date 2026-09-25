@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, CheckCircle2, AlertCircle, RefreshCw, X, ShieldCheck, Key, Globe } from 'lucide-react';
-import { supabaseUrl, supabaseAnonKey, isSupabaseConfigured } from '../../lib/supabase';
+import { supabaseUrl, supabaseAnonKey, isSupabaseConfigured, configureSupabase } from '../../lib/supabase';
 import { testSupabaseConnection } from '../../lib/supabaseAuth';
 import { Language } from '../../types';
 
@@ -59,8 +59,7 @@ export function SupabaseConnectionTester({ lang, onClose }: SupabaseConnectionTe
       alert(lang === 'ar' ? 'يرجى إدخال الرابط والمفتاح' : 'Please enter both URL and Anon Key');
       return;
     }
-    localStorage.setItem('church_supabase_url', inputUrl.trim());
-    localStorage.setItem('church_supabase_key', inputKey.trim());
+    configureSupabase(inputUrl.trim(), inputKey.trim());
     setSaveSuccess(true);
     setTimeout(() => {
       window.location.reload();

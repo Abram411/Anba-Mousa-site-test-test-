@@ -59,6 +59,55 @@ export interface User {
   lastActive?: string;
 }
 
+export interface MultilingualText {
+  en: string;
+  ar: string;
+  cop: string;
+}
+
+export type ClassGroupId = 
+  | 'angels'
+  | 'primary_1'
+  | 'primary_2'
+  | 'preparatory'
+  | 'secondary'
+  | 'university';
+
+export type CanonicalGradeId = 
+  | 'kg_1'
+  | 'kg_2'
+  | 'grade_1'
+  | 'grade_2'
+  | 'grade_3'
+  | 'grade_4'
+  | 'grade_5'
+  | 'grade_6'
+  | 'prep_1'
+  | 'prep_2'
+  | 'prep_3'
+  | 'sec_1'
+  | 'sec_2'
+  | 'sec_3'
+  | 'university';
+
+export interface GradeItem {
+  id: CanonicalGradeId;
+  code: string;
+  classGroupId: ClassGroupId;
+  numericLevel: number;
+  name: MultilingualText;
+  aliases: string[];
+}
+
+export interface ClassGroup {
+  id: ClassGroupId;
+  order: number;
+  name: MultilingualText;
+  description: MultilingualText;
+  grades: GradeItem[];
+  icon: string;
+}
+
 export type LessonStatus = 'draft' | 'published';
 
 export type ClassSessionStatus = 
@@ -427,6 +476,9 @@ export interface Lesson {
   outline?: LessonOutline;
   approvedServantName?: string;
   approvedAt?: string;
+  scriptureVerseEn?: string;
+  scriptureVerseAr?: string;
+  verseReference?: string;
 }
 
 export interface Hymn {

@@ -4,50 +4,70 @@ import { User } from '../types';
 /**
  * Update user profile fields in Supabase using upsert
  */
+/**
+ * Update user profile fields in Supabase.
+ * Strictly sanitizes updates so only valid columns physically present in public.profiles schema are sent.
+ * Excludes parent_email, phone, parent_pin, child_code from database write payloads.
+ */
 export async function updateSupabaseProfile(
   userId: string,
   updates: Partial<{
     name: string;
     avatar: string;
-    parent_email: string;
-    phone: string;
+    role: 'student' | 'teacher' | 'parent' | 'admin';
     grade: string;
-    parent_pin: string;
     points: number;
     current_streak: number;
     longest_streak: number;
     screen_time_seconds: number;
+    parent_id: string | null;
     require_reward_approval: boolean;
     push_notifications_enabled: boolean;
     notify_lesson_completion: boolean;
     notify_event_reminders: boolean;
     last_active: string;
-    child_code: string;
-    parent_id: string;
+    // Local-only / Demo fields accepted for compatibility but filtered out from DB payload:
+    parent_email?: string;
+    phone?: string;
+    parent_pin?: string;
+    child_code?: string;
   }>
 ) {
   if (!supabase) return { error: 'Supabase client not configured' };
 
   try {
-    // Upsert ensures profile exists even if row was not pre-created
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: userId,
-        ...updates,
-        last_active: updates.last_active || new Date().toISOString()
-      }, { onConflict: 'id' });
+    // Whitelist only real schema columns of public.profiles
+    const dbPayload: Record<string, any> = {
+      last_active: updates.last_active || new Date().toISOString()
+    };
 
-    if (error) {
-      // Fallback to update if upsert requires specific constraints
-      const { data: updateData, error: updateError } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId);
-      return { data: updateData, error: updateError };
+    if (updates.name !== undefined) dbPayload.name = updates.name;
+    if (updates.avatar !== undefined) dbPayload.avatar = updates.avatar;
+    if (updates.role !== undefined) dbPayload.role = updates.role;
+    if (updates.grade !== undefined) dbPayload.grade = updates.grade;
+    if (updates.points !== undefined) dbPayload.points = updates.points;
+    if (updates.current_streak !== undefined) dbPayload.current_streak = updates.current_streak;
+    if (updates.longest_streak !== undefined) dbPayload.longest_streak = updates.longest_streak;
+    if (updates.screen_time_seconds !== undefined) dbPayload.screen_time_seconds = updates.screen_time_seconds;
+    if (updates.parent_id !== undefined) dbPayload.parent_id = updates.parent_id;
+    if (updates.require_reward_approval !== undefined) dbPayload.require_reward_approval = updates.require_reward_approval;
+    if (updates.push_notifications_enabled !== undefined) dbPayload.push_notifications_enabled = updates.push_notifications_enabled;
+    if (updates.notify_lesson_completion !== undefined) dbPayload.notify_lesson_completion = updates.notify_lesson_completion;
+    if (updates.notify_event_reminders !== undefined) dbPayload.notify_event_reminders = updates.notify_event_reminders;
+
+    // Use update on profiles by primary key id
+    const { data: updateData, error: updateError } = await supabase
+      .from('profiles')
+      .update(dbPayload)
+      .eq('id', userId)
+      .select();
+
+    if (updateError) {
+      console.warn('Note on Supabase profile update:', updateError.message);
+      return { data: null, error: updateError.message };
     }
 
-    return { data, error: null };
+    return { data: updateData, error: null };
   } catch (err: any) {
     console.warn('Error updating profile in Supabase:', err);
     return { error: err.message };
@@ -210,20 +230,61 @@ export async function fetchLinkedChildrenFromSupabase(parentId: string) {
 }
 
 /**
- * Search student by secret link code in Supabase
+ * Search student by secret link code in Supabase.
+ * Looks up child_code in public.user_relationships, retrieves the child_id,
+ * and fetches the corresponding profile from public.profiles.
+ * Never queries a non-existent child_code column on public.profiles.
  */
 export async function findStudentByLinkCodeInSupabase(cleanCode: string) {
   if (!supabase) return null;
+  const normalized = cleanCode?.trim();
+  if (!normalized) return null;
 
   try {
-    const { data: byCode } = await supabase
-      .from('profiles')
-      .select('*')
-      .or(`child_code.ilike.%${cleanCode}%,id.eq.${cleanCode}`)
-      .single();
+    // 1. Search for child_code in public.user_relationships
+    const { data: relMatch, error: relError } = await supabase
+      .from('user_relationships')
+      .select('child_id, child_code')
+      .ilike('child_code', normalized)
+      .limit(1)
+      .maybeSingle();
 
-    if (byCode) return byCode;
-  } catch (e) {}
+    if (!relError && relMatch?.child_id) {
+      // 2. Retrieve student's profile from public.profiles using child_id
+      const { data: studentProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', relMatch.child_id)
+        .maybeSingle();
+
+      if (studentProfile) return studentProfile;
+    }
+
+    // 3. If input is a direct UUID, check against public.profiles.id
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
+    if (isUuid) {
+      const { data: profileById } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', normalized)
+        .maybeSingle();
+
+      if (profileById) return profileById;
+    }
+
+    // 4. If input is an email, check against public.profiles.email (safe schema column)
+    if (normalized.includes('@')) {
+      const { data: profileByEmail } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', normalized)
+        .maybeSingle();
+
+      if (profileByEmail) return profileByEmail;
+    }
+  } catch (e) {
+    console.warn('Supabase link lookup note:', e);
+  }
 
   return null;
 }
@@ -423,9 +484,7 @@ export function extractEmbedMedia(inputUrl: string): {
 
 /**
  * Long-Term Production Media Upload:
- * 1. Primary: Uploads directly to `/api/upload-media` on the Node.js backend.
- *    - If Cloudflare R2 / S3 is configured, it streams to the unlimited cloud bucket (0 egress fee, no cap, reliable for 10+ years).
- *    - If not configured yet, it stores it safely on the server (/uploads/...) with no artificial 25MB cap.
+ * 1. Primary: Uploads directly to `/api/upload-media` on the Node.js backend (/uploads/...).
  * 2. Fallback: Uses client-side compression and Supabase storage if server endpoint cannot be contacted.
  */
 export async function uploadFeedMediaToSupabase(

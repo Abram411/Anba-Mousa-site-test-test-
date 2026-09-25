@@ -193,17 +193,6 @@ export function ProfileTab({
 
       const result = await updateUserProfile(updates);
 
-      // Explicitly update Supabase profile record
-      if (userData?.id) {
-        await updateSupabaseProfile(userData.id, {
-          name: userName.trim(),
-          avatar: avatar,
-          parent_email: email.trim(),
-          phone: phone.trim(),
-          grade: grade.trim()
-        });
-      }
-
       if (result.success) {
         showToast('success', lang === 'ar' ? 'تم حفظ التعديلات بنجاح في قاعدة البيانات! ✝️' : 'Profile successfully saved to the database! ✝️');
         setTimeout(() => {
@@ -258,7 +247,7 @@ export function ProfileTab({
     if (!userData.parentPin) {
        // If no PIN set, they can set one
        if (parentPinInput.length === 4) {
-          updateSupabaseProfile(userData.id, { parent_pin: parentPinInput } as any);
+          updateUserProfile({ parentPin: parentPinInput });
           setScreen('parental_dashboard');
        }
     } else if (parentPinInput === userData.parentPin) {
@@ -1072,7 +1061,7 @@ export function ProfileTab({
                     <button 
                       onClick={() => {
                         if (newParentPin.length === 4) {
-                           updateSupabaseProfile(userData.id, { parent_pin: newParentPin } as any);
+                           updateUserProfile({ parentPin: newParentPin });
                            alert(lang === 'ar' ? 'تم تحديث كلمة السر' : 'PIN updated successfully');
                            setNewParentPin('');
                         }

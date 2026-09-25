@@ -463,13 +463,11 @@ export function FeedTab({ lang }: { lang: Language }) {
           <button
             onClick={() => setShowStorageModal(true)}
             className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title={lang === 'ar' ? 'سحابة الوسائط الدائمة بدون حد' : 'Long-term unlimited media storage'}
+            title={lang === 'ar' ? 'سحابة الوسائط الكنسية' : 'Church Media Storage'}
           >
             <Database size={13} className="text-emerald-600" />
             <span>
-              {storageStatus?.provider === 'cloudflare-r2' 
-                ? (lang === 'ar' ? 'Cloudflare R2 (سعة غير محدودة)' : 'Cloudflare R2 (No Cap)')
-                : (lang === 'ar' ? 'سحابة الوسائط (بدون حد)' : 'Unlimited Media Cloud')}
+              {lang === 'ar' ? 'مستودع الوسائط الكنسية' : 'Church Media Storage'}
             </span>
           </button>
 
@@ -630,25 +628,25 @@ export function FeedTab({ lang }: { lang: Language }) {
                 className="w-full h-28 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 resize-none outline-none focus:border-[var(--color-church-blue)] transition-colors text-sm text-gray-800 dark:text-white"
               />
 
-              {/* Professional Enterprise Cloud Media Storage Banner */}
+              {/* Church Media Storage Banner */}
               <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-emerald-50/70 border border-blue-100 dark:border-slate-700 dark:from-slate-800 dark:to-slate-850 rounded-2xl text-xs space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold flex items-center gap-1.5 text-[var(--color-church-blue)] dark:text-blue-300">
                     <Database size={15} className="text-blue-600" />
-                    {lang === 'ar' ? 'نظام التخزين السحابي الاحترافي الدائم (Enterprise S3 / R2):' : 'Professional Enterprise Cloud Storage (S3 / R2):'}
+                    {lang === 'ar' ? 'نظام تخزين الوسائط الكنسية:' : 'Church Media Storage System:'}
                   </span>
                   <button 
                     type="button" 
                     onClick={() => setShowStorageModal(true)}
                     className="text-[11px] text-blue-700 dark:text-blue-300 underline font-bold hover:text-blue-900 cursor-pointer"
                   >
-                    {lang === 'ar' ? 'مواصفات النظام وخطة الـ 5 سنوات' : 'Architecture & 5-Year Plan'}
+                    {lang === 'ar' ? 'تفاصيل مستودع الوسائط' : 'Storage Details'}
                   </button>
                 </div>
                 <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-[11px]">
                   {lang === 'ar'
-                    ? 'نظام مخصص للاستخدام طويل الأمد (5 سنوات فما فوق) بدون أي حدود تخزين أو انقطاع، مع دوام حفظ 99.999999999% للصور عالية الدقة، الفيديوهات، والتسجيلات الصوتية.'
-                    : 'Engineered for long-term multi-year operation (5+ years) with zero storage caps, 99.999999999% durability, and direct enterprise CDN streaming for high-res photos, videos, and audio.'}
+                    ? 'نظام تخزين الوسائط الكنسية يدعم الصور عالية الدقة، مقاطع الفيديو، والتسجيلات الصوتية مع الحفاظ على خصوصية الخدمة وسلامتها.'
+                    : 'Church media storage supports high-res photos, video recordings, and hymns with ecclesiastical safety and moderation.'}
                 </p>
               </div>
 
@@ -1260,10 +1258,10 @@ export function FeedTab({ lang }: { lang: Language }) {
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-bold text-[var(--color-church-blue)] dark:text-white">
-                      {lang === 'ar' ? 'هندسة التخزين السحابي الدائم بدون حد أقصى' : 'Long-Term Unlimited Media Cloud Architecture'}
+                      {lang === 'ar' ? 'مستودع الوسائط الكنسية' : 'Church Media Storage System'}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {lang === 'ar' ? 'حل مشكلة قيود Supabase نهائياً للعمل لسنوات قادمة' : 'Permanent solution eliminating Supabase caps for multi-year stability'}
+                      {lang === 'ar' ? 'تخزين الصور، التسجيلات الصوتية، والمقاطع الخاصة بخدمة مدارس الأحد' : 'Storage for photos, audio recordings, and media for Sunday School'}
                     </p>
                   </div>
                 </div>
@@ -1285,13 +1283,11 @@ export function FeedTab({ lang }: { lang: Language }) {
                     <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200 flex items-center gap-1.5">
                       <span>{lang === 'ar' ? 'محرك التخزين النشط حالياً:' : 'Active Storage Backend:'}</span>
                       <span className="px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-100 font-mono text-[11px]">
-                        {storageStatus?.provider === 'cloudflare-r2' ? 'Cloudflare R2 (Cloud S3)' : 'Express Backend (Local Cloud / uploads)'}
+                        {lang === 'ar' ? 'خادم التطبيق الداخلي (مستودع الوسائط الكنسية)' : 'App Server (/uploads)'}
                       </span>
                     </p>
                     <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
-                      {storageStatus?.configured
-                        ? (lang === 'ar' ? 'متصل بسحابة كنسية مخصصة بدون رسوم باندويث' : 'Connected to dedicated cloud storage with $0 egress fees')
-                        : (lang === 'ar' ? 'خادم التطبيق يستقبل الملفات المباشرة حتى 150MB' : 'App server handles direct uploads up to 150MB')}
+                      {lang === 'ar' ? 'خادم التطبيق يستقبل الملفات المباشرة حتى 150MB مع التوافق الكامل مع وسائط Supabase' : 'App server handles direct uploads up to 150MB with full Supabase media compatibility'}
                     </p>
                   </div>
                 </div>
@@ -1300,90 +1296,64 @@ export function FeedTab({ lang }: { lang: Language }) {
                 </span>
               </div>
 
-              {/* 4 Pillars of Professional 5-Year Enterprise Storage */}
+              {/* Features of Church Media Architecture */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {lang === 'ar' ? 'معايير نظام التخزين الاحترافي للـ 5 سنوات القادمة:' : 'Enterprise Media Architecture Standards (5+ Year Longevity):'}
+                  {lang === 'ar' ? 'خصائص نظام وسائط مدارس الأحد:' : 'Sunday School Media System Features:'}
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Pillar 1: Enterprise Object Storage */}
+                  {/* Pillar 1 */}
                   <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 space-y-2">
                     <div className="flex items-center gap-2 text-[var(--color-church-blue)] dark:text-blue-300 font-bold text-xs">
                       <CloudLightning size={16} />
-                      <span>{lang === 'ar' ? '1. استدامة بيانات 99.999999999% (Object Storage)' : '1. 99.999999999% Durability (S3 / R2)'}</span>
+                      <span>{lang === 'ar' ? '1. سلامة وخصوصية المحتوى' : '1. Church Data Privacy'}</span>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                       {lang === 'ar'
-                        ? 'تخزين حقيقي موزع عبر مراكز بيانات متزامنة تلقائياً. لا توجد حدود للتخزين (No Cap)، وتحفظ البيانات لسنوات وعقود دون خوف من تلف الأقراص أو امتلاء المساحة.'
-                        : 'True enterprise object storage replicated across multiple data centers. Unlimited capacity scaling with eleven-9s durability to preserve media for decades.'}
+                        ? 'حفظ وسائط الدروس، الترانيم، وأوراق العمل بصورة آمنة تحت إشراف الخدام مع مراعاة خصوصية الأطفال.'
+                        : 'Secure storage of lesson materials, hymns, and worksheets under servant supervision with child privacy safeguards.'}
                     </p>
                   </div>
 
-                  {/* Pillar 2: Global Edge CDN */}
+                  {/* Pillar 2 */}
                   <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/80 border border-amber-200 dark:border-slate-700 space-y-2">
                     <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-bold text-xs">
                       <Server size={16} />
-                      <span>{lang === 'ar' ? '2. شبكة توزيع عالمية CDN وبث فوري' : '2. Global CDN & Instant Streaming'}</span>
+                      <span>{lang === 'ar' ? '2. دعم مباشر لمختلف الوسائط' : '2. Multi-Format Media Support'}</span>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                       {lang === 'ar'
-                        ? 'يتم توزيع الصور والفيديوهات عبر خوادم CDN فائقة السرعة مع ترويسات تخزين مؤقت ثابتة، مما يتيح تشغيل المقاطع بدون تقطيع مهما زاد عدد المستخدمين.'
-                        : 'Edge-cached globally with immutable cache headers for instantaneous video playback and photo rendering across thousands of devices.'}
+                        ? 'تشغيل سريع وموثوق للصور التوضيحية، تسجيلات الترانيم الصوتية، والملفات التعليمية.'
+                        : 'Fast, reliable playback of illustrations, audio hymns, and Sunday school learning files.'}
                     </p>
                   </div>
 
-                  {/* Pillar 3: Egress & Predictable Costs */}
+                  {/* Pillar 3 */}
                   <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/80 border border-emerald-100 dark:border-slate-700 space-y-2">
                     <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
                       <CheckCircle2 size={16} />
-                      <span>{lang === 'ar' ? '3. صفر رسوم باندويث ($0 Egress Fees)' : '3. Zero Egress Bandwidth Fees'}</span>
+                      <span>{lang === 'ar' ? '3. تكامل مع قاعدة البيانات' : '3. Relational Media Catalog'}</span>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                       {lang === 'ar'
-                        ? 'استخدام بروتوكول Cloudflare R2 يلغي تماماً رسوم تحميل أو مشاهدة الوسائط ($0 Egress). 10GB شهرياً مجانية، وتكلفة 100GB إضافية حوالي 1.5 دولار فقط شهرياً.'
-                        : 'Zero egress fees permanently with Cloudflare R2. First 10GB free every month, then $0.015/GB (~$1.50 per 100GB of high-res video and media).'}
+                        ? 'فهرسة كل أصل مرئي أو صوتي في جدول media_assets وربطه بالأدلة والدروس الكنسية.'
+                        : 'Every visual or audio asset is indexed in media_assets and linked relationally to lessons and evidence.'}
                     </p>
                   </div>
 
-                  {/* Pillar 4: High-Performance Direct Streaming */}
+                  {/* Pillar 4 */}
                   <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/80 border border-amber-100 dark:border-slate-700 space-y-2">
                     <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
                       <Database size={16} />
-                      <span>{lang === 'ar' ? '4. محرك رفع متكامل (صور، فيديو، صوت)' : '4. Direct Multi-Format Pipeline'}</span>
+                      <span>{lang === 'ar' ? '4. محرك رفع متكامل (صور، فيديو، صوت)' : '4. Multi-Format Pipeline'}</span>
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                       {lang === 'ar'
-                        ? 'محرك رفع متكامل يدعم ملفات بحجم حتى 150MB للملف الواحد، مع توليد مفاتيح مشفرة وفهارس في قاعدة البيانات لربط كل وسيط بمنشور صاحبه بشكل دائم.'
-                        : 'Direct upload pipeline supporting files up to 150MB per file with automatic MIME classification, UUID hashing, and permanent database indexing.'}
+                        ? 'محرك رفع متكامل يدعم ملفات بحجم حتى 150MB للملف الواحد مع تصنيف نوع الملف ومعالجته.'
+                        : 'Integrated pipeline supporting files up to 150MB with automatic MIME classification.'}
                     </p>
                   </div>
-                </div>
-              </div>
-
-              {/* How to activate R2 in Environment */}
-              <div className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs space-y-2">
-                <p className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                  <CheckCircle2 size={15} className="text-emerald-600" />
-                  <span>{lang === 'ar' ? 'ربط مفاتيح التخزين السحابي الدائم في .env:' : 'Connect Enterprise Cloud Storage Keys (.env):'}</span>
-                </p>
-                <p className="text-gray-600 dark:text-gray-300 text-[11px] leading-relaxed">
-                  {lang === 'ar'
-                    ? 'الخادم في server.ts مبرمج ومجهز تلقائياً للاتصال بسحابة S3 / R2، فقط أضف المتغيرات التالية في ملف .env أو إعدادات السيرفر:'
-                    : 'The backend in server.ts is fully wired. Simply specify your bucket credentials in .env to stream straight to cloud object storage:'}
-                </p>
-                <div className="p-2.5 rounded-xl bg-gray-900 text-emerald-400 font-mono text-[11px] leading-relaxed overflow-x-auto select-all" dir="ltr">
-                  # Cloudflare R2 (Recommended: $0 bandwidth fees)<br />
-                  R2_ACCOUNT_ID=your_cloudflare_account_id<br />
-                  R2_ACCESS_KEY_ID=your_r2_access_key<br />
-                  R2_SECRET_ACCESS_KEY=your_r2_secret_key<br />
-                  R2_BUCKET_NAME=church-media-bucket<br />
-                  <br />
-                  # OR standard AWS S3 / Google Cloud Storage S3 API<br />
-                  S3_ENDPOINT=https://s3.eu-west-2.amazonaws.com<br />
-                  S3_ACCESS_KEY_ID=your_aws_access_key<br />
-                  S3_SECRET_ACCESS_KEY=your_aws_secret_key<br />
-                  S3_BUCKET_NAME=church-media-bucket
                 </div>
               </div>
 

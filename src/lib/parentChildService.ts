@@ -517,6 +517,82 @@ export function linkChildByCode(
 }
 
 /**
+ * Asynchronously link child by code or link.
+ * First checks local active session, Sunday School roster, and local cache (preserving Demo/Guest Mode).
+ * If not found, checks real Supabase user_relationships and profiles.
+ */
+export async function linkChildByCodeAsync(
+  parentId: string = 'default',
+  parentName: string = 'Parent Guardian',
+  parentEmail: string = 'parent@church.org',
+  inputCodeOrEmail: string,
+  activeStudentUser?: User | null
+): Promise<{ success: boolean; child?: ChildProfile; error?: string }> {
+  // 1. Try local/guest/demo/roster first
+  const localRes = linkChildByCode(parentId, parentName, parentEmail, inputCodeOrEmail, activeStudentUser);
+  if (localRes.success) return localRes;
+
+  const normalized = extractSecretCodeFromInput(inputCodeOrEmail);
+  if (!normalized) return localRes;
+
+  // 2. Query Supabase user_relationships + profiles
+  try {
+    const studentProfile = await findStudentByLinkCodeInSupabase(normalized);
+    if (studentProfile && studentProfile.id) {
+      const currentChildren = getLinkedChildren(parentId, activeStudentUser);
+      const alreadyLinked = currentChildren.find(
+        c => c.id === studentProfile.id || c.studentId === studentProfile.id
+      );
+      if (alreadyLinked) {
+        return { success: false, error: 'هذا التلميذ مرتبط بالفعل بحسابك العائلي / This child is already linked to your account.' };
+      }
+
+      const studentMinutes = Math.round((studentProfile.screen_time_seconds || 0) / 60);
+      const newChild: ChildProfile = {
+        id: studentProfile.id,
+        nameEn: studentProfile.name,
+        nameAr: studentProfile.name,
+        age: 9,
+        gradeEn: studentProfile.grade || '4th Grade',
+        gradeAr: studentProfile.grade || 'الصف الرابع الابتدائي',
+        avatarUrl: studentProfile.avatar || DEFAULT_STUDENT_AVATAR,
+        points: studentProfile.points ?? 0,
+        rank: 3,
+        attendanceRate: 98,
+        screenTimeMinutes: Math.max(15, studentMinutes),
+        completedLessonsCount: 0,
+        totalLessonsCount: 8,
+        verseMemorizedCount: 0,
+        pendingRewardsCount: 0,
+        lessons: mockChildrenProfiles[0]?.lessons?.slice(0, 3) || [],
+        linkCode: normalized,
+        parentId,
+        isRealAccount: true,
+        studentId: studentProfile.id,
+        dailyScreenTimeLimitMinutes: 60,
+        parentBlessingMessage: 'بركة الرب تحفظك وتملأ قلبك حكمة ونوراً!',
+        parentBlessingDate: new Date().toISOString()
+      };
+
+      const updatedList = [newChild, ...currentChildren];
+      saveLinkedChildren(parentId, updatedList);
+      if (parentEmail && parentEmail !== parentId) {
+        saveLinkedChildren(parentEmail, updatedList);
+      }
+
+      await linkParentAndChildInSupabase(parentId, newChild.id, newChild.linkCode);
+      window.dispatchEvent(new CustomEvent('church:parent_linked', { detail: { parentId, parentName, child: newChild } }));
+
+      return { success: true, child: newChild };
+    }
+  } catch (err) {
+    console.warn('Supabase link lookup caught:', err);
+  }
+
+  return localRes;
+}
+
+/**
  * Direct 1-click link from Sunday School roster
  */
 export function linkChildFromRoster(

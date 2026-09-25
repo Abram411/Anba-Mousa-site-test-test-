@@ -23,10 +23,14 @@ import {
   StudentContentProgress, 
   StudentQuizAttempt, 
   StudentMastery,
-  PresentationSlide
+  PresentationSlide,
+  Language
 } from '../../../types';
 import { SundaySchoolAudioPlayer } from '../viewers/SundaySchoolAudioPlayer';
 import { SlideDeckViewer } from '../viewers/SlideDeckViewer';
+import { formatStudentClassDisplay } from '../../../lib/classGroups';
+import { useAuth } from '../../../context/AuthContext';
+import { isSupabaseConfigured } from '../../../lib/supabase';
 
 interface SundaySchoolLessonViewProps {
   lesson: Lesson;
@@ -41,6 +45,8 @@ interface SundaySchoolLessonViewProps {
   onStartQuiz: () => void;
   onOpenSourceViewer?: (source: LessonSource) => void;
   targetSectionId?: string;
+  lang?: Language;
+  isOnlineAuth?: boolean;
 }
 
 export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
@@ -55,18 +61,27 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
   onCompleteContent,
   onStartQuiz,
   onOpenSourceViewer,
-  targetSectionId
+  targetSectionId,
+  lang = 'en' as Language,
+  isOnlineAuth
 }) => {
+  const { userData, isGuest } = useAuth();
+  const effectiveOnlineAuth = isOnlineAuth !== undefined ? isOnlineAuth : Boolean(!isGuest && userData && isSupabaseConfigured);
+
   const [activeAudioMode, setActiveAudioMode] = useState<'TEACHER' | 'AI'>('TEACHER');
   const [showSlidesModal, setShowSlidesModal] = useState<boolean>(false);
   const [activeFlashcardIndex, setActiveFlashcardIndex] = useState<number>(0);
   const [isFlashcardFlipped, setIsFlashcardFlipped] = useState<boolean>(false);
 
   const teacherVoiceSource = sources.find(s => s.type === 'TEACHER_VOICE');
-  const sections = version.sections || [];
+  const rawSections = version.sections || [];
+  // Canonical section ordering according to order_index / order
+  const sections = [...rawSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const completedSections = progress?.sectionsCompleted || [];
   const isContentCompleted = progress?.status === 'COMPLETED' || completedSections.length === sections.length;
   const latestQuizAttempt = quizAttempts[quizAttempts.length - 1];
+
+  const classInfo = formatStudentClassDisplay(lesson.grade, lang);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-16">
@@ -92,8 +107,9 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
       <div className="relative rounded-3xl overflow-hidden border border-amber-800/40 bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40 p-6 sm:p-10 shadow-2xl">
         <div className="relative z-10 space-y-4 max-w-3xl">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
-              {lesson.grade || '4th Grade'} Sunday School
+            <span className="px-3 py-1 rounded-full bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <span>{classInfo.icon}</span>
+              <span>{classInfo.fullDisplay}</span>
             </span>
             <span className="text-xs text-stone-400 flex items-center gap-1">
               <Calendar className="w-3 h-3 text-amber-500" /> {lesson.date}
@@ -101,18 +117,60 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-4xl font-bold text-white font-serif tracking-tight">
-                {version.summaryCop ? `${version.summaryCop} • ` : ''}{lesson.title}
-              </h1>
-            </div>
-            <h2 className="text-lg sm:text-xl font-medium text-amber-400 font-sans mt-1" dir="rtl">
-              {lesson.titleAr || version.summaryAr}
-            </h2>
+            {lang === 'ar' ? (
+              <div>
+                <h1 className="text-2xl sm:text-4xl font-bold text-white font-sans tracking-tight" dir="rtl">
+                  {lesson.titleAr || version.summaryAr || lesson.title}
+                </h1>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-medium text-amber-400 font-serif">
+                    {lesson.title}
+                  </h2>
+                  {(lesson.titleCop || version.summaryCop) && (
+                    <span className="text-xs sm:text-sm text-amber-300 font-serif">
+                      • {lesson.titleCop || version.summaryCop}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : lang === 'copt' || lang === 'cop' ? (
+              <div>
+                <h1 className="text-2xl sm:text-4xl font-bold text-white font-serif tracking-tight">
+                  {(lesson.titleCop || version.summaryCop) ? `${lesson.titleCop || version.summaryCop}` : lesson.title}
+                </h1>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-medium text-amber-400 font-serif">
+                    {lesson.title}
+                  </h2>
+                  {lesson.titleAr && (
+                    <span className="text-xs sm:text-sm text-amber-300 font-sans" dir="rtl">
+                      • {lesson.titleAr}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl sm:text-4xl font-bold text-white font-serif tracking-tight">
+                    {(lesson.titleCop || version.summaryCop) ? `${lesson.titleCop || version.summaryCop} • ` : ''}{lesson.title}
+                  </h1>
+                </div>
+                {lesson.titleAr && (
+                  <h2 className="text-lg sm:text-xl font-medium text-amber-400 font-sans mt-1" dir="rtl">
+                    {lesson.titleAr || version.summaryAr}
+                  </h2>
+                )}
+              </div>
+            )}
           </div>
 
-          <p className="text-sm text-stone-300 font-serif leading-relaxed">
-            {version.bigIdeaEn || lesson.summary}
+          <p className="text-sm text-stone-300 font-serif leading-relaxed" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            {lang === 'ar' 
+              ? (version.bigIdeaAr || lesson.summaryAr || version.bigIdeaEn || lesson.summary)
+              : lang === 'copt' || lang === 'cop'
+                ? (version.summaryCop || version.bigIdeaEn || lesson.summary)
+                : (version.bigIdeaEn || lesson.summary)}
           </p>
 
           {/* Quick Stat Strip: Content Progress vs Quiz Score vs Mastery */}
@@ -250,31 +308,69 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
         </div>
       )}
 
-      {/* Memory Verse Box (1 Cor 1:18) */}
-      <div className="p-6 bg-stone-950 rounded-2xl border-2 border-amber-600/50 shadow-xl text-center space-y-3">
-        <span className="text-xs font-bold uppercase tracking-widest text-amber-500">
-          ✝ Holy Scripture Memory Verse (آية الحفظ)
-        </span>
-        <blockquote className="text-lg sm:text-xl font-bold text-white font-serif italic max-w-2xl mx-auto">
-          "For the message of the cross is foolishness to those who are perishing, but to us who are being saved it is the power of God."
-        </blockquote>
-        <p className="text-base text-amber-400/90 font-sans font-medium" dir="rtl">
-          "فإن كلمة الصليب عند الهالكين جهالة، وأما عندنا نحن المخلصين فهي قوة الله." (١ كورنثوس ١: ١٨)
-        </p>
-        <span className="inline-block text-xs font-semibold text-stone-400 font-mono">
-          1 Corinthians 1:18 • ١ كورنثوس ١: ١٨
-        </span>
-      </div>
+      {/* Memory Verse Box: Normalized curriculum with explicit empty state for online users */}
+      {lesson.scriptureVerseEn || lesson.scriptureVerseAr || lesson.verseReference ? (
+        <div className="p-6 bg-stone-950 rounded-2xl border-2 border-amber-600/50 shadow-xl text-center space-y-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-amber-500">
+            {lang === 'copt' || lang === 'cop' ? '✝ Ⲡⲓⲥϧⲁⲓ ⲉ̀ⲧⲉⲛⲛⲁⲁⲙⲟⲛⲓ ⲙ̀ⲙⲟϥ' : lang === 'ar' ? '✝ آية الحفظ المقررة' : '✝ Holy Scripture Memory Verse'}
+          </span>
+          {lesson.scriptureVerseEn && (
+            <blockquote className="text-lg sm:text-xl font-bold text-white font-serif italic max-w-2xl mx-auto">
+              "{lesson.scriptureVerseEn}"
+            </blockquote>
+          )}
+          {lesson.scriptureVerseAr && (
+            <p className="text-base text-amber-400/90 font-sans font-medium" dir="rtl">
+              "{lesson.scriptureVerseAr}"
+            </p>
+          )}
+          {lesson.verseReference && (
+            <span className="inline-block text-xs font-semibold text-stone-400 font-mono">
+              {lesson.verseReference}
+            </span>
+          )}
+        </div>
+      ) : effectiveOnlineAuth ? (
+        /* Authenticated online normalized curriculum: Explicit empty state, NO hardcoded fallback */
+        <div className="p-6 bg-stone-950 rounded-2xl border border-stone-800 text-center space-y-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-stone-500">
+            {lang === 'copt' || lang === 'cop' ? '✝ Ⲡⲓⲥϧⲁⲓ ⲉ̀ⲧⲉⲛⲛⲁⲁⲙⲟⲛⲓ ⲙ̀ⲙⲟϥ' : lang === 'ar' ? '✝ آية الحفظ' : '✝ Holy Scripture Memory Verse'}
+          </span>
+          <p className="text-xs sm:text-sm text-stone-400 font-serif italic">
+            {lang === 'copt' || lang === 'cop'
+              ? 'Ⲙ̀ⲙⲟⲛ ⲥϧⲁⲓ ⲉ̀ⲧⲟⲩⲧⲏⲓϥ ϧⲉⲛ ⲧⲁⲓⲥⲃⲱ.'
+              : lang === 'ar'
+                ? 'لم يتم تحديد آية حفظ لهذا الدرس.'
+                : 'No Scripture reference provided for this lesson.'}
+          </p>
+        </div>
+      ) : (
+        /* Demo / Guest / legacy-only fallback */
+        <div className="p-6 bg-stone-950 rounded-2xl border-2 border-amber-600/50 shadow-xl text-center space-y-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-amber-500">
+            {lang === 'copt' || lang === 'cop' ? '✝ Ⲡⲓⲥϧⲁⲓ ⲉ̀ⲧⲉⲛⲛⲁⲁⲙⲟⲛⲓ ⲙ̀ⲙⲟϥ' : lang === 'ar' ? '✝ آية الحفظ المقررة' : '✝ Holy Scripture Memory Verse'}
+          </span>
+          <blockquote className="text-lg sm:text-xl font-bold text-white font-serif italic max-w-2xl mx-auto">
+            "For the message of the cross is foolishness to those who are perishing, but to us who are being saved it is the power of God."
+          </blockquote>
+          <p className="text-base text-amber-400/90 font-sans font-medium" dir="rtl">
+            "فإن كلمة الصليب عند الهالكين جهالة، وأما عندنا نحن المخلصين فهي قوة الله." (١ كورنثوس ١: ١٨)
+          </p>
+          <span className="inline-block text-xs font-semibold text-stone-400 font-mono">
+            1 Corinthians 1:18 • ١ كورنثوس ١: ١٨
+          </span>
+        </div>
+      )}
 
       {/* Lesson Sections List with Checkboxes */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
             <BookOpen className="w-4 h-4 text-amber-500" />
-            Lesson Sections & Story Reading
+            {lang === 'copt' || lang === 'cop' ? 'Ⲛⲓⲧⲟⲡⲟⲥ ⲛ̀ⲧⲉ ϯⲥⲃⲱ' : lang === 'ar' ? 'أقسام الدرس والقصة المقررة' : 'Lesson Sections & Story Reading'}
           </h3>
           <span className="text-xs text-stone-400 font-mono">
-            {completedSections.length} of {sections.length} Sections Read
+            {completedSections.length} of {sections.length} {lang === 'copt' || lang === 'cop' ? 'Ⲁⲩⲱϣ' : lang === 'ar' ? 'مقروء' : 'Sections Read'}
           </span>
         </div>
 
@@ -296,42 +392,99 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
                 }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-stone-800 text-amber-400 text-xs font-mono font-bold flex items-center justify-center">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="w-6 h-6 rounded-full bg-stone-800 text-amber-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
                         {idx + 1}
                       </span>
-                      <h4 className="text-base font-bold text-white font-serif">{section.titleEn}</h4>
-                      <span className="text-amber-400 font-serif text-sm font-semibold">{section.titleCop}</span>
+                      {lang === 'ar' ? (
+                        <h4 className="text-base font-bold text-white font-sans" dir="rtl">
+                          {section.titleAr || section.titleEn}
+                        </h4>
+                      ) : lang === 'copt' || lang === 'cop' ? (
+                        <h4 className="text-base font-bold text-white font-serif">
+                          {section.titleCop || section.titleEn}
+                        </h4>
+                      ) : (
+                        <h4 className="text-base font-bold text-white font-serif">
+                          {section.titleEn}
+                        </h4>
+                      )}
+                      {section.titleCop && lang !== 'copt' && lang !== 'cop' && (
+                        <span className="text-amber-400 font-serif text-sm font-semibold">
+                          {section.titleCop}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-amber-300/80 font-sans mt-0.5 ml-8" dir="rtl">{section.titleAr}</p>
+                    {lang !== 'ar' && section.titleAr && (
+                      <p className="text-xs text-amber-300/80 font-sans ml-8" dir="rtl">
+                        {section.titleAr}
+                      </p>
+                    )}
+                    {lang === 'ar' && section.titleEn && section.titleAr !== section.titleEn && (
+                      <p className="text-xs text-stone-400 font-serif mr-8">
+                        {section.titleEn}
+                      </p>
+                    )}
                   </div>
 
                   <button
                     onClick={() => onMarkSectionRead(section.id, sections.length)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
                       isCompleted
                         ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60'
                         : 'bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700'
                     }`}
                   >
                     {isCompleted ? <Check className="w-3.5 h-3.5" /> : null}
-                    {isCompleted ? 'Completed' : 'Mark as Read'}
+                    {isCompleted 
+                      ? (lang === 'copt' || lang === 'cop' ? 'Ⲁⲩϫⲱⲕ' : lang === 'ar' ? 'تمت القراءة' : 'Completed') 
+                      : (lang === 'copt' || lang === 'cop' ? 'Ⲱϣ ⲙ̀ⲡⲁⲓⲧⲟⲡⲟⲥ' : lang === 'ar' ? 'تحديد كمقروء' : 'Mark as Read')}
                   </button>
                 </div>
 
-                <div className="space-y-3 text-sm text-stone-200 font-serif leading-relaxed pl-8">
-                  <p>{section.contentEn}</p>
-                  <p className="text-stone-300 font-sans pt-3 border-t border-stone-800/80 leading-relaxed" dir="rtl">
-                    {section.contentAr}
-                  </p>
+                <div className="space-y-3 text-sm text-stone-200 leading-relaxed pl-8">
+                  {/* Coptic content when available - never fabricate missing Coptic */}
+                  {section.contentCop && (
+                    <div className="p-3 rounded-xl bg-stone-950/60 border border-amber-900/30 text-amber-200 font-serif leading-relaxed">
+                      <span className="text-[10px] text-amber-500 font-bold block mb-1 uppercase tracking-wider">
+                        Ⲙⲉⲑⲣⲉⲙⲛ̀ⲭⲏⲙⲓ (Coptic)
+                      </span>
+                      <p>{section.contentCop}</p>
+                    </div>
+                  )}
+
+                  {lang === 'ar' ? (
+                    <>
+                      <p className="text-stone-100 font-sans leading-relaxed text-base" dir="rtl">
+                        {section.contentAr || section.contentEn}
+                      </p>
+                      {section.contentEn && section.contentAr !== section.contentEn && (
+                        <p className="text-stone-400 font-serif pt-3 border-t border-stone-800/80 leading-relaxed text-xs sm:text-sm">
+                          {section.contentEn}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-serif">{section.contentEn}</p>
+                      {section.contentAr && (
+                        <p className="text-stone-300 font-sans pt-3 border-t border-stone-800/80 leading-relaxed" dir="rtl">
+                          {section.contentAr}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {section.sourceRefs && section.sourceRefs.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-stone-800/60 flex items-center justify-between text-xs text-stone-500 pl-8">
-                    <span className="flex items-center gap-1.5">
-                      <Bookmark className="w-3.5 h-3.5 text-amber-500" />
-                      Classroom Sources: {section.sourceRefs.map(r => `${r.sourceName} (${r.location})`).join(', ')}
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      <Bookmark className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span className="font-medium text-stone-400">
+                        {lang === 'copt' || lang === 'cop' ? 'Ⲛⲓⲡⲏⲅⲏ:' : lang === 'ar' ? 'المصادر الكنسية للفصل:' : 'Classroom Sources:'}
+                      </span>
+                      <span>{section.sourceRefs.map(r => `${r.sourceName} (${r.location})`).join(', ')}</span>
                     </span>
                   </div>
                 )}

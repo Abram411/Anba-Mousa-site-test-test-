@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { LessonSource } from '../../../types';
+import { getAuthorizedSourceUrl } from '../../../lib/lessonSourceService';
 
 interface PdfDocumentViewerProps {
   source: LessonSource;
@@ -29,6 +30,13 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [searchQuery, setSearchQuery] = useState<string>(highlightText || '');
   const [viewMode, setViewMode] = useState<'reading' | 'raw'>('reading');
+  const [downloadUrl, setDownloadUrl] = useState<string>(source.fileUrl || '');
+
+  useEffect(() => {
+    if (source.fileUrl) {
+      getAuthorizedSourceUrl(source.fileUrl).then(setDownloadUrl);
+    }
+  }, [source.fileUrl]);
 
   // Simulated parsed pages from source extracted content
   const pages = [
@@ -299,7 +307,7 @@ Coptic Church Practice:
             Status: <span className="text-emerald-400 font-medium">Verified & Indexed</span>
           </span>
           <a
-            href={source.fileUrl}
+            href={downloadUrl || source.fileUrl}
             download={source.originalFilename}
             className="px-3 py-1.5 bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border border-amber-800/50 rounded-xl flex items-center gap-1.5 transition-colors"
           >
