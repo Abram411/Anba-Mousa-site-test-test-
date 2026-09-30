@@ -515,9 +515,22 @@ export async function uploadFeedMediaToSupabase(
     const formData = new FormData();
     formData.append('media', file);
     formData.append('userId', userId);
+    formData.append('type', 'feed');
+    formData.append('isPublic', 'true');
+
+    const headers: Record<string, string> = {};
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      } catch {}
+    }
 
     const res = await fetch('/api/upload-media', {
       method: 'POST',
+      headers,
       body: formData
     });
 

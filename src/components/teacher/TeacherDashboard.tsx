@@ -429,19 +429,18 @@ export function TeacherDashboard({
             sources={activeSources}
             servantComments={activeCommentsList}
             onApproveOutline={() => approveLessonOutline(activeLessonId)}
+            onSaveOutline={(newOutline) => saveLessonOutline(activeLessonId, newOutline)}
             onSaveVersion={saveLessonVersion}
             onApproveVersion={(verId, servant, note) => approveLessonVersion(activeLessonId, verId, servant, note)}
-            onPublishLesson={() => {
-              if (isOnlineAuth) {
-                alert(lang === 'ar' 
-                  ? 'حماية النشر: سيتم تفعيل نشر المناهج الرسمية في مرحلة الاعتماد (Phase 2B.4).' 
-                  : 'Publication Protection: Official curriculum publication will be activated in Phase 2B.4.');
+            onPublishLesson={async (verId?: string) => {
+              const targetVerId = verId || activeVersions.find(v => v.status === 'APPROVED')?.id;
+              if (!targetVerId) {
+                alert(lang === 'ar' ? 'لا توجد نسخة معتمدة جاهزة للنشر' : 'No approved version found to publish.');
                 return;
               }
-              const latestApproved = activeVersions.find(v => v.status === 'APPROVED') || activeVersions[activeVersions.length - 1];
-              if (latestApproved) {
-                publishLessonVersion(activeLessonId, latestApproved.id);
-                alert(lang === 'ar' ? 'تم نشر الدرس بنجاح لجميع طلاب مدارس الأحد!' : 'Lesson officially published to Sunday School students!');
+              const result = await publishLessonVersion(activeLessonId, targetVerId);
+              if (result && !result.success) {
+                alert(result.error || 'Failed to publish lesson version.');
               }
             }}
             onAddComment={addServantComment}

@@ -42,6 +42,27 @@ import {
   removeLessonSource, 
   updateLessonSource 
 } from '../lib/lessonSourceService';
+import { 
+  saveEvidenceMap as saveEvidenceMapService, 
+  getEvidenceMap 
+} from '../lib/evidenceMapService';
+import { 
+  saveLessonOutline as saveLessonOutlineService, 
+  getLessonOutline, 
+  saveLessonDraft as saveLessonDraftService 
+} from '../lib/lessonGenerationService';
+import {
+  submitVersionForReview as submitVersionForReviewService,
+  requestRevision as requestRevisionService,
+  approveLessonVersion as approveLessonVersionService
+} from '../lib/lessonReviewService';
+import {
+  publishLessonVersion as publishLessonVersionService
+} from '../lib/lessonPublishingService';
+import {
+  updateClaimVerification as updateClaimVerificationService,
+  resolveSourceConflict as resolveSourceConflictService
+} from '../lib/evidenceMapService';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 interface LessonsContextType {
@@ -80,8 +101,12 @@ interface LessonsContextType {
   // Versions
   lessonVersions: Record<string, LessonVersion[]>;
   saveLessonVersion: (lessonId: string, version: LessonVersion) => void;
+  submitVersionForReview: (lessonId: string, versionId: string, notes?: string) => Promise<void>;
+  requestVersionRevision: (lessonId: string, versionId: string, feedback: string) => Promise<void>;
   approveLessonVersion: (lessonId: string, versionId: string, approvedBy: string, approvalNote?: string) => void;
   updateSectionInVersion: (lessonId: string, versionId: string, updatedSection: any) => void;
+  updateClaimVerification: (lessonId: string, claimId: string, isVerified: boolean, reviewStatus?: any, note?: string) => Promise<void>;
+  resolveSourceConflict: (lessonId: string, conflictId: string, resolutionNote: string) => Promise<void>;
 
   // Servant Comments
   servantComments: Record<string, ServantComment[]>;
@@ -118,7 +143,7 @@ interface LessonsContextType {
   deleteLessonSource: (id: string) => void;
   saveLessonOutline: (lessonId: string, outline: LessonOutline) => void;
   approveLessonOutline: (lessonId: string) => void;
-  publishLessonVersion: (lessonId: string, versionId: string) => void;
+  publishLessonVersion: (lessonId: string, versionId: string) => Promise<{ success: boolean; error?: string }> | void;
   updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => void;
   updateStudentMastery: (studentId: string, lessonId: string, status: MasteryStatus, notes?: string) => void;
 
@@ -305,6 +330,23 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
         if (srcResult.data) {
           newSourcesList.push(...srcResult.data);
         }
+
+        if (isTeacher) {
+          const eMapRes = await getEvidenceMap(l.id);
+          if (eMapRes.data) {
+            setEvidenceMaps(prev => ({
+              ...prev,
+              [l.id]: eMapRes.data!
+            }));
+          }
+          const outRes = await getLessonOutline(l.id);
+          if (outRes.data) {
+            setOutlines(prev => ({
+              ...prev,
+              [l.id]: outRes.data!
+            }));
+          }
+        }
       }
 
       setLessonVersions((prev) => ({
@@ -489,24 +531,58 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
   // Evidence Map Helpers
   const saveEvidenceMap = (lessonId: string, map: EvidenceMap) => {
     setEvidenceMaps(prev => ({ ...prev, [lessonId]: map }));
+    if (isOnlineAuth) {
+      saveEvidenceMapService({
+        lessonId,
+        versionId: map.lessonVersionId,
+        evidenceMap: map
+      }).then(res => {
+        if (res.data) {
+          setEvidenceMaps(prev => ({ ...prev, [lessonId]: res.data! }));
+        } else if (res.error) {
+          console.warn('Note on online evidence map persistence:', res.error.message);
+        }
+      }).catch(err => {
+        console.warn('Error persisting online evidence map:', err);
+      });
+    }
   };
 
   // Outline Helpers
   const saveOutline = (lessonId: string, outline: LessonOutline) => {
     setOutlines(prev => ({ ...prev, [lessonId]: outline }));
+    if (isOnlineAuth && outline.draftVersionId) {
+      saveLessonOutlineService({
+        lessonId,
+        draftVersionId: outline.draftVersionId,
+        outline
+      }).catch(err => {
+        console.warn('Note on online outline persistence:', err);
+      });
+    }
   };
 
   const approveOutline = (lessonId: string) => {
     setOutlines(prev => {
       const existing = prev[lessonId];
       if (!existing) return prev;
+      const updated = {
+        ...existing,
+        isApprovedByTeacher: true,
+        approvedAt: new Date().toISOString()
+      };
+      if (isOnlineAuth && updated.draftVersionId) {
+        saveLessonOutlineService({
+          lessonId,
+          draftVersionId: updated.draftVersionId,
+          outline: updated
+        }).catch(err => {
+          console.warn('Note on online outline approval persistence:', err);
+        });
+      }
       return {
         ...prev,
-        [lessonId]: {
-          ...existing,
-          isApprovedByTeacher: true,
-          approvedAt: new Date().toISOString()
-        }
+        [lessonId]: updated
       };
     });
   };
@@ -525,6 +601,13 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
      });
 
     if (isOnlineAuth) {
+      saveLessonDraftService({
+        lessonId,
+        draftVersionId: version.id,
+        version
+      }).catch(err => {
+        console.warn('Note on online lesson draft persistence:', err);
+      });
       updateLessonDraft(lessonId, {
         versionId: version.id,
         summaryEn: version.summaryEn,
@@ -563,6 +646,56 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
      });
    };
 
+   const submitVersionForReview = async (lessonId: string, versionId: string, notes?: string) => {
+     setLessonVersions(prev => {
+       const existing = prev[lessonId] || [];
+       const updated = existing.map(v => {
+         if (v.id === versionId) {
+           return {
+             ...v,
+             status: 'SERVANT_REVIEW' as const,
+             changeReason: notes || 'Submitted for servant review'
+           };
+         }
+         return v;
+       });
+       return { ...prev, [lessonId]: updated };
+     });
+
+     if (isOnlineAuth) {
+       await submitVersionForReviewService({
+         lessonId,
+         versionId,
+         notes
+       }).catch(err => console.warn('Online submit for review sync note:', err));
+     }
+   };
+
+   const requestVersionRevision = async (lessonId: string, versionId: string, feedback: string) => {
+     setLessonVersions(prev => {
+       const existing = prev[lessonId] || [];
+       const updated = existing.map(v => {
+         if (v.id === versionId) {
+           return {
+             ...v,
+             status: 'REVISION_REQUESTED' as const,
+             changeReason: feedback
+           };
+         }
+         return v;
+       });
+       return { ...prev, [lessonId]: updated };
+     });
+
+     if (isOnlineAuth) {
+       await requestRevisionService({
+         lessonId,
+         versionId,
+         feedbackComment: feedback
+       }).catch(err => console.warn('Online request revision sync note:', err));
+     }
+   };
+
    const approveLessonVersion = (lessonId: string, versionId: string, approvedBy: string, approvalNote?: string) => {
      setLessonVersions(prev => {
        const existing = prev[lessonId] || [];
@@ -589,11 +722,182 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
 
      // Update class session
      setClassSessions(prev => prev.map(cs => cs.activeLessonId === lessonId ? { ...cs, status: 'APPROVED' } : cs));
+
+     if (isOnlineAuth) {
+       approveLessonVersionService({
+         lessonId,
+         versionId,
+         approvalNote,
+         servantName: approvedBy
+       }).catch(err => console.warn('Online approve version sync note:', err));
+     }
+   };
+
+   const publishLessonVersion = async (
+     lessonId: string,
+     versionId: string
+   ): Promise<{ success: boolean; error?: string }> => {
+     // UX Pre-check against local state
+     const existing = lessonVersions[lessonId] || [];
+     const targetVersion = existing.find(v => v.id === versionId);
+
+     if (targetVersion && targetVersion.status !== 'APPROVED') {
+       const errMsg = `Cannot publish: Version status is "${targetVersion.status}". Version must be APPROVED before publication.`;
+       console.warn(errMsg);
+       return { success: false, error: errMsg };
+     }
+
+     if (isOnlineAuth) {
+       try {
+         const res = await publishLessonVersionService(lessonId, versionId);
+         if (res.error) {
+           console.error('Publish RPC rejected:', res.error);
+           return { success: false, error: res.error.message };
+         }
+
+         // Authoritative refresh of curriculum and versions
+         await loadOnlineCurriculum();
+
+         // Confirmed state update
+         setLessonVersions(prev => {
+           const list = prev[lessonId] || [];
+           const updated = list.map(v => {
+             if (v.id === versionId) {
+               return {
+                 ...v,
+                 status: 'PUBLISHED' as const,
+                 publishedAt: res.data?.publishedAt || new Date().toISOString()
+               };
+             }
+             return v;
+           });
+           return { ...prev, [lessonId]: updated };
+         });
+
+         updateLesson(lessonId, {
+           currentVersionId: versionId,
+           status: 'published'
+         });
+
+         setClassSessions(prev =>
+           prev.map(cs => (cs.activeLessonId === lessonId ? { ...cs, status: 'PUBLISHED' } : cs))
+         );
+
+         return { success: true };
+       } catch (err: any) {
+         console.error('Failed to publish lesson version:', err);
+         return { success: false, error: err?.message || 'Publication failed' };
+       }
+     } else {
+       // Demo / Guest / Offline mode
+       setLessonVersions(prev => {
+         const list = prev[lessonId] || [];
+         const updated = list.map(v => {
+           if (v.id === versionId) {
+             return {
+               ...v,
+               status: 'PUBLISHED' as const,
+               publishedAt: new Date().toISOString()
+             };
+           }
+           return v;
+         });
+         return { ...prev, [lessonId]: updated };
+       });
+
+       updateLesson(lessonId, {
+         currentVersionId: versionId,
+         status: 'published'
+       });
+
+       setClassSessions(prev =>
+         prev.map(cs => (cs.activeLessonId === lessonId ? { ...cs, status: 'PUBLISHED' } : cs))
+       );
+
+       return { success: true };
+     }
+   };
+
+   const updateClaimVerification = async (
+     lessonId: string,
+     claimId: string,
+     isVerified: boolean,
+     reviewStatus?: any,
+     note?: string
+   ) => {
+     setEvidenceMaps(prev => {
+       const eMap = prev[lessonId];
+       if (!eMap) return prev;
+       const updatedClaims = (eMap.importantClaims || []).map(c => {
+         if (c.claimId === claimId) {
+           return {
+             ...c,
+             verified: isVerified,
+             servantReviewStatus: reviewStatus || (isVerified ? 'APPROVED' : 'PENDING'),
+             servantReviewNote: note || c.servantReviewNote
+           };
+         }
+         return c;
+       });
+       return {
+         ...prev,
+         [lessonId]: {
+           ...eMap,
+           importantClaims: updatedClaims
+         }
+       };
+     });
+
+     if (isOnlineAuth) {
+       await updateClaimVerificationService({
+         claimId,
+         isVerified,
+         servantReviewStatus: reviewStatus,
+         servantReviewNote: note
+       }).catch(err => console.warn('Online claim verification sync note:', err));
+     }
+   };
+
+   const resolveSourceConflict = async (lessonId: string, conflictId: string, resolutionNote: string) => {
+     setEvidenceMaps(prev => {
+       const eMap = prev[lessonId];
+       if (!eMap) return prev;
+       const updatedConflicts = (eMap.conflicts || []).map(c => {
+         if (c.id === conflictId) {
+           return {
+             ...c,
+             status: 'RESOLVED' as const,
+             resolutionNote
+           };
+         }
+         return c;
+       });
+       return {
+         ...prev,
+         [lessonId]: {
+           ...eMap,
+           conflicts: updatedConflicts
+         }
+       };
+     });
+
+     if (isOnlineAuth) {
+       await resolveSourceConflictService({
+         conflictId,
+         resolutionNote
+       }).catch(err => console.warn('Online conflict resolution sync note:', err));
+     }
    };
 
    const updateSectionInVersion = (lessonId: string, versionId: string, updatedSection: any) => {
+     let isImmutable = false;
      setLessonVersions(prev => {
        const existing = prev[lessonId] || [];
+       const target = existing.find(v => v.id === versionId);
+       if (target && (target.status === 'APPROVED' || target.status === 'PUBLISHED')) {
+         isImmutable = true;
+         return prev;
+       }
        const updated = existing.map(v => {
          if (v.id === versionId) {
            const newSections = v.sections.map(sec => sec.id === updatedSection.id ? updatedSection : sec);
@@ -607,6 +911,11 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
        });
        return { ...prev, [lessonId]: updated };
      });
+
+     if (isImmutable) {
+       console.warn(`Cannot edit section: Version ${versionId} is immutable (${isImmutable}).`);
+       return;
+     }
 
     if (isOnlineAuth && updatedSection.id) {
       updateLessonSection(updatedSection.id, {
@@ -804,8 +1113,12 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
       approveOutline,
       lessonVersions,
       saveLessonVersion,
+      submitVersionForReview,
+      requestVersionRevision,
       approveLessonVersion,
       updateSectionInVersion,
+      updateClaimVerification,
+      resolveSourceConflict,
       servantComments,
       addServantComment,
       resolveServantComment,
@@ -830,13 +1143,7 @@ export function LessonsProvider({ children }: { children: React.ReactNode }) {
       deleteLessonSource: deleteSource,
       saveLessonOutline: saveOutline,
       approveLessonOutline: approveOutline,
-      publishLessonVersion: (lessonId: string, _versionId: string) => {
-        if (isOnlineAuth) {
-          console.warn('Publication protection: publishing lesson versions is deferred to Phase 2B.4');
-          return;
-        }
-        publishLesson(lessonId);
-      },
+      publishLessonVersion,
       updateStudentContentProgress: (studentId: string, lessonId: string, sections: string[], pct: number) => {
         const key = `${studentId}_${lessonId}`;
         setContentProgress(prev => ({

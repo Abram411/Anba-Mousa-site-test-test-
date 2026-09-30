@@ -172,37 +172,61 @@ export interface LessonSource {
   createdAt: string;
 }
 
+export type ServantReviewStatus = 'PENDING' | 'APPROVED' | 'FLAGGED' | 'REJECTED';
+
 export interface ClaimEvidence {
   claimId: string;
   statementEn: string;
   statementAr: string;
   sourceId: string;
   sourceName: string;
-  sourceLocation: string; // e.g. "page 4", "02:15-03:40", "slide 3"
+  sourceLocation: string; // e.g. "Page 1, Paragraph 2", "Audio 01:45-02:20", "Slide 3"
+  quoteEn?: string; // Exact quote / excerpt in English from teacher source
+  quoteAr?: string; // Exact quote / excerpt in Arabic from teacher source
+  category?: 'historical' | 'theological' | 'scriptural' | 'liturgical' | 'patristic' | 'general';
   verified: boolean;
   unsupported?: boolean;
+  // Servant review workflow
+  servantReviewStatus?: ServantReviewStatus;
+  servantReviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface SourceConflict {
   id: string;
   sourceAId: string;
   sourceAName: string;
+  sourceALocation?: string;
+  sourceAQuote?: string; // Exact quote / excerpt from Source A
   sourceBId: string;
   sourceBName: string;
+  sourceBLocation?: string;
+  sourceBQuote?: string; // Exact quote / excerpt from Source B
   conflictDescriptionEn: string;
   conflictDescriptionAr: string;
   status: 'UNRESOLVED' | 'RESOLVED';
   resolutionNote?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
 }
 
 export interface EvidenceMap {
+  id?: string;
+  lessonId?: string;
+  lessonVersionId?: string;
   mainTopicsEn: string[];
   mainTopicsAr: string[];
   importantClaims: ClaimEvidence[];
-  bibleReferences: Array<{ reference: string; textEn: string; textAr: string; sourceId: string }>;
+  bibleReferences: Array<{ reference: string; textEn: string; textAr: string; sourceId: string; location?: string; quote?: string }>;
   teacherExplanations: string[];
   conflicts: SourceConflict[];
   unsupportedClaims: string[];
+  lastReviewedBy?: string;
+  lastReviewedAt?: string;
+  reviewStatus?: 'PENDING_REVIEW' | 'IN_REVIEW' | 'SERVANT_APPROVED';
+  allowInternetSearch?: boolean;
+  createdAt?: string;
 }
 
 export interface OutlineSection {
@@ -219,6 +243,7 @@ export interface OutlineSection {
 export interface LessonOutline {
   id: string;
   lessonId: string;
+  draftVersionId?: string;
   sections: OutlineSection[];
   isApprovedByTeacher: boolean;
   approvedAt?: string;
@@ -363,6 +388,7 @@ export type ContentProgressStatus = 'NOT_STARTED' | 'OPENED' | 'IN_PROGRESS' | '
 export interface StudentContentProgress {
   studentId: string;
   lessonId: string;
+  versionId?: string;
   status: ContentProgressStatus;
   sectionsCompleted: string[]; // section IDs
   totalSections: number;

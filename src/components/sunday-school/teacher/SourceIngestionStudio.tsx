@@ -19,6 +19,7 @@ import { LessonSource, ClassSession, EvidenceMap, LessonOutline, SourceType } fr
 import { useAuth } from '../../../context/AuthContext';
 import { isSupabaseConfigured } from '../../../lib/supabase';
 import { uploadSourceMedia } from '../../../lib/lessonSourceService';
+import { buildEvidenceMap } from '../../../lib/evidenceMapService';
 
 interface SourceIngestionStudioProps {
   session: ClassSession;
@@ -216,35 +217,24 @@ export const SourceIngestionStudio: React.FC<SourceIngestionStudioProps> = ({
     setProcessingStage('Ingesting teacher materials & indexing transcripts...');
 
     try {
-      // Step 1: Call Backend to Build Evidence Map
+      // Step 1: Call Evidence Map Service (Closed-Source Guard)
       setProcessingStage('Analyzing claims strictly from teacher sources (Closed-Source Guard)...');
       
-      const response = await fetch('/api/church/build-evidence-map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: session.id,
-          lessonId: session.activeLessonId || 'l-cross-01',
-          sources: sources.map(s => ({
-            id: s.id,
-            type: s.type,
-            originalFilename: s.originalFilename,
-            content: s.extractedContent || s.transcript || s.teacherNotes || ''
-          })),
-          allowInternetSearch: session.allowInternetSearch
-        })
+      const evidenceRes = await buildEvidenceMap({
+        sessionId: session.id,
+        lessonId: session.activeLessonId || 'l-cross-01',
+        lessonTitle: session.title,
+        grade: session.grade,
+        ageGroup: session.ageGroup,
+        sources,
+        allowInternetSearch: session.allowInternetSearch
       });
 
-      if (!response.ok) {
-        const errorJson = await response.json().catch(() => null);
-        throw new Error(errorJson?.message || `Server returned ${response.status}`);
+      if (evidenceRes.error && !evidenceRes.data) {
+        throw evidenceRes.error;
       }
 
-      const evidenceData = await response.json();
-      if (evidenceData.success === false) {
-        throw new Error(evidenceData.message || 'AI processing unavailable');
-      }
-      const evidenceMap: EvidenceMap = evidenceData.evidenceMap || evidenceData;
+      const evidenceMap: EvidenceMap = evidenceRes.data!;
 
       // Step 2: Generate Outline based on Evidence Map
       setProcessingStage('Synthesizing structured lesson outline for teacher review...');

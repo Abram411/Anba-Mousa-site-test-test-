@@ -78,7 +78,8 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
   // Canonical section ordering according to order_index / order
   const sections = [...rawSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const completedSections = progress?.sectionsCompleted || [];
-  const isContentCompleted = progress?.status === 'COMPLETED' || completedSections.length === sections.length;
+  const isAllSectionsRead = sections.length > 0 && completedSections.length >= sections.length;
+  const isContentCompleted = progress?.status === 'COMPLETED' || isAllSectionsRead;
   const latestQuizAttempt = quizAttempts[quizAttempts.length - 1];
 
   const classInfo = formatStudentClassDisplay(lesson.grade, lang);
@@ -95,8 +96,14 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
+          {isContentCompleted && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/80 font-bold flex items-center gap-1 shadow-sm">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              {lang === 'ar' ? 'تم إتمام الدرس' : 'Lesson Completed'}
+            </span>
+          )}
           {lesson.approvedServantName && (
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/80 font-medium flex items-center gap-1">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/80 font-medium flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Approved by {lesson.approvedServantName}
             </span>
           )}
@@ -574,14 +581,21 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onCompleteContent}
+            disabled={!isAllSectionsRead}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               isContentCompleted
-                ? 'bg-stone-800 text-emerald-400 border border-emerald-800/40'
-                : 'bg-stone-800 hover:bg-stone-700 text-stone-200'
+                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/80 shadow-sm'
+                : isAllSectionsRead
+                ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer shadow-md'
+                : 'bg-stone-900 text-stone-500 border border-stone-800 cursor-not-allowed opacity-75'
             }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            {isContentCompleted ? 'Content Completed (100%)' : 'Mark Content Finished'}
+            {isContentCompleted 
+              ? 'Lesson Content Completed (100%)' 
+              : isAllSectionsRead 
+              ? 'Mark Lesson Complete' 
+              : `Read All Sections to Finish (${completedSections.length}/${sections.length})`}
           </button>
 
           <button

@@ -10,7 +10,8 @@ import {
   ExternalLink,
   Search,
   Lock,
-  Globe
+  Globe,
+  Quote
 } from 'lucide-react';
 import { EvidenceMap, LessonSource } from '../../../types';
 
@@ -208,6 +209,24 @@ export const EvidenceCoverageModal: React.FC<EvidenceCoverageModalProps> = ({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {claim.category && (
+                            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono font-bold tracking-wider bg-stone-800 text-stone-300 border border-stone-700">
+                              {claim.category}
+                            </span>
+                          )}
+                          {claim.servantReviewStatus && (
+                            <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-mono font-bold tracking-wider ${
+                              claim.servantReviewStatus === 'APPROVED'
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60'
+                                : claim.servantReviewStatus === 'FLAGGED'
+                                ? 'bg-red-950 text-red-300 border border-red-800/60'
+                                : 'bg-stone-900 text-amber-300 border border-amber-800/40'
+                            }`}>
+                              Review: {claim.servantReviewStatus}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs sm:text-sm text-stone-200 font-medium leading-relaxed">
                           {claim.statementEn}
                         </p>
@@ -228,6 +247,32 @@ export const EvidenceCoverageModal: React.FC<EvidenceCoverageModalProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {/* Exact Excerpt / Verbatim Quote Callout */}
+                    {(claim.quoteEn || claim.quoteAr) && (
+                      <div className="mt-2.5 p-2.5 bg-stone-900/90 rounded-lg border-l-2 border-amber-500/80 space-y-1">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                          <Quote className="w-3 h-3" /> Exact Source Excerpt (Closed-Source Provenance)
+                        </div>
+                        {claim.quoteEn && (
+                          <p className="text-xs text-stone-300 italic font-serif leading-relaxed">
+                            {claim.quoteEn}
+                          </p>
+                        )}
+                        {claim.quoteAr && (
+                          <p className="text-xs text-stone-400 italic font-sans leading-relaxed" dir="rtl">
+                            {claim.quoteAr}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Servant Review Note if present */}
+                    {claim.servantReviewNote && (
+                      <div className="mt-2 text-[11px] text-amber-200/90 bg-amber-950/20 px-2.5 py-1 rounded border border-amber-900/30">
+                        <span className="font-semibold text-amber-400">Servant Note:</span> {claim.servantReviewNote}
+                      </div>
+                    )}
 
                     {/* Source Citation Badge */}
                     <div className="mt-3 pt-2.5 border-t border-stone-900 flex items-center justify-between text-xs text-stone-400 flex-wrap gap-2">
@@ -278,6 +323,73 @@ export const EvidenceCoverageModal: React.FC<EvidenceCoverageModalProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Source Discrepancies & Conflicts */}
+          {evidenceMap.conflicts && evidenceMap.conflicts.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Source Discrepancies & Conflicts ({evidenceMap.conflicts.length})
+                </span>
+                <span className="text-[11px] font-normal text-stone-400">
+                  Flagged for human servant theological review
+                </span>
+              </h3>
+
+              <div className="space-y-3">
+                {evidenceMap.conflicts.map((conf) => (
+                  <div key={conf.id} className="p-4 bg-amber-950/20 border border-amber-900/50 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Source Discrepancy
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        conf.status === 'RESOLVED' 
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60' 
+                          : 'bg-amber-950 text-amber-300 border border-amber-800/60'
+                      }`}>
+                        {conf.status === 'RESOLVED' ? 'Resolved by Servant' : 'Unresolved Discrepancy'}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-stone-200">
+                      <p className="font-medium text-stone-100">{conf.conflictDescriptionEn}</p>
+                      {conf.conflictDescriptionAr && (
+                        <p className="text-stone-400 mt-1 font-sans" dir="rtl">{conf.conflictDescriptionAr}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 bg-stone-900/80 rounded-lg border border-stone-800">
+                        <span className="text-[10px] font-semibold text-stone-400 block mb-1">
+                          Source A: {conf.sourceAName} {conf.sourceALocation ? `(${conf.sourceALocation})` : ''}
+                        </span>
+                        {conf.sourceAQuote && (
+                          <p className="text-stone-300 italic text-[11px] font-serif">{conf.sourceAQuote}</p>
+                        )}
+                      </div>
+                      <div className="p-2.5 bg-stone-900/80 rounded-lg border border-stone-800">
+                        <span className="text-[10px] font-semibold text-stone-400 block mb-1">
+                          Source B: {conf.sourceBName} {conf.sourceBLocation ? `(${conf.sourceBLocation})` : ''}
+                        </span>
+                        {conf.sourceBQuote && (
+                          <p className="text-stone-300 italic text-[11px] font-serif">{conf.sourceBQuote}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {conf.resolutionNote && (
+                      <div className="p-2.5 bg-emerald-950/30 rounded-lg border border-emerald-900/50 text-xs text-emerald-200">
+                        <strong className="block text-[10px] uppercase text-emerald-400">Servant Resolution Note:</strong>
+                        {conf.resolutionNote}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Teacher Classroom Explanations */}
           {evidenceMap.teacherExplanations && evidenceMap.teacherExplanations.length > 0 && (

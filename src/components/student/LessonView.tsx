@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Check, X, Star, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { mockLessons } from '../../data';
@@ -10,6 +10,8 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 import { Language, LessonVersion, LessonSource, StudentContentProgress, StudentQuizAttempt, StudentMastery } from '../../types';
 import { SundaySchoolLessonView } from '../sunday-school/student/SundaySchoolLessonView';
 import { SundaySchoolQuizView } from '../sunday-school/student/SundaySchoolQuizView';
+import { startLessonProgress, completeSectionProgress, completeLessonProgress } from '../../lib/studentProgressService';
+import { submitStudentQuizAttempt } from '../../lib/studentQuizService';
 
 type QuizState = 'intro' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'complete';
 
@@ -108,6 +110,20 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
   const userQuizAttempts = (quizAttempts && quizAttempts[userProgressKey]) || [];
   const currentMastery = studentMasteries ? studentMasteries[userProgressKey] : undefined;
 
+  useEffect(() => {
+    if (activePublishedVersion && !isGuest && userData) {
+      startLessonProgress({
+        lessonId,
+        versionId: activePublishedVersion.id,
+        studentId: currentStudentId
+      }).then(({ data }) => {
+        if (data && data.sectionsCompleted) {
+          updateStudentContentProgress(currentStudentId, lessonId, data.sectionsCompleted, data.completionPercent);
+        }
+      });
+    }
+  }, [lessonId, activePublishedVersion?.id, isGuest, userData?.id, currentStudentId]);
+
   // If Sunday School lesson version exists, render rich Sunday School experience
   if (activePublishedVersion) {
     if (isTakingQuiz && activePublishedVersion.quizDraft) {
@@ -119,7 +135,25 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
             studentId={currentStudentId}
             onBackToLesson={() => setIsTakingQuiz(false)}
             onSubmitAttempt={async (attempt) => {
-              recordQuizAttempt(attempt);
+              if (activePublishedVersion) {
+                const { data } = await submitStudentQuizAttempt({
+                  lessonId,
+                  versionId: activePublishedVersion.id,
+                  quizId: attempt.quizId,
+                  answers: attempt.answers.map(a => ({
+                    questionId: a.questionId,
+                    selectedOptionIndex: a.selectedOptionIndex
+                  })),
+                  studentId: currentStudentId
+                });
+                if (data) {
+                  recordQuizAttempt(data);
+                } else {
+                  recordQuizAttempt(attempt);
+                }
+              } else {
+                recordQuizAttempt(attempt);
+              }
               if (userData && attempt.score > 0) {
                 try {
                   await addPoints(attempt.score * 20);
@@ -150,18 +184,42 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
           lang={lang}
           isOnlineAuth={isOnlineAuth}
           targetSectionId={targetSectionId}
-          onMarkSectionRead={(sectionId, totalSections) => {
+          onMarkSectionRead={async (sectionId, totalSections) => {
             const existingSections = currentProgress?.sectionsCompleted || [];
             const newSections = existingSections.includes(sectionId)
               ? existingSections
               : [...existingSections, sectionId];
             const pct = Math.round((newSections.length / totalSections) * 100);
             updateStudentContentProgress(currentStudentId, lessonId, newSections, pct);
+
+            if (activePublishedVersion) {
+              const { data } = await completeSectionProgress({
+                lessonId,
+                versionId: activePublishedVersion.id,
+                sectionId,
+                studentId: currentStudentId
+              });
+              if (data) {
+                updateStudentContentProgress(currentStudentId, lessonId, data.sectionsCompleted, data.completionPercent);
+              }
+            }
           }}
           onCompleteContent={async () => {
-            const allSecIds = activePublishedVersion.sections.map(s => s.id);
+            if (!activePublishedVersion) return;
+            const allSecIds = (activePublishedVersion.sections || []).map(s => s.id);
+            const currentSections = currentProgress?.sectionsCompleted || [];
+            if (currentSections.length < allSecIds.length) {
+              return;
+            }
             updateStudentContentProgress(currentStudentId, lessonId, allSecIds, 100);
             markCompleted(lessonId);
+
+            await completeLessonProgress({
+              lessonId,
+              versionId: activePublishedVersion.id,
+              studentId: currentStudentId
+            });
+
             if (userData) {
               try {
                 await addPoints(50);

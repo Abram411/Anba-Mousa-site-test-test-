@@ -395,7 +395,14 @@ export const mockEvidenceMaps: Record<string, EvidenceMap> = {
         sourceId: 'src-pdf-curriculum',
         sourceName: 'Coptic_Sunday_School_Feast_of_Cross_Handout.pdf',
         sourceLocation: 'Page 1, Paragraph 2',
-        verified: true
+        quoteEn: '"In the second century, the pagan Emperor Hadrian erected a temple to Venus over the hill of Golgotha and cast mound of dirt and stones to erase all memory of the tomb of Christ."',
+        quoteAr: '"في القرن الثاني، بنى الإمبراطور الوثني هادريان هيكلاً للزهرة فوق تل الجلجثة وألقى أكواماً من التراب والحجارة لمحو ذكرى قبر المسيح."',
+        category: 'historical',
+        verified: true,
+        servantReviewStatus: 'APPROVED',
+        servantReviewNote: 'Confirmed historically with Coptic Synaxarium records for 17 Thout.',
+        reviewedBy: 'Servant Mina',
+        reviewedAt: '2026-09-17T09:30:00Z'
       },
       {
         claimId: 'cl-2',
@@ -404,7 +411,14 @@ export const mockEvidenceMaps: Record<string, EvidenceMap> = {
         sourceId: 'src-voice-cross',
         sourceName: 'Servant_Mina_Cross_Lesson_Class_Audio.m4a',
         sourceLocation: 'Audio 01:45-02:20',
-        verified: true
+        quoteEn: '"Queen Helena gathered the elderly inhabitants of Jerusalem. A man named Judas, who kept the ancient oral traditions of his fathers, revealed the subterranean site beneath the dirt mounds."',
+        quoteAr: '"جمعت الملكة هيلانة شيوخ أورشليم، فأرشدها رجل شيخ يُدعى يهوذا كان يحفظ التقاليد الشفاهية المتوارثة عن موقع الجلجثة تحت تلال الأتربة."',
+        category: 'historical',
+        verified: true,
+        servantReviewStatus: 'APPROVED',
+        servantReviewNote: 'Audio transcript verified; fits Grade 4-6 narrative well.',
+        reviewedBy: 'Servant Mina',
+        reviewedAt: '2026-09-17T09:32:00Z'
       },
       {
         claimId: 'cl-3',
@@ -413,7 +427,14 @@ export const mockEvidenceMaps: Record<string, EvidenceMap> = {
         sourceId: 'src-voice-cross',
         sourceName: 'Servant_Mina_Cross_Lesson_Class_Audio.m4a',
         sourceLocation: 'Audio 03:10-04:05 & PDF Page 2',
-        verified: true
+        quoteEn: '"Bishop Macarius proposed placing each cross upon the body of a departed youth being carried to burial; when the third sacred wood was laid upon him, he arose immediately."',
+        quoteAr: '"اقترح الأنبا مكاريوس وضع كل صليب على جثمان شاب متوفى كان يُحمل للدفن، وعندما وُضع الصليب الثالث قام الشاب فوراً بقوة الحياة الكامنة فيه."',
+        category: 'theological',
+        verified: true,
+        servantReviewStatus: 'PENDING',
+        servantReviewNote: 'Check whether children might ask about why the other crosses had no effect.',
+        reviewedBy: 'Tasoni Mary',
+        reviewedAt: '2026-09-18T14:10:00Z'
       },
       {
         claimId: 'cl-4',
@@ -422,7 +443,14 @@ export const mockEvidenceMaps: Record<string, EvidenceMap> = {
         sourceId: 'src-pdf-curriculum',
         sourceName: 'Coptic_Sunday_School_Feast_of_Cross_Handout.pdf',
         sourceLocation: 'Page 1, Header',
-        verified: true
+        quoteEn: '"The Coptic Orthodox Church commemorates the Holy Cross twice: on 17 Thout (consecration of the Church of the Holy Sepulchre by St. Helena) and 10 Baramhat (discovery of the Cross in 326 AD)."',
+        quoteAr: '"تحتفل الكنيسة القبطية الأرثوذكسية بعيد الصليب مرتين: في ١٧ توت (تدشين كنيسة القيامة) وفي ١٠ برمهات (ظهور الصليب على يد الملكة هيلانة سنة ٣٢٦م)."',
+        category: 'liturgical',
+        verified: true,
+        servantReviewStatus: 'APPROVED',
+        servantReviewNote: 'Core liturgical feast dates verified with Coptic Calendar.',
+        reviewedBy: 'Servant Mina',
+        reviewedAt: '2026-09-17T09:35:00Z'
       }
     ],
     bibleReferences: [
@@ -430,21 +458,48 @@ export const mockEvidenceMaps: Record<string, EvidenceMap> = {
         reference: '1 Corinthians 1:18',
         textEn: 'For the message of the cross is foolishness to those who are perishing, but to us who are being saved it is the power of God.',
         textAr: 'فإن كلمة الصليب عند الهالكين جهالة، وأما عندنا نحن المخلصين فهي قوة الله.',
-        sourceId: 'src-pdf-curriculum'
+        sourceId: 'src-pdf-curriculum',
+        location: 'Page 2, Box A',
+        quote: '1 Cor 1:18 memory verse'
       },
       {
         reference: 'Galatians 6:14',
         textEn: 'God forbid that I should boast except in the cross of our Lord Jesus Christ.',
         textAr: 'حاشا لي أن أفتخر إلا بصليب ربنا يسوع المسيح.',
-        sourceId: 'src-voice-cross'
+        sourceId: 'src-voice-cross',
+        location: 'Audio 04:30',
+        quote: 'Galatians 6:14 closing prayer citation'
       }
     ],
     teacherExplanations: [
       'Servant Mina emphasized that the cross is not a sign of sadness, which is why the Coptic Church chants with Joyful (Frayhi) tunes on the Feast of the Cross.',
       'He instructed the children that when we make the sign of the cross from forehead to chest and left to right, we remember Christ coming from heaven to earth and transferring us from darkness to light.'
     ],
-    conflicts: [],
-    unsupportedClaims: []
+    conflicts: [
+      {
+        id: 'conf-cross-1',
+        sourceAId: 'src-pdf-curriculum',
+        sourceAName: 'Coptic_Sunday_School_Feast_of_Cross_Handout.pdf',
+        sourceALocation: 'Page 1, Paragraph 1',
+        sourceAQuote: '"Queen Helena set out on her royal journey to the Holy Land in the 20th year of Constantine’s reign, corresponding to 326 AD."',
+        sourceBId: 'src-voice-cross',
+        sourceBName: 'Servant_Mina_Cross_Lesson_Class_Audio.m4a',
+        sourceBLocation: 'Audio 00:52',
+        sourceBQuote: '"St. Helena’s journey began around 327-328 AD shortly after the Council of Nicaea."',
+        conflictDescriptionEn: 'Discrepancy in the exact year Helena arrived in Jerusalem (326 AD vs 327/328 AD).',
+        conflictDescriptionAr: 'اختلاف طفيف في تحديد سنة وصول القديسة هيلانة للقدس (٣٢٦م في المذكرة المكتوبة مقابل ٣٢٧-٣٢٨م في التسجيل الشفوي).',
+        status: 'RESOLVED',
+        resolutionNote: 'Teach the standard Synaxarium year (326 AD) while explaining that historical dates around the Council of Nicaea (325 AD) have minor scholarly variations.',
+        resolvedBy: 'Servant Mina',
+        resolvedAt: '2026-09-18T16:00:00Z'
+      }
+    ],
+    unsupportedClaims: [
+      'Note for servant review: Ensure students understand that Judas who revealed the site was later baptized as Cyriacus, distinct from Judas Iscariot.'
+    ],
+    reviewStatus: 'IN_REVIEW',
+    lastReviewedBy: 'Servant Mina',
+    lastReviewedAt: '2026-09-18T16:00:00Z'
   }
 };
 
