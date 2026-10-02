@@ -1706,12 +1706,14 @@ const serverReviewState = {
   claims: {} as Record<string, any[]>,
   comments: {} as Record<string, any[]>,
   progress: {} as Record<string, any>,
-  attempts: {} as Record<string, any[]>
+  attempts: {} as Record<string, any[]>,
+  mastery: {} as Record<string, any>
 };
 
 function resetServerReviewState() {
   serverReviewState.progress = {};
   serverReviewState.attempts = {};
+  serverReviewState.mastery = {};
   serverReviewState.lessons = {
     'l-test-draft-01': { id: 'l-test-draft-01', createdBy: 'user_teacher_mina_101', status: 'draft', active_version_id: null },
     'l-cross-01': { id: 'l-cross-01', createdBy: 'user_teacher_mina_101', status: 'draft', active_version_id: null },
@@ -3022,6 +3024,261 @@ app.get("/api/church/student-quiz/attempts", async (req, res) => {
     return res.json({
       success: true,
       attempts
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 2C.3: STUDENT MASTERY & LEARNING RESULTS
+// Deterministic server-computed learning mastery results on active published versions
+// ==============================================================================
+
+function computeDeterministicMastery(
+  studentId: string,
+  lessonId: string,
+  versionId: string,
+  progressRecord: any,
+  quizAttempts: any[],
+  targetVersion?: any
+) {
+  const versionSectionsCount = targetVersion?.sections?.length || targetVersion?.sectionsCount || 1;
+  const totalSecs = progressRecord?.totalSections || versionSectionsCount;
+  const secsCompleted = progressRecord?.sectionsCompleted?.length || 0;
+  const isContentCompleted = Boolean(
+    progressRecord && 
+    progressRecord.status === 'COMPLETED' && 
+    (progressRecord.completionPercent >= 100 || secsCompleted >= totalSecs)
+  );
+  const completionPercent = progressRecord ? (progressRecord.completionPercent || 0) : 0;
+
+  let latestQuizScore = 0;
+  let hasQuizAttempt = false;
+  if (quizAttempts && quizAttempts.length > 0) {
+    hasQuizAttempt = true;
+    latestQuizScore = quizAttempts[quizAttempts.length - 1].percentage ?? 0;
+  } else if (progressRecord && typeof progressRecord.quizScore === 'number') {
+    hasQuizAttempt = true;
+    latestQuizScore = progressRecord.quizScore;
+  }
+
+  let status: 'NOT_STARTED' | 'DEVELOPING' | 'NEEDS_REVIEW' | 'MASTERED' = 'NOT_STARTED';
+  let teacherNotes = 'Lesson not yet started.';
+
+  if (isContentCompleted && latestQuizScore >= 80) {
+    status = 'MASTERED';
+    teacherNotes = `Demonstrated full mastery: 100% curriculum content read, scored ${latestQuizScore}% on patristic assessment.`;
+  } else if (hasQuizAttempt && latestQuizScore < 60) {
+    status = 'NEEDS_REVIEW';
+    teacherNotes = `Assessment score is ${latestQuizScore}%. Re-reading lesson sections and retaking the review quiz is recommended.`;
+  } else if (completionPercent > 0 || hasQuizAttempt) {
+    status = 'DEVELOPING';
+    teacherNotes = `Actively learning: ${completionPercent}% content read, assessment score: ${latestQuizScore}%.`;
+  }
+
+  return {
+    studentId,
+    lessonId,
+    versionId,
+    status,
+    contentCompleted: isContentCompleted,
+    completionPercent,
+    quizScore: latestQuizScore,
+    evaluatedAt: new Date().toISOString(),
+    evaluatedBy: 'Automated Curriculum Engine',
+    teacherNotes
+  };
+}
+
+// 1. Get Student Mastery
+app.get("/api/church/student-mastery", async (req, res) => {
+  try {
+    const lessonId = String(req.query.lessonId || '');
+    let targetStudentId = String(req.query.studentId || '');
+    if (!lessonId) {
+      return res.status(400).json({ success: false, error: "MISSING_PARAMS", message: "lessonId is required" });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        // Authenticated student can ONLY view their own mastery
+        if (targetStudentId && targetStudentId !== authContext.userId) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: "Students cannot view other students' mastery results."
+          });
+        }
+        targetStudentId = authContext.userId;
+      } else if (!targetStudentId) {
+        targetStudentId = authContext.userId;
+      }
+    } else {
+      // Demo / Guest / Offline fallback
+      targetStudentId = targetStudentId || 'u1';
+    }
+
+    // Version safety check
+    let lessonRecord = serverReviewState.lessons[lessonId];
+    if (!lessonRecord) {
+      if (lessonId === 'l-cross-01') {
+        lessonRecord = { id: 'l-cross-01', status: 'published', active_version_id: 'v-cross-01' };
+      } else {
+        return res.status(404).json({ success: false, error: "LESSON_NOT_FOUND", message: `Lesson ${lessonId} not found.` });
+      }
+    }
+
+    if (!lessonRecord.active_version_id || lessonRecord.status !== 'published') {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_STATE",
+        message: "Cannot access mastery for unpublished or draft lesson."
+      });
+    }
+
+    const requestedVersionId = req.query.versionId ? String(req.query.versionId) : null;
+    if (requestedVersionId && requestedVersionId !== lessonRecord.active_version_id) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_VERSION",
+        message: `Version ${requestedVersionId} is not the active published version of lesson ${lessonId}.`
+      });
+    }
+
+    const targetVersion = serverReviewState.versions[lessonRecord.active_version_id];
+    if (!targetVersion || targetVersion.status !== 'PUBLISHED') {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_STATE",
+        message: "Cannot access mastery for non-published active version."
+      });
+    }
+
+    const key = `${targetStudentId}_${lessonId}`;
+    const progressRecord = serverReviewState.progress[key] || null;
+    const quizAttempts = serverReviewState.attempts[key] || [];
+
+    // Return stored or computed authoritative mastery
+    const computed = computeDeterministicMastery(
+      targetStudentId,
+      lessonId,
+      targetVersion.id,
+      progressRecord,
+      quizAttempts,
+      targetVersion
+    );
+    serverReviewState.mastery[key] = computed;
+
+    return res.json({
+      success: true,
+      mastery: computed
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Evaluate Student Mastery
+app.post("/api/church/student-mastery/evaluate", async (req, res) => {
+  try {
+    const { lessonId, versionId, studentId } = req.body;
+    if (!lessonId || !versionId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "lessonId and versionId are required"
+      });
+    }
+
+    let targetStudentId = studentId;
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      // Parents and teachers cannot write student mastery evaluations
+      if (authContext.role === 'parent' || authContext.role === 'teacher') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Parents and servants cannot evaluate student mastery directly."
+        });
+      }
+      // Student can only evaluate for their own account
+      if (studentId && studentId !== authContext.userId) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students cannot evaluate mastery for another student."
+        });
+      }
+      targetStudentId = authContext.userId;
+    } else {
+      // Demo / Guest / Offline mode
+      targetStudentId = targetStudentId || 'u1';
+    }
+
+    // Version safety check
+    let lessonRecord = serverReviewState.lessons[lessonId];
+    let targetVersion = serverReviewState.versions[versionId];
+
+    if (!lessonRecord) {
+      if (lessonId === 'l-cross-01') {
+        lessonRecord = { id: 'l-cross-01', status: 'published', active_version_id: versionId };
+        serverReviewState.lessons['l-cross-01'] = lessonRecord;
+      } else {
+        return res.status(404).json({ success: false, error: "LESSON_NOT_FOUND", message: `Lesson ${lessonId} not found.` });
+      }
+    }
+
+    if (!targetVersion) {
+      return res.status(404).json({ success: false, error: "VERSION_NOT_FOUND", message: `Version ${versionId} not found.` });
+    }
+
+    // Version must belong to lesson
+    if (targetVersion.lessonId && targetVersion.lessonId !== lessonId) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_PARAMS",
+        message: `Version ${versionId} belongs to lesson ${targetVersion.lessonId}, not ${lessonId}.`
+      });
+    }
+
+    // Version must be the active published version
+    if (lessonRecord.active_version_id !== versionId) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_VERSION",
+        message: `Version ${versionId} is not the active published version of lesson ${lessonId}.`
+      });
+    }
+
+    // Status MUST be 'PUBLISHED'
+    if (targetVersion.status !== 'PUBLISHED') {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_STATE",
+        message: `Cannot evaluate mastery on version with status "${targetVersion.status}". Version must be PUBLISHED.`
+      });
+    }
+
+    const key = `${targetStudentId}_${lessonId}`;
+    const progressRecord = serverReviewState.progress[key] || null;
+    const quizAttempts = serverReviewState.attempts[key] || [];
+
+    // Authoritative calculation: ignores any client-submitted mastery status or score
+    const computed = computeDeterministicMastery(
+      targetStudentId,
+      lessonId,
+      targetVersion.id,
+      progressRecord,
+      quizAttempts,
+      targetVersion
+    );
+    serverReviewState.mastery[key] = computed;
+
+    return res.json({
+      success: true,
+      mastery: computed
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || "Server error" });

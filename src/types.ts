@@ -431,10 +431,14 @@ export type MasteryStatus = 'NOT_ASSESSED' | 'NEEDS_REVIEW' | 'DEVELOPING' | 'MA
 export interface StudentMastery {
   studentId: string;
   lessonId: string;
+  versionId?: string;
   status: MasteryStatus;
   evaluatedBy?: string;
   evaluatedAt?: string;
   teacherNotes?: string;
+  contentCompleted?: boolean;
+  completionPercent?: number;
+  quizScore?: number;
 }
 
 export interface SearchAuditLog {

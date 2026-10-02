@@ -12,6 +12,7 @@ import { SundaySchoolLessonView } from '../sunday-school/student/SundaySchoolLes
 import { SundaySchoolQuizView } from '../sunday-school/student/SundaySchoolQuizView';
 import { startLessonProgress, completeSectionProgress, completeLessonProgress } from '../../lib/studentProgressService';
 import { submitStudentQuizAttempt } from '../../lib/studentQuizService';
+import { getStudentMastery, evaluateStudentMastery } from '../../lib/studentMasteryService';
 
 type QuizState = 'intro' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'complete';
 
@@ -25,6 +26,7 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
     studentProgress,
     quizAttempts,
     studentMasteries,
+    setStudentMastery,
     updateStudentContentProgress,
     recordQuizAttempt
   } = useLessons();
@@ -121,6 +123,18 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
           updateStudentContentProgress(currentStudentId, lessonId, data.sectionsCompleted, data.completionPercent);
         }
       });
+
+      getStudentMastery(lessonId, currentStudentId, activePublishedVersion.id).then(({ data }) => {
+        if (data) {
+          setStudentMastery(
+            currentStudentId,
+            lessonId,
+            data.status,
+            data.evaluatedBy || 'Automated Curriculum Engine',
+            data.teacherNotes
+          );
+        }
+      });
     }
   }, [lessonId, activePublishedVersion?.id, isGuest, userData?.id, currentStudentId]);
 
@@ -150,6 +164,22 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
                   recordQuizAttempt(data);
                 } else {
                   recordQuizAttempt(attempt);
+                }
+
+                // Automatically evaluate mastery after quiz attempt
+                const masteryRes = await evaluateStudentMastery({
+                  lessonId,
+                  versionId: activePublishedVersion.id,
+                  studentId: currentStudentId
+                });
+                if (masteryRes.data) {
+                  setStudentMastery(
+                    currentStudentId,
+                    lessonId,
+                    masteryRes.data.status,
+                    masteryRes.data.evaluatedBy || 'Automated Curriculum Engine',
+                    masteryRes.data.teacherNotes
+                  );
                 }
               } else {
                 recordQuizAttempt(attempt);
@@ -219,6 +249,22 @@ export function LessonView({ lessonId, onBack, lang = 'en' }: { lessonId: string
               versionId: activePublishedVersion.id,
               studentId: currentStudentId
             });
+
+            // Automatically evaluate mastery after lesson content complete
+            const masteryRes = await evaluateStudentMastery({
+              lessonId,
+              versionId: activePublishedVersion.id,
+              studentId: currentStudentId
+            });
+            if (masteryRes.data) {
+              setStudentMastery(
+                currentStudentId,
+                lessonId,
+                masteryRes.data.status,
+                masteryRes.data.evaluatedBy || 'Automated Curriculum Engine',
+                masteryRes.data.teacherNotes
+              );
+            }
 
             if (userData) {
               try {

@@ -218,7 +218,8 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
                 <span className="text-stone-400 font-medium">Teacher Mastery</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                   mastery?.status === 'MASTERED' ? 'bg-emerald-950 text-emerald-300' :
-                  mastery?.status === 'DEVELOPING' ? 'bg-amber-950 text-amber-300' : 'bg-stone-800 text-stone-400'
+                  mastery?.status === 'DEVELOPING' ? 'bg-amber-950 text-amber-300' :
+                  mastery?.status === 'NEEDS_REVIEW' ? 'bg-rose-950 text-rose-300' : 'bg-stone-800 text-stone-400'
                 }`}>
                   {mastery?.status || 'NOT_STARTED'}
                 </span>
