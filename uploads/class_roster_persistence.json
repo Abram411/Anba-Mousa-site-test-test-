@@ -1,0 +1,79 @@
+{
+  "studentClasses": {
+    "mark": {
+      "studentId": "mark",
+      "fullName": "Mark Shenouda",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda"
+    },
+    "u1": {
+      "studentId": "u1",
+      "fullName": "Youssef Mina",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef"
+    },
+    "student-david": {
+      "studentId": "student-david",
+      "fullName": "David Shenouda",
+      "grade": "Grade 5",
+      "classGroupId": "primary_2",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=David"
+    },
+    "c1": {
+      "studentId": "c1",
+      "fullName": "Mina Emad",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=MinaEmad"
+    },
+    "other": {
+      "studentId": "other",
+      "fullName": "Peter Fadi",
+      "grade": "Prep 1",
+      "classGroupId": "preparatory",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Peter"
+    }
+  },
+  "teacherStudentRelationships": [
+    {
+      "teacherId": "mina",
+      "studentId": "student-david",
+      "relationshipType": "teacher_student",
+      "createdAt": "2026-10-03T09:26:50.969Z"
+    }
+  ],
+  "parentChildRelationships": [
+    {
+      "parentId": "mary",
+      "childId": "mark",
+      "relationshipType": "parent_child",
+      "createdAt": "2026-10-03T09:26:50.963Z"
+    },
+    {
+      "parentId": "mary",
+      "childId": "student-david",
+      "relationshipType": "parent_child",
+      "createdAt": "2026-10-03T09:26:50.963Z"
+    },
+    {
+      "parentId": "user_parent_mary_301",
+      "childId": "mark",
+      "relationshipType": "parent_child",
+      "createdAt": "2026-10-03T09:26:50.963Z"
+    },
+    {
+      "parentId": "user_parent_mary_301",
+      "childId": "student-david",
+      "relationshipType": "parent_child",
+      "createdAt": "2026-10-03T09:26:50.963Z"
+    },
+    {
+      "parentId": "other_parent",
+      "childId": "other",
+      "relationshipType": "parent_child",
+      "createdAt": "2026-10-03T09:26:50.963Z"
+    }
+  ]
+}

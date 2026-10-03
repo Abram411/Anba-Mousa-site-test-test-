@@ -19,7 +19,8 @@ import {
   Globe,
   Award,
   BookOpen,
-  School
+  School,
+  FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +36,8 @@ import { SessionManager } from '../sunday-school/teacher/SessionManager';
 import { SourceIngestionStudio } from '../sunday-school/teacher/SourceIngestionStudio';
 import { LessonVersionStudio } from '../sunday-school/teacher/LessonVersionStudio';
 import { TeacherMasteryReview } from '../sunday-school/teacher/TeacherMasteryReview';
+import { ServantClassManagement } from './ServantClassManagement';
+import { ServantSourceManagement } from './ServantSourceManagement';
 import { EvidenceCoverageModal } from '../sunday-school/evidence/EvidenceCoverageModal';
 import { PdfDocumentViewer } from '../sunday-school/viewers/PdfDocumentViewer';
 import { SlideDeckViewer } from '../sunday-school/viewers/SlideDeckViewer';
@@ -85,7 +88,7 @@ export function TeacherDashboard({
     updateStudentMastery
   } = useLessons();
 
-  const [activeTab, setActiveTab] = useState<'attendance' | 'sundaySchool' | 'mastery' | 'ai' | 'lessons' | 'moderation'>('sundaySchool');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'sundaySchool' | 'sources' | 'mastery' | 'classManagement' | 'ai' | 'lessons' | 'moderation'>('sundaySchool');
   const [selectedSessionId, setSelectedSessionId] = useState<string>(() => classSessions[0]?.id || 'cs-2026-09-27');
   
   // Active session and lesson resolution
@@ -361,6 +364,28 @@ export function TeacherDashboard({
           <span>{lang === 'ar' ? 'تقييم وإتقان الطلاب' : 'Student Mastery'}</span>
         </button>
         <button 
+          onClick={() => setActiveTab('classManagement')}
+          className={`flex-1 min-w-[130px] py-2.5 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === 'classManagement' 
+              ? 'bg-amber-600 text-white shadow-md font-extrabold' 
+              : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <Users size={16} />
+          <span>{lang === 'ar' ? 'فصلي وقائمة الطلاب' : 'My Class & Roster'}</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('sources')}
+          className={`flex-1 min-w-[130px] py-2.5 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === 'sources' 
+              ? 'bg-amber-600 text-white shadow-md font-extrabold' 
+              : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+          }`}
+        >
+          <FolderOpen size={16} />
+          <span>{lang === 'ar' ? 'المصادر والوسائط' : 'Media & Sources'}</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('attendance')}
           className={`flex-1 min-w-[120px] py-2.5 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeTab === 'attendance' 
@@ -460,6 +485,22 @@ export function TeacherDashboard({
           quizAttempts={quizAttempts}
           masteries={studentMasteries}
           onUpdateMastery={updateStudentMastery}
+        />
+      )}
+
+      {/* Tab: Servant Class Management & Persistent Roster */}
+      {activeTab === 'classManagement' && (
+        <ServantClassManagement lang={lang} />
+      )}
+
+      {/* Tab: Servant Curriculum Media & Source Management (Phase 2E.1) */}
+      {activeTab === 'sources' && (
+        <ServantSourceManagement
+          lessons={lessons}
+          lang={lang}
+          activeLessonId={activeLessonId}
+          onViewSource={(src) => setViewingSource(src)}
+          onRefresh={refreshCurriculum}
         />
       )}
 

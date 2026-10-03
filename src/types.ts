@@ -108,6 +108,27 @@ export interface ClassGroup {
   icon: string;
 }
 
+export interface ClassRosterStudent {
+  id: string;
+  name: string;
+  grade: string;
+  classGroupId: ClassGroupId;
+  avatarUrl: string;
+  learningSummary?: {
+    latestMasteryStatus?: MasteryStatus;
+    lessonsCompletedCount?: number;
+    latestQuizScore?: number;
+  };
+}
+
+export interface StudentClassAssociation {
+  studentId: string;
+  grade: string;
+  classGroupId: ClassGroupId;
+  className: string;
+  servants: string[];
+}
+
 export type LessonStatus = 'draft' | 'published';
 
 export type ClassSessionStatus = 

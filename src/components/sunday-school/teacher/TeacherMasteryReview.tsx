@@ -18,6 +18,7 @@ import {
   StudentMastery, 
   MasteryStatus 
 } from '../../../types';
+import { getClassRoster } from '../../../lib/classRosterService';
 
 interface TeacherMasteryReviewProps {
   lessonId: string;
@@ -43,13 +44,26 @@ export const TeacherMasteryReview: React.FC<TeacherMasteryReviewProps> = ({
   masteries,
   onUpdateMastery
 }) => {
-  // Mock Sunday School class roster
-  const students: StudentRosterItem[] = [
+  // Sunday School class roster with live server and fallback resilience
+  const [students, setStudents] = useState<StudentRosterItem[]>([
     { id: 'u1', name: 'Youssef Mina', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef', grade: '4th Grade' },
     { id: 's1', name: 'Mina Shenouda', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mina', grade: '4th Grade' },
     { id: 's2', name: 'Mary Gabriel', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mary', grade: '4th Grade' },
     { id: 's3', name: 'Kyrollos Bassily', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kyrollos', grade: '4th Grade' }
-  ];
+  ]);
+
+  React.useEffect(() => {
+    getClassRoster().then(({ data }) => {
+      if (data && data.length > 0) {
+        setStudents(data.map(d => ({
+          id: d.id,
+          name: d.name,
+          avatar: d.avatarUrl,
+          grade: d.grade
+        })));
+      }
+    });
+  }, []);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0].id);
   const [editStatus, setEditStatus] = useState<MasteryStatus>('DEVELOPING');

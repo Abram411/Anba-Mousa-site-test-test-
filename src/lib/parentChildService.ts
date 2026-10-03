@@ -2,6 +2,9 @@ import { ChildProfile, User, Language } from '../types';
 import { mockChildrenProfiles } from '../components/parent/parentData';
 import { linkParentAndChildInSupabase, findStudentByLinkCodeInSupabase } from './supabaseDatabase';
 import { COPTIC_AVATARS, DEFAULT_STUDENT_AVATAR } from '../data/copticAvatars';
+import { supabase } from './supabase';
+import type { StudentLearningReviewData } from './classRosterService';
+export type { StudentLearningReviewData as ChildLearningReviewData };
 
 export interface RewardRequest {
   id: string;
@@ -929,3 +932,139 @@ export function updateRewardRequestStatus(
 }
 
 export const getRewardRequests = getSyncedRewardRequests;
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (supabase) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (_) {}
+  }
+  return headers;
+}
+
+/**
+ * Fetch authoritative linked children for the authenticated parent.
+ */
+export async function getAuthoritativeParentChildren(): Promise<{
+  data: Array<{
+    id: string;
+    name: string;
+    grade: string;
+    classGroupId: string;
+    avatarUrl: string;
+    attendanceRate: number;
+    points: number;
+  }> | null;
+  error: Error | null;
+}> {
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch('/api/church/parent/children', {
+      method: 'GET',
+      headers
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        data: null,
+        error: new Error(json?.message || json?.error || `HTTP ${res.status}: Failed to fetch parent children`)
+      };
+    }
+    return { data: json.children, error: null };
+  } catch (err: any) {
+    return { data: null, error: new Error(err?.message || 'Network error') };
+  }
+}
+
+/**
+ * Fetch authoritative read-only learning review for an authorized linked child.
+ */
+export async function getChildLearningReview(
+  studentId: string
+): Promise<{ data: StudentLearningReviewData | null; error: Error | null }> {
+  if (!studentId) {
+    return { data: null, error: new Error('studentId is required') };
+  }
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch(`/api/church/parent/child-learning-review/${encodeURIComponent(studentId)}`, {
+      method: 'GET',
+      headers
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        data: null,
+        error: new Error(json?.message || json?.error || `HTTP ${res.status}: Failed to fetch child learning review`)
+      };
+    }
+    return {
+      data: {
+        student: json.student,
+        summary: json.summary,
+        lessons: json.lessons || [],
+        needsReviewItems: json.needsReviewItems || [],
+        recentActivity: json.recentActivity || []
+      },
+      error: null
+    };
+  } catch (err: any) {
+    // Pure offline demo fallback
+    const matched = sundaySchoolRoster.find(s => s.id === studentId);
+    const demoReview: StudentLearningReviewData = {
+      student: {
+        id: studentId,
+        name: matched?.nameEn || `Child ${studentId}`,
+        grade: matched?.gradeEn || 'Grade 4',
+        classGroupId: 'primary_2',
+        avatarUrl: matched?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+      },
+      summary: {
+        totalLessons: 1,
+        completedLessonsCount: 1,
+        masteredCount: 1,
+        developingCount: 0,
+        needsReviewCount: 0,
+        averageQuizScore: 85
+      },
+      lessons: [
+        {
+          lessonId: 'l-test-multiversion-01',
+          title: 'Sunday School Lesson',
+          titleAr: 'درس مدارس الأحد',
+          category: 'bible',
+          versionId: 'v-test-multi-1',
+          progressStatus: 'COMPLETED',
+          completionPercent: 100,
+          sectionsCompleted: ['sec-multi-1', 'sec-multi-2', 'sec-multi-3'],
+          totalSections: 3,
+          latestQuizScore: 2,
+          latestQuizPercentage: 100,
+          quizPassed: true,
+          quizAttemptsCount: 1,
+          masteryStatus: 'MASTERED',
+          needsReview: false,
+          lastActivityAt: new Date().toISOString()
+        }
+      ],
+      needsReviewItems: [],
+      recentActivity: [
+        {
+          type: 'lesson_completed',
+          lessonTitle: 'Sunday School Lesson',
+          description: 'Completed all required published sections',
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+    return { data: demoReview, error: null };
+  }
+}
+

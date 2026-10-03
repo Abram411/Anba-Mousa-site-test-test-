@@ -472,3 +472,119 @@ export async function getDraftSourcePacket(
     return { data: null, error: new Error(err?.message || 'Failed to prepare draft source packet') };
   }
 }
+
+export interface ServantManagedSource extends LessonSource {
+  lessonTitle?: string;
+  lessonStatus?: 'draft' | 'published';
+  isPublic?: boolean;
+  evidenceMapAvailable?: boolean;
+  evidenceClaimsCount?: number;
+  claimsSample?: Array<{
+    claimId: string;
+    statementEn: string;
+    statementAr: string;
+    category?: string;
+    sourceLocation?: string;
+    verified: boolean;
+    servantReviewStatus?: string;
+  }>;
+}
+
+export interface SourceEvidenceDetails {
+  sourceId: string;
+  lessonId: string;
+  sourceFilename: string;
+  evidenceMapAvailable: boolean;
+  claimsCount: number;
+  claims: Array<{
+    claimId: string;
+    statementEn: string;
+    statementAr: string;
+    category?: string;
+    sourceLocation?: string;
+    quoteEn?: string;
+    verified: boolean;
+    servantReviewStatus?: string;
+  }>;
+}
+
+/**
+ * 7. fetchServantSources(lessonId?, type?)
+ *
+ * Retrieves curriculum sources for an authorized servant using authoritative server endpoints.
+ * Includes evidence map availability and provenance link metadata.
+ */
+export async function fetchServantSources(
+  lessonId?: string,
+  type?: string
+): Promise<SourceServiceResult<ServantManagedSource[]>> {
+  try {
+    const headers = await getAuthHeader();
+    const params = new URLSearchParams();
+    if (lessonId) params.append('lessonId', lessonId);
+    if (type && type !== 'ALL') params.append('type', type);
+
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/church/sources${queryStr}`, { headers });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      throw new Error(errJson?.message || errJson?.error || `Failed to fetch sources: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { data: data.sources || [], error: null };
+  } catch (err: any) {
+    console.warn('Error fetching servant sources via API, falling back if offline:', err);
+    // If Supabase is available and lessonId is provided, fallback to listLessonSources
+    if (lessonId && supabase) {
+      const fallback = await listLessonSources(lessonId);
+      if (fallback.data) {
+        return { data: fallback.data as ServantManagedSource[], error: null };
+      }
+    }
+    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+  }
+}
+
+/**
+ * 8. fetchSourceEvidence(sourceId)
+ *
+ * Read-only inspection of evidence map and theological claims associated with a source.
+ */
+export async function fetchSourceEvidence(
+  sourceId: string
+): Promise<SourceServiceResult<SourceEvidenceDetails>> {
+  try {
+    const headers = await getAuthHeader();
+    const res = await fetch(`/api/church/sources/${encodeURIComponent(sourceId)}/evidence`, { headers });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      throw new Error(errJson?.message || errJson?.error || `Failed to fetch source evidence: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+  }
+}
+
+/**
+ * Helper to get authorization headers from current session
+ */
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (supabase) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return headers;
+}

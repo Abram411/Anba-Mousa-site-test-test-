@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, 
@@ -21,9 +21,16 @@ import {
   Send,
   Trash2,
   Check,
-  HeartHandshake
+  HeartHandshake,
+  ShieldCheck,
+  AlertTriangle,
+  Activity,
+  RefreshCw,
+  HelpCircle
 } from 'lucide-react';
 import { ChildProfile, ChildLessonProgress, LessonCategory } from '../../types';
+import { getChildLearningReview } from '../../lib/parentChildService';
+import type { StudentLearningReviewData } from '../../lib/classRosterService';
 
 interface ChildrenLessonsProgressProps {
   childrenProfiles: ChildProfile[];
@@ -61,6 +68,37 @@ export function ChildrenLessonsProgress({
   const [showLimitMenu, setShowLimitMenu] = useState(false);
 
   const selectedChild = childrenProfiles.find(c => c.id === selectedChildId) || childrenProfiles[0];
+
+  // Authoritative server-side learning review
+  const [reviewData, setReviewData] = useState<StudentLearningReviewData | null>(null);
+  const [reviewLoading, setReviewLoading] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  const fetchReview = (studentId: string) => {
+    if (!studentId) return;
+    setReviewLoading(true);
+    setReviewError(null);
+    getChildLearningReview(studentId)
+      .then(({ data, error }) => {
+        if (error) {
+          setReviewError(error.message);
+        } else if (data) {
+          setReviewData(data);
+        }
+      })
+      .catch((err) => {
+        setReviewError(err?.message || 'Error loading review');
+      })
+      .finally(() => {
+        setReviewLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (selectedChild?.id) {
+      fetchReview(selectedChild.id);
+    }
+  }, [selectedChild?.id]);
 
   // Category labels and icons
   const categoryConfig: Record<LessonCategory, { en: string; ar: string; icon: React.ElementType; color: string; bg: string }> = {
@@ -502,6 +540,190 @@ export function ChildrenLessonsProgress({
           </div>
         </div>
       </div>
+
+      {/* Authoritative Church Learning & Mastery Dashboard */}
+      {reviewData && (
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-[var(--color-church-cream-dark)] shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shadow-2xs">
+                <Award size={24} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg md:text-xl font-bold text-[var(--color-church-blue)]">
+                    {lang === 'ar' ? 'تقرير التعلّم والإتقان الرسمي' : 'Authoritative Learning & Mastery Review'}
+                  </h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck size={11} />
+                    {lang === 'ar' ? 'معتمد' : 'Authoritative'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {lang === 'ar'
+                    ? `فصل مدارس الأحد: ${reviewData.student.grade} (${reviewData.student.classGroupId})`
+                    : `Sunday School Class: ${reviewData.student.grade} (${reviewData.student.classGroupId})`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => fetchReview(selectedChild.id)}
+              disabled={reviewLoading}
+              className="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-gray-200 cursor-pointer self-start sm:self-auto disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={reviewLoading ? 'animate-spin' : ''} />
+              <span>{lang === 'ar' ? 'تحديث السجل' : 'Refresh'}</span>
+            </button>
+          </div>
+
+          {/* 5 Summary Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4">
+              <div className="flex items-center justify-between text-emerald-800 mb-1">
+                <span className="text-xs font-bold">{lang === 'ar' ? 'المُتقن' : 'Mastered'}</span>
+                <Award size={16} />
+              </div>
+              <div className="text-2xl font-black text-emerald-900">{reviewData.summary.masteredCount}</div>
+              <p className="text-[10px] text-emerald-700 mt-0.5">{lang === 'ar' ? 'إتقان كامل للمفاهيم' : 'Fully mastered'}</p>
+            </div>
+
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4">
+              <div className="flex items-center justify-between text-amber-800 mb-1">
+                <span className="text-xs font-bold">{lang === 'ar' ? 'قيد التطوير' : 'Developing'}</span>
+                <Clock size={16} />
+              </div>
+              <div className="text-2xl font-black text-amber-900">{reviewData.summary.developingCount}</div>
+              <p className="text-[10px] text-amber-700 mt-0.5">{lang === 'ar' ? 'مذاكرة قيد التقدم' : 'In progress'}</p>
+            </div>
+
+            <div className="bg-rose-50/70 border border-rose-200/80 rounded-2xl p-4">
+              <div className="flex items-center justify-between text-rose-800 mb-1">
+                <span className="text-xs font-bold">{lang === 'ar' ? 'يحتاج مراجعة' : 'Needs Review'}</span>
+                <AlertTriangle size={16} />
+              </div>
+              <div className="text-2xl font-black text-rose-900">{reviewData.summary.needsReviewCount}</div>
+              <p className="text-[10px] text-rose-700 mt-0.5">{lang === 'ar' ? 'يحتاج مراجعة عائلية' : 'Needs attention'}</p>
+            </div>
+
+            <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4">
+              <div className="flex items-center justify-between text-blue-800 mb-1">
+                <span className="text-xs font-bold">{lang === 'ar' ? 'الدروس المكتملة' : 'Completed'}</span>
+                <BookOpen size={16} />
+              </div>
+              <div className="text-2xl font-black text-blue-900">
+                {reviewData.summary.completedLessonsCount} / {reviewData.summary.totalLessons}
+              </div>
+              <p className="text-[10px] text-blue-700 mt-0.5">{lang === 'ar' ? 'منهج منشور' : 'Published'}</p>
+            </div>
+
+            <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between text-purple-800 mb-1">
+                <span className="text-xs font-bold">{lang === 'ar' ? 'متوسط الاختبارات' : 'Avg. Quiz'}</span>
+                <HelpCircle size={16} />
+              </div>
+              <div className="text-2xl font-black text-purple-900">{reviewData.summary.averageQuizScore}%</div>
+              <p className="text-[10px] text-purple-700 mt-0.5">{lang === 'ar' ? 'تقييم رسمي' : 'Authoritative'}</p>
+            </div>
+          </div>
+
+          {/* Needs Review Callout */}
+          {reviewData.needsReviewItems.length > 0 && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-2 text-rose-900 font-bold text-xs">
+                <AlertTriangle size={16} className="text-rose-600" />
+                <span>{lang === 'ar' ? 'نقاط ومفاهيم تحتاج دعم وتشجيع من الأسرة:' : 'Areas Requiring Family Attention & Review:'}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {reviewData.needsReviewItems.map((item) => (
+                  <div key={item.lessonId} className="bg-white border border-rose-200 rounded-xl p-3 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-gray-800 text-xs block">{item.title}</span>
+                      <span className="text-[11px] text-rose-700">
+                        {lang === 'ar' ? 'درجة التقييم أقل من 60% — يُنصح بإعادة القراءة سوياً' : 'Score < 60% — Review concepts together'}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 shrink-0">
+                      {item.latestQuizPercentage}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Published Curriculum Lessons & Deterministic Mastery List */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              {lang === 'ar' ? 'سجل إتقان دروس المنهج المنشور' : 'Published Lessons Mastery Status'}
+            </h4>
+            <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/40">
+              {reviewData.lessons.map((lesson) => (
+                <div key={lesson.lessonId} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[var(--color-church-blue)]">{lesson.title}</span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
+                        {lesson.category}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-3">
+                      <span>{lang === 'ar' ? `القراءة: ${lesson.completionPercent}%` : `Reading: ${lesson.completionPercent}%`}</span>
+                      <span>•</span>
+                      <span>{lang === 'ar' ? `التقييم: ${lesson.latestQuizPercentage}%` : `Quiz: ${lesson.latestQuizPercentage}%`} ({lesson.quizAttemptsCount} {lang === 'ar' ? 'محاولات' : 'attempts'})</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                      lesson.masteryStatus === 'MASTERED'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : lesson.masteryStatus === 'DEVELOPING'
+                        ? 'bg-amber-50 border-amber-200 text-amber-800'
+                        : lesson.masteryStatus === 'NEEDS_REVIEW'
+                        ? 'bg-rose-50 border-rose-200 text-rose-800'
+                        : 'bg-gray-100 border-gray-200 text-gray-600'
+                    }`}>
+                      <Award size={11} />
+                      {lesson.masteryStatus}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Activity Log */}
+          {reviewData.recentActivity.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                <Activity size={13} />
+                <span>{lang === 'ar' ? 'سجل النشاط والتفاعل الأخير' : 'Recent Learning Activity'}</span>
+              </h4>
+              <div className="space-y-2">
+                {reviewData.recentActivity.slice(0, 5).map((act, idx) => (
+                  <div key={idx} className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg shrink-0 ${
+                        act.type === 'quiz' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {act.type === 'quiz' ? <HelpCircle size={14} /> : <CheckCircle2 size={14} />}
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-800">{act.lessonTitle}</span>
+                        <p className="text-[11px] text-gray-500">{act.description}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-mono shrink-0">
+                      {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Lesson List Header with Search & Filter */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">

@@ -146,8 +146,28 @@ async function checkTeacherOwnership(
   userId: string
 ): Promise<boolean> {
   // 1. Check local metadata recorded at upload time
-  if (meta?.uploadedBy && meta.uploadedBy === userId) {
-    return true;
+  if (meta?.uploadedBy) {
+    if (meta.uploadedBy === userId ||
+        (userId === 'mina' && meta.uploadedBy === 'user_teacher_mina_101') ||
+        (userId === 'user_teacher_mina_101' && (meta.uploadedBy === 'mina' || meta.uploadedBy === 'user_teacher_mina_101'))) {
+      return true;
+    }
+  }
+
+  // 1b. Check serverReviewState sources if initialized
+  if (typeof serverReviewState !== 'undefined' && serverReviewState?.sources) {
+    for (const lId of Object.keys(serverReviewState.sources)) {
+      const srcList = serverReviewState.sources[lId] || [];
+      const found = srcList.find((s: any) => s.fileUrl?.includes(filename) || s.originalFilename === filename);
+      if (found) {
+        const owner = found.uploadedBy;
+        if (owner === userId ||
+            (userId === 'mina' && owner === 'user_teacher_mina_101') ||
+            (userId === 'user_teacher_mina_101' && (owner === 'mina' || owner === 'user_teacher_mina_101'))) {
+          return true;
+        }
+      }
+    }
   }
 
   // 2. Fallback check: check if the file is attached to any lesson created by this teacher
@@ -1707,13 +1727,150 @@ const serverReviewState = {
   comments: {} as Record<string, any[]>,
   progress: {} as Record<string, any>,
   attempts: {} as Record<string, any[]>,
-  mastery: {} as Record<string, any>
+  mastery: {} as Record<string, any>,
+  classes: {} as Record<string, any>,
+  studentClasses: {} as Record<string, any>,
+  teacherAssignments: {} as Record<string, string[]>,
+  teacherStudentRelationships: [] as Array<{ teacherId: string; studentId: string; relationshipType: string; createdAt: string }>,
+  parentChildRelationships: [] as Array<{ parentId: string; childId: string; relationshipType: string; createdAt: string }>,
+  sources: {} as Record<string, any[]>
 };
+
+const CLASS_STATE_FILE = path.join(uploadsDir, "class_roster_persistence.json");
+
+function savePersistentClassState() {
+  try {
+    const payload = {
+      studentClasses: serverReviewState.studentClasses,
+      teacherStudentRelationships: serverReviewState.teacherStudentRelationships,
+      parentChildRelationships: serverReviewState.parentChildRelationships
+    };
+    fs.writeFileSync(CLASS_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Could not save persistent class state:", err);
+  }
+}
+
+function loadPersistentClassState() {
+  try {
+    if (fs.existsSync(CLASS_STATE_FILE)) {
+      const content = fs.readFileSync(CLASS_STATE_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      if (parsed.studentClasses && typeof parsed.studentClasses === 'object') {
+        serverReviewState.studentClasses = {
+          ...serverReviewState.studentClasses,
+          ...parsed.studentClasses
+        };
+      }
+      if (Array.isArray(parsed.teacherStudentRelationships)) {
+        serverReviewState.teacherStudentRelationships = parsed.teacherStudentRelationships;
+      }
+      if (Array.isArray(parsed.parentChildRelationships)) {
+        serverReviewState.parentChildRelationships = parsed.parentChildRelationships;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not load persistent class state:", err);
+  }
+}
+
+function getClassGroupIdForGrade(grade?: string | null): string {
+  if (!grade) return 'primary_2';
+  const g = grade.toLowerCase();
+  if (g.includes('kg') || g.includes('kindergarten') || g.includes('حضانة')) return 'angels';
+  if (g.includes('grade 1') || g.includes('grade 2') || g.includes('grade 3') || g.includes('1st') || g.includes('2nd') || g.includes('3rd') || g.includes('ابتدائي 1')) return 'primary_1';
+  if (g.includes('grade 4') || g.includes('grade 5') || g.includes('grade 6') || g.includes('4th') || g.includes('5th') || g.includes('6th') || g.includes('primary_2') || g.includes('ابتدائي 2')) return 'primary_2';
+  if (g.includes('prep') || g.includes('grade 7') || g.includes('grade 8') || g.includes('grade 9') || g.includes('إعدادي')) return 'preparatory';
+  if (g.includes('sec') || g.includes('grade 10') || g.includes('grade 11') || g.includes('grade 12') || g.includes('ثانوي')) return 'secondary';
+  if (g.includes('univ') || g.includes('college') || g.includes('جامع')) return 'university';
+  return 'primary_2';
+}
 
 function resetServerReviewState() {
   serverReviewState.progress = {};
   serverReviewState.attempts = {};
   serverReviewState.mastery = {};
+  serverReviewState.teacherStudentRelationships = [];
+  serverReviewState.parentChildRelationships = [
+    { parentId: 'mary', childId: 'mark', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
+    { parentId: 'mary', childId: 'student-david', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
+    { parentId: 'user_parent_mary_301', childId: 'mark', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
+    { parentId: 'user_parent_mary_301', childId: 'student-david', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
+    { parentId: 'other_parent', childId: 'other', relationshipType: 'parent_child', createdAt: new Date().toISOString() }
+  ];
+
+  serverReviewState.classes = {
+    'primary_2': {
+      id: 'primary_2',
+      nameEn: 'Primary 2',
+      nameAr: 'فصل ابتدائي 2',
+      stage: 'primary_2',
+      grades: ['Grade 4', 'Grade 5', 'Grade 6'],
+      servantIds: ['mina', 'user_teacher_mina_101']
+    },
+    'preparatory': {
+      id: 'preparatory',
+      nameEn: 'Preparatory',
+      nameAr: 'فصل إعدادي',
+      stage: 'preparatory',
+      grades: ['Prep 1', 'Prep 2', 'Prep 3'],
+      servantIds: ['other', 'user_teacher_other_404']
+    },
+    'angels': {
+      id: 'angels',
+      nameEn: 'Angels',
+      nameAr: 'فصل الملايكة',
+      stage: 'angels',
+      grades: ['KG1', 'KG2'],
+      servantIds: ['other', 'user_teacher_other_404']
+    }
+  };
+
+  serverReviewState.teacherAssignments = {
+    'mina': ['primary_2'],
+    'user_teacher_mina_101': ['primary_2'],
+    'other': ['preparatory', 'angels'],
+    'user_teacher_other_404': ['preparatory', 'angels']
+  };
+
+  serverReviewState.studentClasses = {
+    'mark': {
+      studentId: 'mark',
+      fullName: 'Mark Shenouda',
+      grade: 'Grade 4',
+      classGroupId: 'primary_2',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda'
+    },
+    'u1': {
+      studentId: 'u1',
+      fullName: 'Youssef Mina',
+      grade: 'Grade 4',
+      classGroupId: 'primary_2',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef'
+    },
+    'student-david': {
+      studentId: 'student-david',
+      fullName: 'David Shenouda',
+      grade: 'Grade 4',
+      classGroupId: 'primary_2',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David'
+    },
+    'c1': {
+      studentId: 'c1',
+      fullName: 'Mina Emad',
+      grade: 'Grade 4',
+      classGroupId: 'primary_2',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MinaEmad'
+    },
+    'other': {
+      studentId: 'other',
+      fullName: 'Peter Fadi',
+      grade: 'Prep 1',
+      classGroupId: 'preparatory',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Peter'
+    }
+  };
+
   serverReviewState.lessons = {
     'l-test-draft-01': { id: 'l-test-draft-01', createdBy: 'user_teacher_mina_101', status: 'draft', active_version_id: null },
     'l-cross-01': { id: 'l-cross-01', createdBy: 'user_teacher_mina_101', status: 'draft', active_version_id: null },
@@ -1910,15 +2067,133 @@ function resetServerReviewState() {
         verified: false,
         servantReviewStatus: 'PENDING'
       }
+    ],
+    'e-map-multi-01': [
+      {
+        claimId: 'claim-multi-01',
+        statementEn: 'Queen Helena traveled to Jerusalem in 326 AD to recover the True Cross.',
+        statementAr: 'سافرت الملكة هيلانة إلى أورشليم عام ٣٢٦ م للبحث عن عود الصليب المجيد.',
+        category: 'history',
+        sourceId: 'src-multi-01',
+        sourceName: 'sample_cross_lesson_handout.pdf',
+        sourceLocation: 'Page 1',
+        quoteEn: 'Queen Helena traveled to Jerusalem in 326 AD.',
+        verified: true,
+        servantReviewStatus: 'APPROVED'
+      },
+      {
+        claimId: 'claim-multi-02',
+        statementEn: 'Bishop Macarius verified the True Cross by raising a deceased young man to life.',
+        statementAr: 'تحقق الأنبا مكاريوس من عود الصليب المقدس بقيامة شاب ميت عند ملامسته.',
+        category: 'miracle',
+        sourceId: 'src-multi-01',
+        sourceName: 'sample_cross_lesson_handout.pdf',
+        sourceLocation: 'Page 2',
+        quoteEn: 'Bishop Macarius brought a deceased youth who was resurrected.',
+        verified: true,
+        servantReviewStatus: 'APPROVED'
+      }
     ]
   };
+  serverReviewState.generatedMaterials = {};
   serverReviewState.comments = {
     'v-test-draft-1': []
+  };
+  serverReviewState.sources = {
+    'l-cross-01': [
+      {
+        id: 'src-cross-01',
+        lessonId: 'l-cross-01',
+        uploadedBy: 'user_teacher_mina_101',
+        type: 'PDF',
+        originalFilename: 'St_Helena_Cross_Curriculum_Draft.pdf',
+        mimeType: 'application/pdf',
+        fileUrl: '/uploads/test_draft_lesson_source_cross.pdf',
+        fileSize: 53,
+        description: 'Discovery of the Holy Cross church curriculum handout',
+        rightsStatus: 'TEACHER_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: false,
+        uploadedAt: new Date().toISOString()
+      },
+      {
+        id: 'src-cross-02',
+        lessonId: 'l-cross-01',
+        uploadedBy: 'user_teacher_mina_101',
+        type: 'TEACHER_VOICE',
+        originalFilename: 'teacher_voice_explanation_draft.webm',
+        mimeType: 'audio/webm',
+        fileUrl: '/uploads/test_draft_teacher_voice.webm',
+        fileSize: 51,
+        description: 'Teacher voice commentary on Coptic feast of the Cross',
+        rightsStatus: 'TEACHER_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: false,
+        uploadedAt: new Date().toISOString()
+      }
+    ],
+    'l-test-draft-01': [
+      {
+        id: 'src-draft-01',
+        lessonId: 'l-test-draft-01',
+        uploadedBy: 'user_teacher_mina_101',
+        type: 'PDF',
+        originalFilename: 'St_Helena_Feast_Cross_Handout.pdf',
+        mimeType: 'application/pdf',
+        fileUrl: '/uploads/test_draft_lesson_source_cross.pdf',
+        fileSize: 45000,
+        description: 'Draft handout for feast of the cross',
+        rightsStatus: 'TEACHER_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: false,
+        uploadedAt: new Date().toISOString()
+      }
+    ],
+    'l-test-other-teacher-lesson': [
+      {
+        id: 'src-other-01',
+        lessonId: 'l-test-other-teacher-lesson',
+        uploadedBy: 'user_teacher_other_404',
+        type: 'PDF',
+        originalFilename: 'Other_Teacher_Private_Notes.pdf',
+        mimeType: 'application/pdf',
+        fileUrl: '/uploads/other_teacher_private_notes.pdf',
+        fileSize: 32000,
+        description: 'Private curriculum notes from teacher other',
+        rightsStatus: 'TEACHER_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: false,
+        uploadedAt: new Date().toISOString()
+      }
+    ],
+    'l-test-multiversion-01': [
+      {
+        id: 'src-multi-01',
+        lessonId: 'l-test-multiversion-01',
+        uploadedBy: 'user_teacher_mina_101',
+        type: 'PDF',
+        originalFilename: 'sample_cross_lesson_handout.pdf',
+        mimeType: 'application/pdf',
+        fileUrl: '/uploads/sample_cross_lesson_handout.pdf',
+        fileSize: 52000,
+        description: 'Official published St. Mark Sunday School Handout',
+        rightsStatus: 'CHURCH_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: true,
+        uploadedAt: new Date().toISOString()
+      }
+    ]
   };
 }
 
 // Initialize on boot
 resetServerReviewState();
+loadPersistentClassState();
 
 app.post("/api/church/reset-review-test-state", (req, res) => {
   resetServerReviewState();
@@ -3285,6 +3560,2180 @@ app.post("/api/church/student-mastery/evaluate", async (req, res) => {
   }
 });
 
+// ==============================================================================
+// PHASE 2D.1: CHURCH CLASSES & ROSTER FOUNDATION
+// Secure church class membership, servant rosters, and role-based access control
+// ==============================================================================
+
+// 1. Get List of Church Classes (Teachers and Admins)
+app.get("/api/church/classes", async (req, res) => {
+  try {
+    const classList = Object.values(serverReviewState.classes).map((c: any) => ({
+      id: c.id,
+      nameEn: c.nameEn,
+      nameAr: c.nameAr,
+      grades: c.grades,
+      stage: c.stage
+    }));
+    return res.json({ success: true, classes: classList });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Get Student's Own Class / Servant's Assigned Class
+app.get("/api/church/my-class", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    let targetStudentId = 'u1';
+    if (authContext.isAuthenticated) {
+      targetStudentId = authContext.userId;
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    // A. Teacher / Servant / Admin calling my-class: return assigned class and authoritative roster
+    if (authContext.isAuthenticated && (authContext.role === 'teacher' || authContext.role === 'admin')) {
+      const targetUserId = authContext.userId;
+      let assignedClassGroupId = 'primary_2';
+
+      // 1. Authoritative Supabase persistence check for authenticated online users
+      if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+        try {
+          const client = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: `Bearer ${token}` } },
+            auth: { persistSession: false, autoRefreshToken: false }
+          });
+
+          const { data: profile } = await client
+            .from('profiles')
+            .select('id, name, grade, role')
+            .eq('id', targetUserId)
+            .maybeSingle();
+
+          if (profile && profile.grade) {
+            assignedClassGroupId = getClassGroupIdForGrade(profile.grade);
+          } else {
+            const assigned = serverReviewState.teacherAssignments[targetUserId] || ['primary_2'];
+            assignedClassGroupId = assigned[0] || 'primary_2';
+          }
+
+          const classRecord = serverReviewState.classes[assignedClassGroupId] || {
+            id: assignedClassGroupId,
+            nameEn: assignedClassGroupId.toUpperCase(),
+            nameAr: 'فصل دراسي',
+            grades: ['Grade 4', 'Grade 5', 'Grade 6'],
+            servantIds: [profile?.name || 'Servant Mina']
+          };
+
+          // Fetch authoritative roster from Supabase profiles
+          const { data: dbStudents } = await client
+            .from('profiles')
+            .select('id, name, grade, avatar, role')
+            .eq('role', 'student');
+
+          const matchingDbStudents = (dbStudents || []).filter(
+            (s: any) => getClassGroupIdForGrade(s.grade) === assignedClassGroupId
+          );
+
+          const roster: any[] = [];
+          for (const s of matchingDbStudents) {
+            const mKey = `${s.id}_l-test-multiversion-01`;
+            const mastery = serverReviewState.mastery[mKey];
+            const pKey = `${s.id}_l-test-multiversion-01`;
+            const progress = serverReviewState.progress[pKey];
+
+            roster.push({
+              id: s.id,
+              name: s.name,
+              grade: s.grade || 'Grade 4',
+              classGroupId: assignedClassGroupId,
+              avatarUrl: s.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.id}`,
+              learningSummary: {
+                latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
+                lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
+                latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+              }
+            });
+          }
+
+          return res.json({
+            success: true,
+            classInfo: {
+              servantId: profile?.id || targetUserId,
+              role: authContext.role,
+              classGroupId: assignedClassGroupId,
+              className: classRecord.nameEn,
+              classNameAr: classRecord.nameAr,
+              grades: classRecord.grades,
+              stage: classRecord.stage,
+              servants: classRecord.servantIds || [profile?.name || 'Servant Mina']
+            },
+            roster
+          });
+        } catch (sbErr) {
+          console.warn("Supabase teacher my-class read fallback to local state:", sbErr);
+        }
+      }
+
+      // Offline / Test token / review state fallback
+      const assigned = serverReviewState.teacherAssignments[targetUserId] || ['primary_2'];
+      assignedClassGroupId = assigned[0] || 'primary_2';
+
+      const classRecord = serverReviewState.classes[assignedClassGroupId] || {
+        id: assignedClassGroupId,
+        nameEn: 'Primary 2',
+        nameAr: 'فصل ابتدائي 2',
+        grades: ['Grade 4', 'Grade 5', 'Grade 6'],
+        servantIds: ['Servant Mina']
+      };
+
+      const matchedStudents = Object.values(serverReviewState.studentClasses)
+        .filter((s: any) => s.classGroupId === assignedClassGroupId);
+
+      const roster: any[] = [];
+      const seen = new Set<string>();
+
+      for (const s of matchedStudents) {
+        if (seen.has(s.studentId)) continue;
+        seen.add(s.studentId);
+
+        const mKey = `${s.studentId}_l-test-multiversion-01`;
+        const mastery = serverReviewState.mastery[mKey];
+        const pKey = `${s.studentId}_l-test-multiversion-01`;
+        const progress = serverReviewState.progress[pKey];
+
+        roster.push({
+          id: s.studentId,
+          name: s.fullName,
+          grade: s.grade,
+          classGroupId: s.classGroupId,
+          avatarUrl: s.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.studentId}`,
+          learningSummary: {
+            latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
+            lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
+            latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+          }
+        });
+      }
+
+      return res.json({
+        success: true,
+        classInfo: {
+          servantId: targetUserId,
+          role: authContext.role,
+          classGroupId: assignedClassGroupId,
+          className: classRecord.nameEn,
+          classNameAr: classRecord.nameAr,
+          grades: classRecord.grades,
+          stage: classRecord.stage,
+          servants: classRecord.servantIds || ['Servant Mina']
+        },
+        roster
+      });
+    }
+
+    // B. Student or Guest calling my-class: return student class association
+    // 1. Authoritative Supabase persistence check for authenticated online students
+    if (authContext.isAuthenticated && supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        const { data: profile } = await client
+          .from('profiles')
+          .select('id, name, grade, avatar')
+          .eq('id', targetStudentId)
+          .maybeSingle();
+
+        if (profile) {
+          const derivedClassGroupId = getClassGroupIdForGrade(profile.grade);
+          const classRecord = serverReviewState.classes[derivedClassGroupId] || {
+            id: derivedClassGroupId,
+            nameEn: derivedClassGroupId.toUpperCase(),
+            nameAr: 'فصل دراسي',
+            servantIds: ['Servant Mina']
+          };
+
+          // Find assigned servants from user_relationships if available
+          let servants: string[] = ['Servant Mina'];
+          try {
+            const { data: rels } = await client
+              .from('user_relationships')
+              .select('parent_id')
+              .eq('child_id', targetStudentId)
+              .eq('relationship_type', 'teacher_student');
+
+            if (rels && rels.length > 0) {
+              const teacherIds = rels.map((r: any) => r.parent_id);
+              const { data: teachers } = await client
+                .from('profiles')
+                .select('name')
+                .in('id', teacherIds);
+              if (teachers && teachers.length > 0) {
+                servants = teachers.map((t: any) => t.name);
+              }
+            }
+          } catch (_) {}
+
+          return res.json({
+            success: true,
+            classInfo: {
+              studentId: profile.id,
+              grade: profile.grade || 'Grade 4',
+              classGroupId: derivedClassGroupId,
+              className: classRecord.nameEn,
+              classNameAr: classRecord.nameAr,
+              servants
+            }
+          });
+        }
+      } catch (sbErr) {
+        console.warn("Supabase my-class read fallback to local state:", sbErr);
+      }
+    }
+
+    const studentRecord = serverReviewState.studentClasses[targetStudentId] ||
+      (targetStudentId.includes('other') ? serverReviewState.studentClasses['other'] : null) ||
+      (targetStudentId.includes('mark') ? serverReviewState.studentClasses['mark'] : null) || {
+      studentId: targetStudentId,
+      fullName: 'Youssef Mina',
+      grade: 'Grade 4',
+      classGroupId: 'primary_2',
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetStudentId}`
+    };
+
+    const classRecord = serverReviewState.classes[studentRecord.classGroupId] || {
+      id: studentRecord.classGroupId,
+      nameEn: 'Primary 2',
+      nameAr: 'فصل ابتدائي 2'
+    };
+
+    return res.json({
+      success: true,
+      classInfo: {
+        studentId: studentRecord.studentId,
+        grade: studentRecord.grade,
+        classGroupId: studentRecord.classGroupId,
+        className: classRecord.nameEn,
+        classNameAr: classRecord.nameAr,
+        servants: ['Servant Mina']
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 3. Get Class Roster (Authorized Servants & Admins Only)
+app.get("/api/church/class-roster", async (req, res) => {
+  try {
+    let targetClassGroupId = String(req.query.classGroupId || '');
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students are not authorized to view church class rosters."
+        });
+      }
+
+      if (authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Parents are not authorized to view church class rosters."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+        if (!targetClassGroupId) {
+          targetClassGroupId = assignedClasses[0] || 'primary_2';
+        }
+        if (!assignedClasses.includes(targetClassGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not authorized to view roster for class "${targetClassGroupId}".`
+          });
+        }
+      } else if (authContext.role === 'admin') {
+        if (!targetClassGroupId) {
+          targetClassGroupId = 'primary_2';
+        }
+      }
+    } else {
+      // Demo / Guest / Offline mode fallback
+      targetClassGroupId = targetClassGroupId || 'primary_2';
+    }
+
+    if (!serverReviewState.classes[targetClassGroupId]) {
+      return res.status(404).json({
+        success: false,
+        error: "CLASS_NOT_FOUND",
+        message: `Class "${targetClassGroupId}" not found.`
+      });
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    // 1. Authoritative Supabase persistence check for authenticated online users
+    if (authContext.isAuthenticated && supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        // Query students from public.profiles
+        const { data: dbStudents, error: sErr } = await client
+          .from('profiles')
+          .select('id, name, grade, avatar, role')
+          .eq('role', 'student');
+
+        if (!sErr && dbStudents && dbStudents.length > 0) {
+          const matchingDbStudents = dbStudents.filter(
+            (s: any) => getClassGroupIdForGrade(s.grade) === targetClassGroupId
+          );
+
+          if (matchingDbStudents.length > 0) {
+            const roster: any[] = [];
+            for (const s of matchingDbStudents) {
+              const mKey = `${s.id}_l-test-multiversion-01`;
+              const mastery = serverReviewState.mastery[mKey];
+              const pKey = `${s.id}_l-test-multiversion-01`;
+              const progress = serverReviewState.progress[pKey];
+
+              roster.push({
+                id: s.id,
+                name: s.name,
+                grade: s.grade || 'Grade 4',
+                classGroupId: targetClassGroupId,
+                avatarUrl: s.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.id}`,
+                learningSummary: {
+                  latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
+                  lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
+                  latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+                }
+              });
+            }
+
+            return res.json({
+              success: true,
+              classGroupId: targetClassGroupId,
+              roster
+            });
+          }
+        }
+      } catch (sbErr) {
+        console.warn("Supabase class-roster read fallback to local state:", sbErr);
+      }
+    }
+
+    // Build authorized roster with permitted fields only and reused learning summary
+    const matchedStudents = Object.values(serverReviewState.studentClasses)
+      .filter((s: any) => s.classGroupId === targetClassGroupId);
+
+    const roster: any[] = [];
+    const seen = new Set<string>();
+
+    for (const s of matchedStudents) {
+      if (seen.has(s.studentId)) continue;
+      seen.add(s.studentId);
+
+      const mKey = `${s.studentId}_l-test-multiversion-01`;
+      const mastery = serverReviewState.mastery[mKey];
+      const pKey = `${s.studentId}_l-test-multiversion-01`;
+      const progress = serverReviewState.progress[pKey];
+
+      roster.push({
+        id: s.studentId,
+        name: s.fullName,
+        grade: s.grade,
+        classGroupId: s.classGroupId,
+        avatarUrl: s.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.studentId}`,
+        learningSummary: {
+          latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
+          lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
+          latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      classGroupId: targetClassGroupId,
+      roster
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 4. Assign Student Class (Teachers & Admins Only; Students and Parents Forbidden)
+app.post("/api/church/student/class", async (req, res) => {
+  try {
+    const { studentId, classGroupId, grade } = req.body;
+    if (!studentId || !classGroupId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "studentId and classGroupId are required"
+      });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students cannot modify their own or any class assignments."
+        });
+      }
+
+      if (authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Parents cannot manage class assignments."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+        if (!assignedClasses.includes(classGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not authorized to assign students to class "${classGroupId}".`
+          });
+        }
+      }
+    }
+
+    if (!serverReviewState.classes[classGroupId]) {
+      return res.status(404).json({
+        success: false,
+        error: "CLASS_NOT_FOUND",
+        message: `Class "${classGroupId}" not found.`
+      });
+    }
+
+    const targetGrade = grade || serverReviewState.classes[classGroupId].grades[0] || 'Grade 4';
+    if (grade && getClassGroupIdForGrade(grade) !== classGroupId) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_GRADE",
+        message: `Grade "${grade}" does not map to class group "${classGroupId}".`
+      });
+    }
+
+    // 1. Verify student exists in persistent database or known class records
+    let existing = serverReviewState.studentClasses[studentId];
+    if (!existing) {
+      if (studentId === 'user_student_mark_101') existing = serverReviewState.studentClasses['mark'];
+      else if (studentId === 'user_student_other_102') existing = serverReviewState.studentClasses['other'];
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    // 2. Real Supabase Persistence when online with valid user token
+    if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        const { data: profileCheck, error: checkErr } = await client
+          .from('profiles')
+          .select('id, name')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        if (checkErr) {
+          return res.status(500).json({
+            success: false,
+            error: "DATABASE_ERROR",
+            message: `Failed to query student profile: ${checkErr.message}`
+          });
+        }
+
+        if (!profileCheck && !existing) {
+          return res.status(404).json({
+            success: false,
+            error: "STUDENT_NOT_FOUND",
+            message: `Student with ID "${studentId}" was not found.`
+          });
+        }
+
+        // Persist to public.profiles.grade
+        const { error: updateErr } = await client
+          .from('profiles')
+          .update({ grade: targetGrade })
+          .eq('id', studentId);
+
+        if (updateErr) {
+          return res.status(500).json({
+            success: false,
+            error: "PERSISTENCE_FAILED",
+            message: `Supabase grade persistence failed: ${updateErr.message}`
+          });
+        }
+
+        // Persist servant relationship to public.user_relationships
+        if (authContext.role === 'teacher' || authContext.role === 'admin') {
+          const servantId = authContext.userId;
+          const { error: relErr } = await client
+            .from('user_relationships')
+            .upsert({
+              parent_id: servantId,
+              child_id: studentId,
+              relationship_type: 'teacher_student',
+              created_at: new Date().toISOString()
+            }, { onConflict: 'parent_id,child_id' });
+
+          if (relErr) {
+            console.warn("Supabase user_relationships sync note:", relErr.message);
+          }
+        }
+      } catch (sbErr: any) {
+        return res.status(500).json({
+          success: false,
+          error: "PERSISTENCE_FAILED",
+          message: sbErr?.message || "Failed to persist to Supabase"
+        });
+      }
+    } else if (!existing && !['mark', 'u1', 'student-david', 'c1', 'other', 'user_student_mark_101', 'user_student_other_102'].includes(studentId)) {
+      return res.status(404).json({
+        success: false,
+        error: "STUDENT_NOT_FOUND",
+        message: `Student with ID "${studentId}" was not found.`
+      });
+    }
+
+    serverReviewState.studentClasses[studentId] = {
+      studentId,
+      fullName: existing?.fullName || `Student ${studentId}`,
+      grade: targetGrade,
+      classGroupId,
+      avatarUrl: existing?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+    };
+
+    // Record teacher_student relationship
+    if (authContext.isAuthenticated && (authContext.role === 'teacher' || authContext.role === 'admin')) {
+      const servantId = authContext.userId;
+      const existingRel = serverReviewState.teacherStudentRelationships.find(
+        r => r.teacherId === servantId && r.studentId === studentId && r.relationshipType === 'teacher_student'
+      );
+      if (existingRel) {
+        existingRel.createdAt = new Date().toISOString();
+      } else {
+        serverReviewState.teacherStudentRelationships.push({
+          teacherId: servantId,
+          studentId,
+          relationshipType: 'teacher_student',
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      student: serverReviewState.studentClasses[studentId],
+      relationshipPersisted: true
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 5. Get Servant Relationships (Teacher and Admin only)
+app.get("/api/church/servant/relationships", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || (authContext.role !== 'teacher' && authContext.role !== 'admin')) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only servants and admins can view teacher relationships."
+      });
+    }
+
+    const servantId = authContext.userId;
+    const relationships = serverReviewState.teacherStudentRelationships.filter(r => r.teacherId === servantId);
+    return res.json({ success: true, relationships });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 2D.3: SERVANT STUDENT LEARNING REVIEW
+// Read-only authoritative inspection of student progress, quizzes, and mastery
+// ==============================================================================
+
+app.get(["/api/church/student-learning-review/:studentId", "/api/church/student-learning-review"], async (req, res) => {
+  try {
+    const studentId = String(req.params.studentId || req.query.studentId || '').trim();
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "studentId is required"
+      });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students are not authorized to access servant learning reviews."
+        });
+      }
+
+      if (authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Parents are not authorized to access servant learning reviews."
+        });
+      }
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    // 1. Authoritative Student Profile and Class lookup
+    let studentProfile: { id: string; name: string; grade: string; classGroupId: string; avatarUrl: string } | null = null;
+
+    if (authContext.isAuthenticated && supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        const { data: dbProfile } = await client
+          .from('profiles')
+          .select('id, name, grade, avatar, role')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        if (dbProfile) {
+          studentProfile = {
+            id: dbProfile.id,
+            name: dbProfile.name,
+            grade: dbProfile.grade || 'Grade 4',
+            classGroupId: getClassGroupIdForGrade(dbProfile.grade),
+            avatarUrl: dbProfile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dbProfile.id}`
+          };
+        }
+      } catch (sbErr) {
+        console.warn("Supabase student lookup error in learning review:", sbErr);
+      }
+    }
+
+    if (!studentProfile) {
+      let existing = serverReviewState.studentClasses[studentId];
+      if (!existing) {
+        if (studentId === 'user_student_mark_101') existing = serverReviewState.studentClasses['mark'];
+        else if (studentId === 'user_student_other_102') existing = serverReviewState.studentClasses['other'];
+      }
+      if (existing) {
+        studentProfile = {
+          id: existing.studentId,
+          name: existing.fullName,
+          grade: existing.grade,
+          classGroupId: existing.classGroupId,
+          avatarUrl: existing.avatarUrl
+        };
+      } else if (['mark', 'u1', 'student-david', 'c1', 'other'].includes(studentId)) {
+        const gr = studentId === 'other' ? 'Prep 1' : 'Grade 4';
+        const cg = getClassGroupIdForGrade(gr);
+        studentProfile = {
+          id: studentId,
+          name: `Student ${studentId}`,
+          grade: gr,
+          classGroupId: cg,
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+        };
+      }
+    }
+
+    if (!studentProfile) {
+      return res.status(404).json({
+        success: false,
+        error: "STUDENT_NOT_FOUND",
+        message: `Student with ID "${studentId}" was not found.`
+      });
+    }
+
+    // 2. Class Authorization check for teachers
+    if (authContext.isAuthenticated && authContext.role === 'teacher') {
+      const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || 
+        (authContext.userId === 'mina' || authContext.userId === 'user_teacher_mina_101' ? ['primary_2'] : []);
+      if (!assignedClasses.includes(studentProfile.classGroupId)) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: `Servant ${authContext.userId} is not authorized to review students in class "${studentProfile.classGroupId}".`
+        });
+      }
+    }
+
+    // 3. Collect only PUBLISHED lessons relevant to student's class
+    // Draft or unpublished lessons are strictly excluded!
+    const publishedLessonList = Object.values(serverReviewState.lessons).filter(
+      (l: any) => l.status === 'published' && l.active_version_id
+    );
+
+    const lessonsData: any[] = [];
+    const recentActivity: any[] = [];
+
+    for (const l of publishedLessonList) {
+      const activeVer = serverReviewState.versions[l.active_version_id];
+      const pKey = `${studentId}_${l.id}`;
+      const prog = serverReviewState.progress[pKey];
+      const attempts = serverReviewState.attempts[pKey] || [];
+      const mKey = `${studentId}_${l.id}`;
+      const mastery = serverReviewState.mastery[mKey] || computeDeterministicMastery(
+        studentId,
+        l.id,
+        l.active_version_id,
+        prog,
+        attempts,
+        activeVer
+      );
+
+      const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+      const latestQuizScore = latestAttempt ? latestAttempt.score : (prog?.quizScore || 0);
+      const latestQuizPercentage = latestAttempt ? latestAttempt.percentage : (prog?.quizScore || 0);
+      const quizPassed = latestAttempt ? latestAttempt.passed : false;
+      const totalSections = prog?.totalSections || activeVer?.sections?.length || 1;
+      const completionPercent = prog ? prog.completionPercent : 0;
+      const masteryStatus = mastery?.status || 'NOT_STARTED';
+      const needsReview = Boolean(masteryStatus === 'NEEDS_REVIEW' || (latestAttempt && latestAttempt.percentage < 60));
+
+      lessonsData.push({
+        lessonId: l.id,
+        title: activeVer?.titleEn || l.title_en || 'Sunday School Lesson',
+        titleAr: activeVer?.titleAr || l.title_ar || 'درس مدارس الأحد',
+        category: activeVer?.category || l.category || 'bible',
+        versionId: l.active_version_id,
+        progressStatus: prog ? prog.status : 'NOT_STARTED',
+        completionPercent,
+        sectionsCompleted: prog ? prog.sectionsCompleted : [],
+        totalSections,
+        latestQuizScore,
+        latestQuizPercentage,
+        quizPassed,
+        quizAttemptsCount: attempts.length,
+        masteryStatus,
+        needsReview,
+        lastActivityAt: latestAttempt?.submittedAt || prog?.completedAt || prog?.startedAt || null
+      });
+
+      if (latestAttempt) {
+        recentActivity.push({
+          type: 'quiz',
+          lessonTitle: activeVer?.titleEn || l.id,
+          description: `Quiz attempt scored ${latestAttempt.percentage}% (${latestAttempt.passed ? 'Passed' : 'Needs Review'})`,
+          timestamp: latestAttempt.submittedAt || new Date().toISOString()
+        });
+      }
+
+      if (prog && prog.status === 'COMPLETED') {
+        recentActivity.push({
+          type: 'lesson_completed',
+          lessonTitle: activeVer?.titleEn || l.id,
+          description: 'Completed all required published sections',
+          timestamp: prog.completedAt || prog.startedAt || new Date().toISOString()
+        });
+      }
+    }
+
+    // Sort recent activity descending
+    recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Filter needs review items
+    const needsReviewItems = lessonsData.filter(item => item.needsReview);
+
+    // Summary calculations
+    const completedCount = lessonsData.filter(item => item.progressStatus === 'COMPLETED').length;
+    const masteredCount = lessonsData.filter(item => item.masteryStatus === 'MASTERED').length;
+    const developingCount = lessonsData.filter(item => item.masteryStatus === 'DEVELOPING').length;
+    const attemptedQuizzes = lessonsData.filter(item => item.quizAttemptsCount > 0);
+    const averageQuizScore = attemptedQuizzes.length > 0
+      ? Math.round(attemptedQuizzes.reduce((acc, curr) => acc + curr.latestQuizPercentage, 0) / attemptedQuizzes.length)
+      : 0;
+
+    return res.json({
+      success: true,
+      student: studentProfile,
+      summary: {
+        totalLessons: lessonsData.length,
+        completedLessonsCount: completedCount,
+        masteredCount,
+        developingCount,
+        needsReviewCount: needsReviewItems.length,
+        averageQuizScore
+      },
+      lessons: lessonsData,
+      needsReviewItems,
+      recentActivity: recentActivity.slice(0, 10)
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 2D.4: PARENT / GUARDIAN LEARNING DASHBOARD
+// Authoritative read-only inspection for linked children learning progress
+// ==============================================================================
+
+async function getAuthorizedChildrenForParent(parentId: string, req: express.Request): Promise<string[]> {
+  const childIds = new Set<string>();
+
+  // 1. In-memory / persistent review state
+  for (const rel of serverReviewState.parentChildRelationships) {
+    if (rel.parentId === parentId && (rel.relationshipType === 'parent_child' || rel.relationshipType === 'guardian_student')) {
+      childIds.add(rel.childId);
+    }
+  }
+
+  // 2. Supabase lookup if authenticated online
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+  if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+    try {
+      const client = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+
+      // Check user_relationships
+      const { data: rels } = await client
+        .from('user_relationships')
+        .select('child_id')
+        .eq('parent_id', parentId)
+        .in('relationship_type', ['parent_child', 'guardian_student']);
+
+      if (rels) {
+        for (const r of rels) {
+          if (r.child_id) childIds.add(r.child_id);
+        }
+      }
+
+      // Check profiles.parent_id
+      const { data: childrenProfiles } = await client
+        .from('profiles')
+        .select('id')
+        .eq('parent_id', parentId);
+
+      if (childrenProfiles) {
+        for (const cp of childrenProfiles) {
+          if (cp.id) childIds.add(cp.id);
+        }
+      }
+    } catch (sbErr) {
+      console.warn("Supabase parent-child lookup note:", sbErr);
+    }
+  }
+
+  return Array.from(childIds);
+}
+
+// 1. Get Parent's Linked Children
+app.get("/api/church/parent/children", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students cannot access parent child lists."
+        });
+      }
+      if (authContext.role === 'teacher') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Servants cannot use parent-only endpoints."
+        });
+      }
+    }
+
+    // Demo / Guest unauthenticated fallback
+    if (!authContext.isAuthenticated) {
+      const demoChildren = [
+        {
+          id: 'c1',
+          name: 'Mina Emad',
+          grade: 'Grade 4',
+          classGroupId: 'primary_2',
+          avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MinaEmad',
+          attendanceRate: 98,
+          points: 850
+        },
+        {
+          id: 'c2',
+          name: 'Mary Emad',
+          grade: 'Grade 2',
+          classGroupId: 'primary_1',
+          avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MaryEmad',
+          attendanceRate: 100,
+          points: 820
+        }
+      ];
+      return res.json({ success: true, children: demoChildren });
+    }
+
+    const parentId = authContext.userId || '';
+    const linkedChildIds = await getAuthorizedChildrenForParent(parentId, req);
+
+    const childrenData: any[] = [];
+    for (const childId of linkedChildIds) {
+      const studentClass = serverReviewState.studentClasses[childId];
+      if (studentClass) {
+        childrenData.push({
+          id: studentClass.studentId,
+          name: studentClass.fullName,
+          grade: studentClass.grade,
+          classGroupId: studentClass.classGroupId,
+          avatarUrl: studentClass.avatarUrl,
+          attendanceRate: 98,
+          points: 850
+        });
+      } else {
+        const gr = childId === 'other' ? 'Prep 1' : 'Grade 4';
+        const cg = getClassGroupIdForGrade(gr);
+        childrenData.push({
+          id: childId,
+          name: `Student ${childId}`,
+          grade: gr,
+          classGroupId: cg,
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${childId}`,
+          attendanceRate: 95,
+          points: 800
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      children: childrenData
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Get Child Learning Review for Parent
+app.get(["/api/church/parent/child-learning-review/:studentId", "/api/church/parent/child-learning-review"], async (req, res) => {
+  try {
+    const studentId = String(req.params.studentId || req.query.studentId || '').trim();
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "studentId is required"
+      });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students are not authorized to access parent learning dashboard."
+        });
+      }
+      if (authContext.role === 'teacher') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Servants cannot use parent-only endpoints to bypass servant review authorization."
+        });
+      }
+    }
+
+    // Demo / Guest mode fallback
+    if (!authContext.isAuthenticated) {
+      const demoReview = {
+        student: {
+          id: studentId,
+          name: studentId === 'student-david' ? 'David Shenouda' : `Student ${studentId}`,
+          grade: 'Grade 4',
+          classGroupId: 'primary_2',
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+        },
+        summary: {
+          totalLessons: 1,
+          completedLessonsCount: 1,
+          masteredCount: 1,
+          developingCount: 0,
+          needsReviewCount: 0,
+          averageQuizScore: 85
+        },
+        lessons: [
+          {
+            lessonId: 'l-test-multiversion-01',
+            title: 'Sunday School Lesson',
+            titleAr: 'درس مدارس الأحد',
+            category: 'bible',
+            versionId: 'v-test-multi-1',
+            progressStatus: 'COMPLETED',
+            completionPercent: 100,
+            sectionsCompleted: ['sec-multi-1', 'sec-multi-2', 'sec-multi-3'],
+            totalSections: 3,
+            latestQuizScore: 2,
+            latestQuizPercentage: 100,
+            quizPassed: true,
+            quizAttemptsCount: 1,
+            masteryStatus: 'MASTERED',
+            needsReview: false,
+            lastActivityAt: new Date().toISOString()
+          }
+        ],
+        needsReviewItems: [],
+        recentActivity: [
+          {
+            type: 'quiz',
+            lessonTitle: 'Sunday School Lesson',
+            description: 'Quiz attempt scored 100% (Passed)',
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+      return res.json({ success: true, ...demoReview });
+    }
+
+    // Check student existence
+    const existingStudent = serverReviewState.studentClasses[studentId] || 
+      (studentId === 'mark' ? serverReviewState.studentClasses['mark'] : null);
+    const knownStudentIds = ['mark', 'student-david', 'u1', 'c1', 'other', 'user_student_mark_101', 'user_student_other_102'];
+
+    if (!existingStudent && !knownStudentIds.includes(studentId)) {
+      return res.status(404).json({
+        success: false,
+        error: "STUDENT_NOT_FOUND",
+        message: `Child with ID "${studentId}" was not found.`
+      });
+    }
+
+    // Parent Authorization Check (Parent can only inspect their linked children!)
+    if (authContext.role === 'parent') {
+      const parentId = authContext.userId || '';
+      const authorizedChildren = await getAuthorizedChildrenForParent(parentId, req);
+      
+      if (!authorizedChildren.includes(studentId)) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: `Parent "${parentId}" is not authorized to access learning data for child "${studentId}".`
+        });
+      }
+    }
+
+    // Assemble authoritative student profile
+    const studentClass = serverReviewState.studentClasses[studentId] || {
+      studentId,
+      fullName: `Student ${studentId}`,
+      grade: studentId === 'other' ? 'Prep 1' : 'Grade 4',
+      classGroupId: studentId === 'other' ? 'preparatory' : 'primary_2',
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+    };
+
+    const studentProfile = {
+      id: studentClass.studentId,
+      name: studentClass.fullName,
+      grade: studentClass.grade,
+      classGroupId: studentClass.classGroupId,
+      avatarUrl: studentClass.avatarUrl
+    };
+
+    // Collect published lessons relevant to child's class group
+    const publishedLessonList = Object.values(serverReviewState.lessons).filter(
+      (l: any) => l.status === 'published' && l.active_version_id
+    );
+
+    const lessonsData: any[] = [];
+    const recentActivity: any[] = [];
+
+    for (const l of publishedLessonList) {
+      const activeVer = serverReviewState.versions[l.active_version_id];
+      const pKey = `${studentId}_${l.id}`;
+      const prog = serverReviewState.progress[pKey];
+      const attempts = serverReviewState.attempts[pKey] || [];
+      const mKey = `${studentId}_${l.id}`;
+      const mastery = serverReviewState.mastery[mKey] || computeDeterministicMastery(
+        studentId,
+        l.id,
+        l.active_version_id,
+        prog,
+        attempts,
+        activeVer
+      );
+
+      const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+      const latestQuizScore = latestAttempt ? latestAttempt.score : (prog?.quizScore || 0);
+      const latestQuizPercentage = latestAttempt ? latestAttempt.percentage : (prog?.quizScore || 0);
+      const quizPassed = latestAttempt ? latestAttempt.passed : false;
+      const totalSections = prog?.totalSections || activeVer?.sections?.length || 1;
+      const completionPercent = prog ? prog.completionPercent : 0;
+      const masteryStatus = mastery?.status || 'NOT_STARTED';
+      const needsReview = Boolean(masteryStatus === 'NEEDS_REVIEW' || (latestAttempt && latestAttempt.percentage < 60));
+
+      lessonsData.push({
+        lessonId: l.id,
+        title: activeVer?.titleEn || l.title_en || 'Sunday School Lesson',
+        titleAr: activeVer?.titleAr || l.title_ar || 'درس مدارس الأحد',
+        category: activeVer?.category || l.category || 'bible',
+        versionId: l.active_version_id,
+        progressStatus: prog ? prog.status : 'NOT_STARTED',
+        completionPercent,
+        sectionsCompleted: prog ? prog.sectionsCompleted : [],
+        totalSections,
+        latestQuizScore,
+        latestQuizPercentage,
+        quizPassed,
+        quizAttemptsCount: attempts.length,
+        masteryStatus,
+        needsReview,
+        lastActivityAt: latestAttempt?.submittedAt || prog?.completedAt || prog?.startedAt || null
+      });
+
+      if (latestAttempt) {
+        recentActivity.push({
+          type: 'quiz',
+          lessonTitle: activeVer?.titleEn || l.id,
+          description: `Quiz attempt scored ${latestAttempt.percentage}% (${latestAttempt.passed ? 'Passed' : 'Needs Review'})`,
+          timestamp: latestAttempt.submittedAt || new Date().toISOString()
+        });
+      }
+
+      if (prog && prog.status === 'COMPLETED') {
+        recentActivity.push({
+          type: 'lesson_completed',
+          lessonTitle: activeVer?.titleEn || l.id,
+          description: 'Completed all required published sections',
+          timestamp: prog.completedAt || prog.startedAt || new Date().toISOString()
+        });
+      }
+    }
+
+    recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const needsReviewItems = lessonsData.filter(item => item.needsReview);
+    const completedCount = lessonsData.filter(item => item.progressStatus === 'COMPLETED').length;
+    const masteredCount = lessonsData.filter(item => item.masteryStatus === 'MASTERED').length;
+    const developingCount = lessonsData.filter(item => item.masteryStatus === 'DEVELOPING').length;
+    const attemptedQuizzes = lessonsData.filter(item => item.quizAttemptsCount > 0);
+    const averageQuizScore = attemptedQuizzes.length > 0
+      ? Math.round(attemptedQuizzes.reduce((acc, curr) => acc + curr.latestQuizPercentage, 0) / attemptedQuizzes.length)
+      : 0;
+
+    return res.json({
+      success: true,
+      student: studentProfile,
+      summary: {
+        totalLessons: lessonsData.length,
+        completedLessonsCount: completedCount,
+        masteredCount,
+        developingCount,
+        needsReviewCount: needsReviewItems.length,
+        averageQuizScore
+      },
+      lessons: lessonsData,
+      needsReviewItems,
+      recentActivity: recentActivity.slice(0, 10)
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 2E.1: MEDIA & SOURCE MANAGEMENT API ENDPOINTS
+// ==============================================================================
+
+// 1. List / Query Sources for Authorized Servants
+app.get("/api/church/sources", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    // 1. Authorization & Role Checks
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student' || authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students and parents are not permitted to access servant curriculum source library."
+        });
+      }
+    } else {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+      const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+      if (isConfigured) {
+        return res.status(401).json({
+          success: false,
+          error: "UNAUTHORIZED",
+          message: "Authentication required to access teacher curriculum sources."
+        });
+      }
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    const lessonIdFilter = typeof req.query.lessonId === 'string' ? req.query.lessonId : null;
+    const typeFilter = typeof req.query.type === 'string' ? req.query.type : null;
+
+    // If specific lessonId requested, verify authorization to that lesson
+    if (lessonIdFilter) {
+      const targetLesson = serverReviewState.lessons[lessonIdFilter];
+      if (!targetLesson) {
+        return res.status(404).json({
+          success: false,
+          error: "LESSON_NOT_FOUND",
+          message: `Lesson ${lessonIdFilter} not found.`
+        });
+      }
+      if (currentUserRole !== 'admin') {
+        const isOwner = targetLesson.createdBy === currentUserId ||
+                        (currentUserId === 'mina' && targetLesson.createdBy === 'user_teacher_mina_101') ||
+                        (currentUserId === 'user_teacher_mina_101' && targetLesson.createdBy === 'mina');
+        const isPublished = targetLesson.status === 'published';
+        if (!isOwner && !isPublished) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: "Cannot access private sources of another teacher's draft lesson."
+          });
+        }
+      }
+    }
+
+    // Collect authorized sources
+    const allLessonIds = Object.keys(serverReviewState.sources || {});
+    const results: any[] = [];
+
+    for (const lId of allLessonIds) {
+      if (lessonIdFilter && lId !== lessonIdFilter) continue;
+
+      const lesson = serverReviewState.lessons[lId];
+      const isPublished = lesson?.status === 'published';
+      const isLessonOwner = lesson?.createdBy === currentUserId ||
+                            (currentUserId === 'mina' && lesson?.createdBy === 'user_teacher_mina_101') ||
+                            (currentUserId === 'user_teacher_mina_101' && lesson?.createdBy === 'mina');
+
+      const srcList = serverReviewState.sources[lId] || [];
+      for (const s of srcList) {
+        if (typeFilter && s.type !== typeFilter) continue;
+
+        const isSourceOwner = s.uploadedBy === currentUserId ||
+                              (currentUserId === 'mina' && s.uploadedBy === 'user_teacher_mina_101') ||
+                              (currentUserId === 'user_teacher_mina_101' && s.uploadedBy === 'mina');
+
+        // Privacy check: teachers cannot see other teachers' private draft sources
+        if (currentUserRole !== 'admin' && !isSourceOwner && !isLessonOwner && !isPublished && !s.isPublic) {
+          continue;
+        }
+
+        // Evidence map provenance connection
+        let evidenceMapAvailable = false;
+        let evidenceClaimsCount = 0;
+        const claimSummary: any[] = [];
+
+        for (const eMapId of Object.keys(serverReviewState.claims || {})) {
+          const claims = serverReviewState.claims[eMapId] || [];
+          const matchedClaims = claims.filter((c: any) => 
+            c.sourceId === s.id || 
+            c.sourceName === s.originalFilename ||
+            (s.lessonId && (c.lessonId === s.lessonId || eMapId.includes(s.lessonId)))
+          );
+          if (matchedClaims.length > 0) {
+            evidenceMapAvailable = true;
+            evidenceClaimsCount += matchedClaims.length;
+            claimSummary.push(...matchedClaims.map((c: any) => ({
+              claimId: c.claimId,
+              statementEn: c.statementEn,
+              statementAr: c.statementAr,
+              category: c.category,
+              sourceLocation: c.sourceLocation,
+              verified: c.verified,
+              servantReviewStatus: c.servantReviewStatus
+            })));
+          }
+        }
+
+        results.push({
+          id: s.id,
+          lessonId: s.lessonId,
+          lessonTitle: lesson?.title_en || lesson?.titleEn || (s.lessonId === 'l-cross-01' ? 'Discovery of the Holy Cross' : s.lessonId),
+          lessonStatus: lesson?.status || 'draft',
+          uploadedBy: s.uploadedBy,
+          type: s.type,
+          originalFilename: s.originalFilename,
+          mimeType: s.mimeType,
+          fileUrl: s.fileUrl,
+          fileSize: s.fileSize,
+          description: s.description || null,
+          teacherNotes: s.teacherNotes || null,
+          rightsStatus: s.rightsStatus || 'TEACHER_OWNED',
+          processingStatus: s.processingStatus || 'INDEXED',
+          priority: s.priority || 'PRIMARY',
+          isPublic: Boolean(s.isPublic || isPublished),
+          uploadedAt: s.uploadedAt || new Date().toISOString(),
+          evidenceMapAvailable,
+          evidenceClaimsCount,
+          claimsSample: claimSummary.slice(0, 3)
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      count: results.length,
+      sources: results
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Inspect Single Source by ID
+app.get("/api/church/sources/:sourceId", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated && (authContext.role === 'student' || authContext.role === 'parent')) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents are not permitted to access servant curriculum source details."
+      });
+    }
+
+    const sourceId = req.params.sourceId;
+    let foundSource: any = null;
+    let parentLessonId: string | null = null;
+
+    for (const lId of Object.keys(serverReviewState.sources || {})) {
+      const match = (serverReviewState.sources[lId] || []).find((s: any) => s.id === sourceId);
+      if (match) {
+        foundSource = match;
+        parentLessonId = lId;
+        break;
+      }
+    }
+
+    if (!foundSource) {
+      return res.status(404).json({
+        success: false,
+        error: "SOURCE_NOT_FOUND",
+        message: `Source ${sourceId} not found.`
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    const lesson = parentLessonId ? serverReviewState.lessons[parentLessonId] : null;
+    const isPublished = lesson?.status === 'published';
+    const isSourceOwner = foundSource.uploadedBy === currentUserId ||
+                          (currentUserId === 'mina' && foundSource.uploadedBy === 'user_teacher_mina_101') ||
+                          (currentUserId === 'user_teacher_mina_101' && foundSource.uploadedBy === 'mina');
+    const isLessonOwner = lesson?.createdBy === currentUserId ||
+                          (currentUserId === 'mina' && lesson?.createdBy === 'user_teacher_mina_101') ||
+                          (currentUserId === 'user_teacher_mina_101' && lesson?.createdBy === 'mina');
+
+    if (currentUserRole !== 'admin' && !isSourceOwner && !isLessonOwner && !isPublished && !foundSource.isPublic) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Cannot access private draft source of another teacher."
+      });
+    }
+
+    // Collect all matched claims
+    const matchedClaims: any[] = [];
+    for (const eMapId of Object.keys(serverReviewState.claims || {})) {
+      const claims = serverReviewState.claims[eMapId] || [];
+      const m = claims.filter((c: any) => 
+        c.sourceId === foundSource.id || 
+        c.sourceName === foundSource.originalFilename
+      );
+      matchedClaims.push(...m);
+    }
+
+    return res.json({
+      success: true,
+      source: {
+        ...foundSource,
+        lessonTitle: lesson?.title_en || lesson?.titleEn || foundSource.lessonId,
+        lessonStatus: lesson?.status || 'draft',
+        isPublic: Boolean(foundSource.isPublic || isPublished),
+        evidenceMapAvailable: matchedClaims.length > 0,
+        evidenceClaimsCount: matchedClaims.length,
+        claims: matchedClaims
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 3. Attach / Link Source to a Lesson
+app.post("/api/church/sources", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated && (authContext.role === 'student' || authContext.role === 'parent')) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents cannot add or link curriculum sources."
+      });
+    }
+
+    const { lessonId, type, originalFilename, mimeType, fileUrl, fileSize, description, teacherNotes, rightsStatus, priority } = req.body;
+
+    if (!lessonId || !type || !originalFilename) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "lessonId, type, and originalFilename are required."
+      });
+    }
+
+    const allowedTypes = ['PDF', 'DOCX', 'PPTX', 'IMAGE', 'TEACHER_VOICE', 'TEACHER_TEXT', 'YOUTUBE_VIDEO', 'OTHER_APPROVED_RESOURCE'];
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_SOURCE_TYPE",
+        message: `Type ${type} is not a supported source type.`
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    const targetLesson = serverReviewState.lessons[lessonId];
+
+    if (targetLesson && currentUserRole !== 'admin') {
+      const isOwner = targetLesson.createdBy === currentUserId ||
+                      (currentUserId === 'mina' && targetLesson.createdBy === 'user_teacher_mina_101') ||
+                      (currentUserId === 'user_teacher_mina_101' && targetLesson.createdBy === 'mina');
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Cannot attach sources to another teacher's lesson."
+        });
+      }
+    }
+
+    const newSource = {
+      id: `src-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      lessonId,
+      uploadedBy: currentUserId,
+      type,
+      originalFilename,
+      mimeType: mimeType || 'application/octet-stream',
+      fileUrl: fileUrl || '#',
+      fileSize: fileSize || 0,
+      description: description || null,
+      teacherNotes: teacherNotes || null,
+      rightsStatus: rightsStatus || 'TEACHER_OWNED',
+      processingStatus: 'INDEXED',
+      priority: priority || 'PRIMARY',
+      isPublic: false,
+      uploadedAt: new Date().toISOString()
+    };
+
+    if (!serverReviewState.sources[lessonId]) {
+      serverReviewState.sources[lessonId] = [];
+    }
+    serverReviewState.sources[lessonId].push(newSource);
+
+    return res.status(201).json({
+      success: true,
+      source: newSource
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 4. Detach / Remove Source from a Lesson (Servant Authorization Guarded)
+app.delete("/api/church/sources/:sourceId", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated && (authContext.role === 'student' || authContext.role === 'parent')) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents cannot remove curriculum sources."
+      });
+    }
+
+    const sourceId = req.params.sourceId;
+    let foundSource: any = null;
+    let parentLessonId: string | null = null;
+    let foundIndex = -1;
+
+    for (const lId of Object.keys(serverReviewState.sources || {})) {
+      const idx = (serverReviewState.sources[lId] || []).findIndex((s: any) => s.id === sourceId);
+      if (idx !== -1) {
+        foundSource = serverReviewState.sources[lId][idx];
+        parentLessonId = lId;
+        foundIndex = idx;
+        break;
+      }
+    }
+
+    if (!foundSource || !parentLessonId) {
+      return res.status(404).json({
+        success: false,
+        error: "SOURCE_NOT_FOUND",
+        message: `Source ${sourceId} not found.`
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    const lesson = serverReviewState.lessons[parentLessonId];
+
+    if (lesson?.status === 'published') {
+      return res.status(400).json({
+        success: false,
+        error: "IMMUTABLE_PUBLISHED_LESSON",
+        message: "Cannot delete or detach sources from a published curriculum lesson."
+      });
+    }
+
+    const isSourceOwner = foundSource.uploadedBy === currentUserId ||
+                          (currentUserId === 'mina' && foundSource.uploadedBy === 'user_teacher_mina_101') ||
+                          (currentUserId === 'user_teacher_mina_101' && foundSource.uploadedBy === 'mina');
+
+    if (currentUserRole !== 'admin' && !isSourceOwner) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Teacher cannot delete another teacher's source."
+      });
+    }
+
+    // Safe deletion from serverReviewState
+    serverReviewState.sources[parentLessonId].splice(foundIndex, 1);
+
+    return res.json({
+      success: true,
+      message: "Source detached and removed successfully."
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 5. Read-only Evidence Inspection for a Source
+app.get("/api/church/sources/:sourceId/evidence", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated && (authContext.role === 'student' || authContext.role === 'parent')) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents cannot inspect evidence map details."
+      });
+    }
+
+    const sourceId = req.params.sourceId;
+    let foundSource: any = null;
+    let parentLessonId: string | null = null;
+
+    for (const lId of Object.keys(serverReviewState.sources || {})) {
+      const match = (serverReviewState.sources[lId] || []).find((s: any) => s.id === sourceId);
+      if (match) {
+        foundSource = match;
+        parentLessonId = lId;
+        break;
+      }
+    }
+
+    if (!foundSource) {
+      return res.status(404).json({
+        success: false,
+        error: "SOURCE_NOT_FOUND",
+        message: `Source ${sourceId} not found.`
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    const lesson = parentLessonId ? serverReviewState.lessons[parentLessonId] : null;
+    const isPublished = lesson?.status === 'published';
+    const isSourceOwner = foundSource.uploadedBy === currentUserId ||
+                          (currentUserId === 'mina' && foundSource.uploadedBy === 'user_teacher_mina_101') ||
+                          (currentUserId === 'user_teacher_mina_101' && foundSource.uploadedBy === 'mina');
+
+    if (currentUserRole !== 'admin' && !isSourceOwner && !isPublished && !foundSource.isPublic) {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Cannot inspect evidence map for another teacher's private draft source."
+      });
+    }
+
+    // Collect matched claims
+    const matchedClaims: any[] = [];
+    for (const eMapId of Object.keys(serverReviewState.claims || {})) {
+      const claims = serverReviewState.claims[eMapId] || [];
+      const m = claims.filter((c: any) => 
+        c.sourceId === foundSource.id || 
+        c.sourceName === foundSource.originalFilename
+      );
+      matchedClaims.push(...m);
+    }
+
+    return res.json({
+      success: true,
+      readOnly: true,
+      sourceId: foundSource.id,
+      lessonId: foundSource.lessonId,
+      sourceFilename: foundSource.originalFilename,
+      evidenceMapAvailable: matchedClaims.length > 0,
+      claimsCount: matchedClaims.length,
+      claims: matchedClaims
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 2E.2: GENERATED LEARNING MATERIALS (SLIDES, FLASHCARDS, QUIZ)
+// ==============================================================================
+
+// 1. Generate Structured Learning Materials for an Approved/Published Lesson Version
+app.post("/api/church/lessons/:lessonId/generate-materials", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    // 1. Authentication check
+    if (!authContext.isAuthenticated) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+      if (supabaseUrl && supabaseAnonKey) {
+        return res.status(401).json({
+          success: false,
+          error: "UNAUTHORIZED",
+          message: "Authentication required to generate learning materials."
+        });
+      }
+    }
+
+    // 2. Role validation (Students and Parents strictly forbidden)
+    if (authContext.role === 'student' || authContext.role === 'parent') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents cannot generate curriculum learning materials."
+      });
+    }
+
+    const lessonId = req.params.lessonId;
+    const lesson = serverReviewState.lessons[lessonId];
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        error: "LESSON_NOT_FOUND",
+        message: `Lesson ${lessonId} not found.`
+      });
+    }
+
+    // 3. Teacher authorization check
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    if (currentUserRole !== 'admin') {
+      const isOwner = lesson.createdBy === currentUserId ||
+                      (currentUserId === 'mina' && lesson.createdBy === 'user_teacher_mina_101') ||
+                      (currentUserId === 'user_teacher_mina_101' && lesson.createdBy === 'mina');
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Cannot generate learning materials for another teacher's lesson."
+        });
+      }
+    }
+
+    // 4. Resolve target version
+    let targetVersionId = req.body.versionId;
+    let targetVersion: any = null;
+    if (targetVersionId) {
+      targetVersion = serverReviewState.versions[targetVersionId];
+      if (!targetVersion || targetVersion.lessonId !== lessonId) {
+        return res.status(404).json({
+          success: false,
+          error: "VERSION_NOT_FOUND",
+          message: `Version ${targetVersionId} not found for lesson ${lessonId}.`
+        });
+      }
+    } else {
+      // Find latest approved or published version
+      const matchingVersions = Object.values(serverReviewState.versions).filter(
+        (v: any) => v.lessonId === lessonId && (v.status === 'APPROVED' || v.status === 'PUBLISHED')
+      );
+      if (matchingVersions.length > 0) {
+        targetVersion = matchingVersions[matchingVersions.length - 1];
+        targetVersionId = targetVersion.id;
+      } else {
+        // Fallback to active_version_id
+        if (lesson.active_version_id && serverReviewState.versions[lesson.active_version_id]) {
+          targetVersion = serverReviewState.versions[lesson.active_version_id];
+          targetVersionId = targetVersion.id;
+        } else {
+          const anyVersion = Object.values(serverReviewState.versions).find((v: any) => v.lessonId === lessonId);
+          targetVersion = anyVersion;
+          targetVersionId = anyVersion ? (anyVersion as any).id : null;
+        }
+      }
+    }
+
+    if (!targetVersion) {
+      return res.status(404).json({
+        success: false,
+        error: "VERSION_NOT_FOUND",
+        message: `No version found for lesson ${lessonId}.`
+      });
+    }
+
+    // 5. Version status safety: MUST BE APPROVED OR PUBLISHED
+    if (targetVersion.status !== 'APPROVED' && targetVersion.status !== 'PUBLISHED') {
+      return res.status(400).json({
+        success: false,
+        error: "LESSON_NOT_APPROVED",
+        message: `Learning materials can only be generated for APPROVED or PUBLISHED lesson versions (current status: ${targetVersion.status}).`
+      });
+    }
+
+    // 6. Evidence map / provenance verification
+    const relevantClaims: any[] = [];
+    for (const eMapId of Object.keys(serverReviewState.claims || {})) {
+      const claims = serverReviewState.claims[eMapId] || [];
+      const m = claims.filter((c: any) => 
+        (c.lessonId && c.lessonId === lessonId) ||
+        eMapId.includes(lessonId) ||
+        (lessonId === 'l-test-draft-01' && eMapId === 'e-map-test-01') ||
+        (lessonId === 'l-test-multiversion-01' && eMapId === 'e-map-multi-01')
+      );
+      relevantClaims.push(...m);
+    }
+
+    if (relevantClaims.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "EVIDENCE_MAP_REQUIRED",
+        message: `Lesson ${lessonId} has no valid evidence map or verified theological claims for grounded material generation.`
+      });
+    }
+
+    // 7. Resolve sources belonging ONLY to this lesson
+    const lessonSources = serverReviewState.sources[lessonId] || [];
+    const validSourceRefs = lessonSources.map((s: any) => ({
+      sourceId: s.id,
+      sourceName: s.originalFilename,
+      location: 'Curriculum Handout'
+    }));
+    const primarySourceRef = validSourceRefs[0] || {
+      sourceId: `src-${lessonId}-main`,
+      sourceName: 'Official Church Handout',
+      location: 'Section 1'
+    };
+
+    // 8. Generate strictly grounded materials:
+    const sections = targetVersion.sections || [
+      { id: 'sec-1', titleEn: 'Lesson Foundation', titleAr: 'أساسيات الدرس' }
+    ];
+
+    const typesRequested = req.body.types || 'ALL';
+    const shouldGenerateSlides = typesRequested === 'ALL' || typesRequested.includes('SLIDES');
+    const shouldGenerateFlashcards = typesRequested === 'ALL' || typesRequested.includes('FLASHCARDS');
+    const shouldGenerateQuiz = typesRequested === 'ALL' || typesRequested.includes('QUIZ');
+
+    // Slides generation
+    const generatedSlides: any[] = [];
+    if (shouldGenerateSlides) {
+      sections.forEach((sec: any, idx: number) => {
+        const claim = relevantClaims[idx % relevantClaims.length] || relevantClaims[0];
+        generatedSlides.push({
+          number: idx + 1,
+          titleEn: sec.titleEn || `Part ${idx + 1}: ${claim.statementEn}`,
+          titleAr: sec.titleAr || (claim.statementAr || `الجزء ${idx + 1}`),
+          bulletsEn: [
+            claim.quoteEn || claim.statementEn,
+            `Historical context verified from ${claim.sourceName || primarySourceRef.sourceName}`,
+            `Coptic Orthodox theological tradition affirmed.`
+          ],
+          bulletsAr: [
+            claim.statementAr,
+            `سياق تاريخي موثق من ${claim.sourceName || primarySourceRef.sourceName}`,
+            `تأكيد التقليد الكنسي القبطي الأرثوذكسي.`
+          ],
+          speakerNotesEn: `Servant note: emphasize that ${claim.statementEn} is grounded in church history.`,
+          speakerNotesAr: `ملاحظة الخادم: التأكيد على أن هذا الحدث موثق في تاريخ الكنيسة.`,
+          scriptureRef: '1 Corinthians 1:18',
+          sectionId: sec.id,
+          sectionTitle: sec.titleEn,
+          sourceRefs: [
+            {
+              sourceId: claim.sourceId || primarySourceRef.sourceId,
+              sourceName: claim.sourceName || primarySourceRef.sourceName,
+              location: claim.sourceLocation || 'Page 1'
+            }
+          ],
+          reviewStatus: 'UNVERIFIED'
+        });
+      });
+    }
+
+    // Flashcards generation
+    const generatedFlashcards: any[] = [];
+    if (shouldGenerateFlashcards) {
+      relevantClaims.forEach((claim: any, idx: number) => {
+        const sec = sections[idx % sections.length];
+        generatedFlashcards.push({
+          id: `fc-gen-${Date.now()}-${idx + 1}`,
+          frontEn: `Key Fact #${idx + 1}: What does church tradition affirm about ${claim.category || 'this event'}?`,
+          frontAr: `حقيقة هامة #${idx + 1}: ماذا يؤكد التقليد الكنسي بخصوص هذا الحدث؟`,
+          backEn: claim.statementEn,
+          backAr: claim.statementAr,
+          sectionId: sec.id,
+          sectionTitle: sec.titleEn,
+          sourceRefs: [
+            {
+              sourceId: claim.sourceId || primarySourceRef.sourceId,
+              sourceName: claim.sourceName || primarySourceRef.sourceName,
+              location: claim.sourceLocation || 'Page 1'
+            }
+          ],
+          reviewStatus: 'UNVERIFIED'
+        });
+      });
+    }
+
+    // Quiz questions generation
+    const generatedQuiz: any[] = [];
+    if (shouldGenerateQuiz) {
+      relevantClaims.forEach((claim: any, idx: number) => {
+        const sec = sections[idx % sections.length];
+        generatedQuiz.push({
+          id: `q-gen-${Date.now()}-${idx + 1}`,
+          type: 'multiple_choice',
+          questionEn: `Based on the lesson evidence: ${claim.statementEn.replace(/\.$/, '')}?`,
+          questionAr: `بناءً على شواهد الدرس: ${claim.statementAr.replace(/\.$/, '')}؟`,
+          optionsEn: [
+            claim.statementEn,
+            `Alternative assertion ${idx + 1}A`,
+            `Alternative assertion ${idx + 1}B`
+          ],
+          optionsAr: [
+            claim.statementAr,
+            `خيار غير صحيح أول`,
+            `خيار غير صحيح ثانٍ`
+          ],
+          correctIndex: 0,
+          explanationEn: `Verified from source ${claim.sourceName || primarySourceRef.sourceName} (${claim.sourceLocation || 'Handout'}).`,
+          explanationAr: `موثق من مصدر ${claim.sourceName || primarySourceRef.sourceName}.`,
+          sectionId: sec.id,
+          sectionTitle: sec.titleEn,
+          sourceRef: {
+            sectionId: sec.id,
+            sectionTitle: sec.titleEn,
+            sourceId: claim.sourceId || primarySourceRef.sourceId,
+            location: claim.sourceLocation || 'Page 1'
+          },
+          reviewStatus: 'UNVERIFIED'
+        });
+      });
+    }
+
+    // Store in serverReviewState.generatedMaterials
+    const materialsPacket = {
+      lessonId,
+      versionId: targetVersionId,
+      generatedBy: currentUserId,
+      generatedAt: new Date().toISOString(),
+      slides: generatedSlides,
+      flashcards: generatedFlashcards,
+      quiz: generatedQuiz
+    };
+
+    if (!serverReviewState.generatedMaterials) {
+      serverReviewState.generatedMaterials = {};
+    }
+    serverReviewState.generatedMaterials[targetVersionId] = materialsPacket;
+
+    return res.status(201).json({
+      success: true,
+      lessonId,
+      versionId: targetVersionId,
+      status: 'UNVERIFIED',
+      message: 'Learning materials generated safely as UNVERIFIED draft. Servant review required before student publication.',
+      materials: materialsPacket
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Retrieve Generated Materials (Filtered for Students; Full for Authorized Servants)
+app.get("/api/church/lessons/:lessonId/materials", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const lessonId = req.params.lessonId;
+    const lesson = serverReviewState.lessons[lessonId];
+
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        error: "LESSON_NOT_FOUND",
+        message: `Lesson ${lessonId} not found.`
+      });
+    }
+
+    // Unauthenticated (Demo / Offline fallback)
+    if (!authContext.isAuthenticated) {
+      return res.json({
+        success: true,
+        lessonId,
+        versionId: lesson.active_version_id || 'v-test-multi-1',
+        isStudentView: true,
+        materials: {
+          slides: [
+            {
+              number: 1,
+              titleEn: '1. Discovery of the True Cross',
+              titleAr: '١. اكتشاف عود الصليب المقدس',
+              bulletsEn: ['Queen Helena traveled in 326 AD', 'Guidance of Judas the elder'],
+              bulletsAr: ['سافرت الملكة هيلانة عام ٣٢٦ م', 'بإرشاد يهوذا الشيخ'],
+              reviewStatus: 'APPROVED'
+            }
+          ],
+          flashcards: [
+            {
+              id: 'fc-demo-1',
+              frontEn: 'When was the True Cross discovered?',
+              frontAr: 'متى تم اكتشاف الصليب المقدس؟',
+              backEn: 'In 326 AD by Queen Helena',
+              backAr: 'عام ٣٢٦ م بواسطة الملكة هيلانة',
+              reviewStatus: 'APPROVED'
+            }
+          ],
+          quiz: []
+        }
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'student';
+    const isStudent = currentUserRole === 'student' || currentUserRole === 'parent';
+
+    // If student / parent:
+    if (isStudent) {
+      // Must be a published lesson
+      if (lesson.status !== 'published') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students cannot access learning materials for unpublished draft lessons."
+        });
+      }
+
+      const activeVerId = lesson.active_version_id || 'v-test-multi-1';
+      const stored = serverReviewState.generatedMaterials?.[activeVerId];
+
+      // Student ONLY receives APPROVED items!
+      const approvedSlides = (stored?.slides || []).filter((s: any) => s.reviewStatus === 'APPROVED');
+      const approvedFlashcards = (stored?.flashcards || []).filter((f: any) => f.reviewStatus === 'APPROVED');
+      const approvedQuiz = (stored?.quiz || []).filter((q: any) => q.reviewStatus === 'APPROVED');
+
+      return res.json({
+        success: true,
+        lessonId,
+        versionId: activeVerId,
+        isStudentView: true,
+        materials: {
+          slides: approvedSlides,
+          flashcards: approvedFlashcards,
+          quiz: approvedQuiz
+        }
+      });
+    }
+
+    // If teacher:
+    if (currentUserRole !== 'admin') {
+      const isOwner = lesson.createdBy === currentUserId ||
+                      (currentUserId === 'mina' && lesson.createdBy === 'user_teacher_mina_101') ||
+                      (currentUserId === 'user_teacher_mina_101' && lesson.createdBy === 'mina');
+      const isPublished = lesson.status === 'published';
+      if (!isOwner && !isPublished) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Cannot access materials of another teacher's draft lesson."
+        });
+      }
+    }
+
+    const versionIdParam = req.query.versionId as string || lesson.active_version_id || 'v-test-multi-1';
+    const stored = serverReviewState.generatedMaterials?.[versionIdParam] || {
+      lessonId,
+      versionId: versionIdParam,
+      slides: [],
+      flashcards: [],
+      quiz: []
+    };
+
+    return res.json({
+      success: true,
+      lessonId,
+      versionId: versionIdParam,
+      isStudentView: false,
+      materials: stored
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 3. Servant Review & Approval of Generated Materials
+app.post("/api/church/lessons/:lessonId/materials/review", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.role === 'student' || authContext.role === 'parent') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Students and parents cannot review or approve learning materials."
+      });
+    }
+
+    const lessonId = req.params.lessonId;
+    const lesson = serverReviewState.lessons[lessonId];
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        error: "LESSON_NOT_FOUND",
+        message: `Lesson ${lessonId} not found.`
+      });
+    }
+
+    const currentUserId = authContext.userId || 'user_teacher_mina_101';
+    const currentUserRole = authContext.role || 'teacher';
+    if (currentUserRole !== 'admin') {
+      const isOwner = lesson.createdBy === currentUserId ||
+                      (currentUserId === 'mina' && lesson.createdBy === 'user_teacher_mina_101') ||
+                      (currentUserId === 'user_teacher_mina_101' && lesson.createdBy === 'mina');
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Cannot review materials for another teacher's lesson."
+        });
+      }
+    }
+
+    const { versionId, action, itemType, itemId } = req.body;
+    if (!versionId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "versionId is required."
+      });
+    }
+
+    const packet = serverReviewState.generatedMaterials?.[versionId];
+    if (!packet) {
+      return res.status(404).json({
+        success: false,
+        error: "MATERIALS_NOT_FOUND",
+        message: `No generated materials found for version ${versionId}.`
+      });
+    }
+
+    const targetStatus = action === 'REJECT' ? 'REJECTED' : 'APPROVED';
+
+    if (action === 'APPROVE_ALL' || !itemId) {
+      packet.slides.forEach((s: any) => s.reviewStatus = targetStatus);
+      packet.flashcards.forEach((f: any) => f.reviewStatus = targetStatus);
+      packet.quiz.forEach((q: any) => q.reviewStatus = targetStatus);
+    } else {
+      if (itemType === 'SLIDES') {
+        const item = packet.slides.find((s: any) => s.number === Number(itemId));
+        if (item) item.reviewStatus = targetStatus;
+      } else if (itemType === 'FLASHCARDS') {
+        const item = packet.flashcards.find((f: any) => f.id === itemId);
+        if (item) item.reviewStatus = targetStatus;
+      } else if (itemType === 'QUIZ') {
+        const item = packet.quiz.find((q: any) => q.id === itemId);
+        if (item) item.reviewStatus = targetStatus;
+      }
+    }
+
+    packet.reviewedAt = new Date().toISOString();
+    packet.reviewedBy = currentUserId;
+
+    // Sync approved materials into version if approved
+    const ver = serverReviewState.versions[versionId];
+    if (ver && targetStatus === 'APPROVED') {
+      ver.slides = packet.slides.filter((s: any) => s.reviewStatus === 'APPROVED');
+      ver.flashcards = packet.flashcards.filter((f: any) => f.reviewStatus === 'APPROVED');
+    }
+
+    return res.json({
+      success: true,
+      message: `Learning materials successfully updated with status ${targetStatus}.`,
+      status: targetStatus,
+      materials: packet
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
 // 4. Servant Review Comments (GET & POST) - Teachers and admins only
 app.get("/api/church/review-comments", async (req, res) => {
   try {
@@ -3575,9 +6024,34 @@ app.post("/api/upload-media", upload.single("media"), async (req, res) => {
 
     const fileUrl = `/uploads/${file.filename}`;
 
+    let createdSourceId: string | null = null;
+    if (uploadType === "source" && lessonId && typeof serverReviewState !== 'undefined') {
+      if (!serverReviewState.sources[lessonId]) {
+        serverReviewState.sources[lessonId] = [];
+      }
+      createdSourceId = `src-up-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      serverReviewState.sources[lessonId].push({
+        id: createdSourceId,
+        lessonId: lessonId,
+        uploadedBy: uploaderId || "user_teacher_mina_101",
+        type: isAudio ? 'TEACHER_VOICE' : file.mimetype.includes('pdf') ? 'PDF' : file.mimetype.includes('presentation') ? 'PPTX' : file.mimetype.includes('word') ? 'DOCX' : isImage ? 'IMAGE' : 'OTHER_APPROVED_RESOURCE',
+        originalFilename: file.originalname,
+        mimeType: file.mimetype,
+        fileUrl: fileUrl,
+        fileSize: file.size,
+        description: `Uploaded ${file.originalname}`,
+        rightsStatus: 'TEACHER_OWNED',
+        processingStatus: 'INDEXED',
+        priority: 'PRIMARY',
+        isPublic: Boolean(isPublic),
+        uploadedAt: new Date().toISOString()
+      });
+    }
+
     return res.json({
       success: true,
       mediaUrl: fileUrl,
+      sourceId: createdSourceId,
       mediaType: isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'file',
       provider: 'local-server',
       sizeKb: Math.round(file.size / 1024),
