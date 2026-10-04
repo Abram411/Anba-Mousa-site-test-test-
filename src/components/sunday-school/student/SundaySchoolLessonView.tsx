@@ -82,6 +82,17 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
   const isContentCompleted = progress?.status === 'COMPLETED' || isAllSectionsRead;
   const latestQuizAttempt = quizAttempts[quizAttempts.length - 1];
 
+  // Learning materials (slides & flashcards): only show reviewed/approved items to students on published lessons
+  const isLessonPublished = lesson.status === 'published' || Boolean((lesson as any).isPublished);
+  const isVersionApproved = version.status === 'APPROVED';
+  const isEligibleForStudents = isLessonPublished && isVersionApproved;
+
+  const rawSlides = isEligibleForStudents ? ((version as any)?.slides || []) : [];
+  const eligibleSlides = rawSlides.filter((s: any) => s.reviewStatus === 'APPROVED' || (!s.reviewStatus && isVersionApproved));
+
+  const rawFlashcards = isEligibleForStudents ? ((version as any)?.flashcards || []) : [];
+  const eligibleFlashcards = rawFlashcards.filter((f: any) => f.reviewStatus === 'APPROVED' || (!f.reviewStatus && isVersionApproved));
+
   const classInfo = formatStudentClassDisplay(lesson.grade, lang);
 
   return (
@@ -293,7 +304,7 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
       </div>
 
       {/* Classroom Slide Deck Action Card */}
-      {version.slides && version.slides.length > 0 && (
+      {eligibleSlides && eligibleSlides.length > 0 && (
         <div className="p-5 bg-gradient-to-r from-amber-950/40 via-stone-900 to-stone-900 border border-amber-800/40 rounded-2xl flex items-center justify-between flex-wrap gap-4 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
@@ -302,7 +313,7 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
             <div>
               <h3 className="text-sm font-bold text-white">Classroom Slide Presentation</h3>
               <p className="text-xs text-stone-400">
-                {version.slides.length} visual slides used by your servant on the classroom smart board.
+                {eligibleSlides.length} visual slides used by your servant on the classroom smart board.
               </p>
             </div>
           </div>
@@ -503,14 +514,14 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
       </div>
 
       {/* Interactive Review Flashcards */}
-      {version.flashcards && version.flashcards.length > 0 && (
+      {eligibleFlashcards && eligibleFlashcards.length > 0 && (
         <div className="p-6 bg-stone-900 border border-stone-800 rounded-2xl space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400">
-              Interactive Memory Flashcards ({version.flashcards.length})
+              Interactive Memory Flashcards ({eligibleFlashcards.length})
             </h3>
             <span className="text-xs font-mono text-stone-500">
-              Card {activeFlashcardIndex + 1} of {version.flashcards.length}
+              Card {activeFlashcardIndex + 1} of {eligibleFlashcards.length}
             </span>
           </div>
 
@@ -526,19 +537,19 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
             {isFlashcardFlipped ? (
               <div className="space-y-2">
                 <p className="text-base font-bold text-emerald-400 font-serif">
-                  {version.flashcards[activeFlashcardIndex].backEn}
+                  {eligibleFlashcards[activeFlashcardIndex]?.backEn}
                 </p>
                 <p className="text-xs text-stone-300 font-sans" dir="rtl">
-                  {version.flashcards[activeFlashcardIndex].backAr}
+                  {eligibleFlashcards[activeFlashcardIndex]?.backAr}
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-base font-bold text-white font-serif">
-                  {version.flashcards[activeFlashcardIndex].frontEn}
+                  {eligibleFlashcards[activeFlashcardIndex]?.frontEn}
                 </p>
                 <p className="text-xs text-amber-300 font-sans" dir="rtl">
-                  {version.flashcards[activeFlashcardIndex].frontAr}
+                  {eligibleFlashcards[activeFlashcardIndex]?.frontAr}
                 </p>
               </div>
             )}
@@ -559,9 +570,9 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
             <button
               onClick={() => {
                 setIsFlashcardFlipped(false);
-                setActiveFlashcardIndex(prev => Math.min(version.flashcards!.length - 1, prev + 1));
+                setActiveFlashcardIndex(prev => Math.min(eligibleFlashcards.length - 1, prev + 1));
               }}
-              disabled={activeFlashcardIndex === version.flashcards.length - 1}
+              disabled={activeFlashcardIndex === eligibleFlashcards.length - 1}
               className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 rounded-xl text-xs text-stone-300"
             >
               Next Card
@@ -611,11 +622,11 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
       </div>
 
       {/* Fullscreen Slide Deck Modal */}
-      {showSlidesModal && version.slides && (
+      {showSlidesModal && eligibleSlides.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm p-4 sm:p-8 flex items-center justify-center">
           <div className="w-full max-w-5xl">
             <SlideDeckViewer
-              slides={version.slides}
+              slides={eligibleSlides}
               onClose={() => setShowSlidesModal(false)}
             />
           </div>

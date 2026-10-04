@@ -19,7 +19,10 @@ import {
   ChevronDown,
   ChevronUp,
   Bookmark,
-  Globe
+  Globe,
+  X,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { 
   LessonOutline, 
@@ -50,6 +53,15 @@ import {
   publishLessonVersion as publishLessonVersionService,
   canPublishVersion
 } from '../../../lib/lessonPublishingService';
+import {
+  GeneratedMaterialsPacket,
+  GeneratedSlideItem,
+  GeneratedFlashcardItem,
+  GeneratedQuizQuestionItem,
+  fetchLessonMaterials,
+  generateLessonMaterials,
+  reviewLessonMaterials
+} from '../../../lib/generatedMaterialsService';
 
 interface LessonVersionStudioProps {
   lessonId: string;
@@ -98,11 +110,80 @@ export const LessonVersionStudio: React.FC<LessonVersionStudioProps> = ({
     return versions[versions.length - 1]?.id || '';
   });
 
-  const [activeTab, setActiveTab] = useState<'review' | 'outline' | 'sections' | 'slides' | 'quiz' | 'diff' | 'narration'>(() => {
+  const [activeTab, setActiveTab] = useState<'review' | 'outline' | 'sections' | 'slides' | 'quiz' | 'diff' | 'narration' | 'materials'>(() => {
     const latest = versions[versions.length - 1];
     return latest?.status === 'SERVANT_REVIEW' ? 'review' : 'sections';
   });
   const [servantName, setServantName] = useState<string>('Servant Mina');
+
+  // Phase 2E.3: Generated Learning Materials Review State
+  const [materialsPacket, setMaterialsPacket] = useState<GeneratedMaterialsPacket | null>(null);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState<boolean>(false);
+  const [isGeneratingMaterials, setIsGeneratingMaterials] = useState<boolean>(false);
+  const [isReviewingMaterials, setIsReviewingMaterials] = useState<boolean>(false);
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
+  const [materialsSuccess, setMaterialsSuccess] = useState<string | null>(null);
+  const [materialsFilter, setMaterialsFilter] = useState<'ALL' | 'UNVERIFIED' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [activeFlippedCards, setActiveFlippedCards] = useState<Record<string, boolean>>({});
+
+  const loadMaterials = async (verId: string) => {
+    setIsLoadingMaterials(true);
+    setMaterialsError(null);
+    try {
+      const res = await fetchLessonMaterials(lessonId, verId);
+      if (res.data) {
+        setMaterialsPacket(res.data);
+      } else if (res.error) {
+        setMaterialsError(res.error.message);
+      }
+    } catch (err: any) {
+      setMaterialsError(err?.message || 'Error loading materials');
+    } finally {
+      setIsLoadingMaterials(false);
+    }
+  };
+
+  const handleGenerateMaterials = async () => {
+    setIsGeneratingMaterials(true);
+    setMaterialsError(null);
+    setMaterialsSuccess(null);
+    try {
+      const res = await generateLessonMaterials(lessonId, selectedVersionId, 'ALL');
+      if (res.data) {
+        setMaterialsPacket(res.data);
+        setMaterialsSuccess('Grounding pipeline successfully generated Slides, Flashcards, and Quiz items in UNVERIFIED state.');
+      } else {
+        setMaterialsError(res.error?.message || 'Failed to generate materials');
+      }
+    } catch (err: any) {
+      setMaterialsError(err?.message || 'Generation failed');
+    } finally {
+      setIsGeneratingMaterials(false);
+    }
+  };
+
+  const handleReviewMaterialAction = async (
+    action: 'APPROVE_ALL' | 'APPROVE_ITEM' | 'REJECT',
+    itemType?: 'SLIDES' | 'FLASHCARDS' | 'QUIZ',
+    itemId?: string
+  ) => {
+    setIsReviewingMaterials(true);
+    setMaterialsError(null);
+    setMaterialsSuccess(null);
+    try {
+      const res = await reviewLessonMaterials(lessonId, selectedVersionId, action, itemType, itemId);
+      if (res.data) {
+        setMaterialsPacket(res.data);
+        setMaterialsSuccess(action === 'REJECT' ? 'Item marked as rejected and hidden from students.' : 'Item approved and eligible for student publication.');
+      } else {
+        setMaterialsError(res.error?.message || 'Failed to review material');
+      }
+    } catch (err: any) {
+      setMaterialsError(err?.message || 'Review action failed');
+    } finally {
+      setIsReviewingMaterials(false);
+    }
+  };
 
   // Servant Review State (Phase 2B.5)
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
@@ -817,6 +898,26 @@ export const LessonVersionStudio: React.FC<LessonVersionStudioProps> = ({
         >
           <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
           <span>Separate Quiz Draft</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('materials');
+            loadMaterials(selectedVersionId);
+          }}
+          className={`py-3 px-3.5 border-b-2 font-medium flex items-center gap-1.5 transition-colors ${
+            activeTab === 'materials'
+              ? 'border-amber-500 text-amber-400 font-bold'
+              : 'border-transparent text-stone-400 hover:text-stone-200'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Materials Review</span>
+          {materialsPacket && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-950/80 text-amber-300 border border-amber-800/80 font-mono">
+              {(materialsPacket.slides?.length || 0) + (materialsPacket.flashcards?.length || 0) + (materialsPacket.quiz?.length || 0)}
+            </span>
+          )}
         </button>
 
         <button
@@ -1968,6 +2069,353 @@ export const LessonVersionStudio: React.FC<LessonVersionStudioProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TAB 7: GENERATED LEARNING MATERIALS REVIEW (Phase 2E.3) */}
+        {activeTab === 'materials' && (
+          <div className="space-y-6">
+            {/* Header Control Card */}
+            <div className="p-5 bg-stone-950 rounded-2xl border border-stone-800 space-y-4">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <h3 className="font-bold text-sm text-stone-100">Generated Learning Materials Review</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950 border border-amber-800 text-amber-300 font-mono font-bold">
+                      Version: {currentVersion.versionNumber} ({currentVersion.status})
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400 mt-1 max-w-2xl">
+                    Strict closed-source grounding pipeline. Generated items start strictly as <strong>UNVERIFIED</strong> and require explicit servant audit before becoming student-visible upon publication.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => loadMaterials(selectedVersionId)}
+                    disabled={isLoadingMaterials}
+                    className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-300 rounded-xl text-xs font-medium border border-stone-800 flex items-center gap-1.5 transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingMaterials ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+
+                  <button
+                    onClick={handleGenerateMaterials}
+                    disabled={isGeneratingMaterials || (currentVersion.status !== 'APPROVED' && currentVersion.status !== 'PUBLISHED')}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{isGeneratingMaterials ? 'Synthesizing...' : 'Generate Grounded Materials'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleReviewMaterialAction('APPROVE_ALL')}
+                    disabled={isReviewingMaterials || !materialsPacket || (currentVersion.status !== 'APPROVED' && currentVersion.status !== 'PUBLISHED')}
+                    className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isReviewingMaterials ? 'Updating...' : 'Approve All Valid'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Version Pre-condition Notification */}
+              {currentVersion.status !== 'APPROVED' && currentVersion.status !== 'PUBLISHED' && (
+                <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    Material generation and student publication strictly require an <strong>APPROVED</strong> or <strong>PUBLISHED</strong> lesson version with a verified evidence map. Approve the lesson version in the Audit tab first.
+                  </span>
+                </div>
+              )}
+
+              {/* Success / Error Feedback */}
+              {materialsSuccess && (
+                <div className="p-3 bg-emerald-950/50 border border-emerald-800/60 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{materialsSuccess}</span>
+                </div>
+              )}
+              {materialsError && (
+                <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-xl text-xs text-red-300 flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{materialsError}</span>
+                </div>
+              )}
+
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-2 pt-2 border-t border-stone-900">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Filter Status:</span>
+                {(['ALL', 'UNVERIFIED', 'APPROVED', 'REJECTED'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setMaterialsFilter(filter)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      materialsFilter === filter
+                        ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
+                        : 'bg-stone-900 text-stone-400 hover:text-stone-200 border border-stone-800'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Empty State */}
+            {!materialsPacket && !isLoadingMaterials && (
+              <div className="p-8 text-center bg-stone-950 rounded-2xl border border-stone-800 space-y-3">
+                <Sparkles className="w-8 h-8 text-stone-600 mx-auto" />
+                <h4 className="text-sm font-bold text-stone-300">No Generated Materials Yet</h4>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  Click &ldquo;Generate Grounded Materials&rdquo; to create structured classroom slides, memory flashcards, and student quiz items from approved evidence.
+                </p>
+              </div>
+            )}
+
+            {materialsPacket && (
+              <div className="space-y-6">
+                {/* 1. SLIDES SECTION */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-blue-400" />
+                      <span>Classroom Slides ({materialsPacket.slides?.length || 0})</span>
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {materialsPacket.slides
+                      ?.filter((s) => materialsFilter === 'ALL' || s.reviewStatus === materialsFilter)
+                      .map((slide) => (
+                        <div key={slide.number} className="p-4 bg-stone-950 rounded-xl border border-stone-800 space-y-3 text-xs">
+                          <div className="flex items-center justify-between border-b border-stone-900 pb-2">
+                            <span className="font-mono text-amber-400 font-bold">Slide #{slide.number}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                              slide.reviewStatus === 'APPROVED'
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                : slide.reviewStatus === 'REJECTED'
+                                ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                : 'bg-amber-950 text-amber-300 border border-amber-800'
+                            }`}>
+                              {slide.reviewStatus}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <h5 className="font-bold text-stone-100">{slide.titleEn}</h5>
+                            <p className="text-stone-300 font-sans text-[11px]" dir="rtl">{slide.titleAr}</p>
+                          </div>
+
+                          <ul className="space-y-1 text-stone-400 list-disc list-inside">
+                            {slide.bulletsEn.map((b, idx) => (
+                              <li key={idx}>{b}</li>
+                            ))}
+                          </ul>
+
+                          {slide.scriptureRef && (
+                            <div className="p-2 bg-stone-900/60 rounded-lg text-amber-400 font-mono text-[11px]">
+                              Scripture: {slide.scriptureRef}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-2 border-t border-stone-900 text-[11px]">
+                            <span className="text-stone-500">
+                              Provenance: {slide.sectionTitle || 'Lesson Section'}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleReviewMaterialAction('APPROVE_ITEM', 'SLIDES', String(slide.number))}
+                                disabled={isReviewingMaterials || slide.reviewStatus === 'APPROVED'}
+                                className="px-2.5 py-1 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 text-emerald-200 rounded-lg font-bold flex items-center gap-1"
+                              >
+                                <Check className="w-3 h-3" /> Approve
+                              </button>
+                              <button
+                                onClick={() => handleReviewMaterialAction('REJECT', 'SLIDES', String(slide.number))}
+                                disabled={isReviewingMaterials || slide.reviewStatus === 'REJECTED'}
+                                className="px-2.5 py-1 bg-stone-800 hover:bg-rose-900 disabled:opacity-40 text-stone-300 hover:text-rose-200 rounded-lg font-bold flex items-center gap-1"
+                              >
+                                <X className="w-3 h-3" /> Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* 2. FLASHCARDS SECTION */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                      <Bookmark className="w-4 h-4 text-emerald-400" />
+                      <span>Interactive Memory Flashcards ({materialsPacket.flashcards?.length || 0})</span>
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {materialsPacket.flashcards
+                      ?.filter((f) => materialsFilter === 'ALL' || f.reviewStatus === materialsFilter)
+                      .map((card) => {
+                        const isFlipped = Boolean(activeFlippedCards[card.id]);
+                        return (
+                          <div key={card.id} className="p-4 bg-stone-950 rounded-xl border border-stone-800 space-y-3 text-xs">
+                            <div className="flex items-center justify-between border-b border-stone-900 pb-2">
+                              <span className="text-stone-400 font-mono text-[11px]">{card.id}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                card.reviewStatus === 'APPROVED'
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : card.reviewStatus === 'REJECTED'
+                                  ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                  : 'bg-amber-950 text-amber-300 border border-amber-800'
+                              }`}>
+                                {card.reviewStatus}
+                              </span>
+                            </div>
+
+                            {/* Flashcard Interactive Preview */}
+                            <div
+                              onClick={() => setActiveFlippedCards(prev => ({ ...prev, [card.id]: !prev[card.id] }))}
+                              className="p-3 bg-stone-900 border border-stone-800 rounded-lg cursor-pointer hover:border-amber-600/60 transition-all select-none space-y-1 min-h-[90px] flex flex-col justify-center text-center"
+                            >
+                              <span className="text-[10px] uppercase font-bold text-amber-400">
+                                {isFlipped ? 'Answer (Click to Flip)' : 'Question (Click to Flip)'}
+                              </span>
+                              {isFlipped ? (
+                                <>
+                                  <p className="font-bold text-emerald-400">{card.backEn}</p>
+                                  <p className="text-stone-300 font-sans text-[11px]" dir="rtl">{card.backAr}</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="font-bold text-stone-100">{card.frontEn}</p>
+                                  <p className="text-stone-300 font-sans text-[11px]" dir="rtl">{card.frontAr}</p>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Provenance Details */}
+                            {card.sourceRefs && card.sourceRefs.length > 0 && (
+                              <div className="p-2 bg-stone-900/60 rounded-lg text-stone-400 text-[11px]">
+                                <span className="font-semibold text-stone-300">Source:</span> {card.sourceRefs.map(s => `${s.sourceName} (${s.location})`).join(', ')}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-2 border-t border-stone-900 text-[11px]">
+                              <span className="text-stone-500">
+                                {card.sectionTitle || 'Section Grounding'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleReviewMaterialAction('APPROVE_ITEM', 'FLASHCARDS', card.id)}
+                                  disabled={isReviewingMaterials || card.reviewStatus === 'APPROVED'}
+                                  className="px-2.5 py-1 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 text-emerald-200 rounded-lg font-bold flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" /> Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReviewMaterialAction('REJECT', 'FLASHCARDS', card.id)}
+                                  disabled={isReviewingMaterials || card.reviewStatus === 'REJECTED'}
+                                  className="px-2.5 py-1 bg-stone-800 hover:bg-rose-900 disabled:opacity-40 text-stone-300 hover:text-rose-200 rounded-lg font-bold flex items-center gap-1"
+                                >
+                                  <X className="w-3 h-3" /> Reject
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* 3. QUIZ QUESTIONS SECTION */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-stone-300 flex items-center gap-1.5">
+                      <HelpCircle className="w-4 h-4 text-purple-400" />
+                      <span>Grounded Quiz Questions ({materialsPacket.quiz?.length || 0})</span>
+                    </h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    {materialsPacket.quiz
+                      ?.filter((q) => materialsFilter === 'ALL' || q.reviewStatus === materialsFilter)
+                      .map((q, idx) => (
+                        <div key={q.id || idx} className="p-4 bg-stone-950 rounded-xl border border-stone-800 space-y-3 text-xs">
+                          <div className="flex items-center justify-between border-b border-stone-900 pb-2">
+                            <span className="font-bold text-stone-200">Question #{idx + 1}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                              q.reviewStatus === 'APPROVED'
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                : q.reviewStatus === 'REJECTED'
+                                ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                : 'bg-amber-950 text-amber-300 border border-amber-800'
+                            }`}>
+                              {q.reviewStatus}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="font-semibold text-stone-100">{q.questionEn}</p>
+                            <p className="text-stone-300 font-sans text-[11px]" dir="rtl">{q.questionAr}</p>
+                          </div>
+
+                          <div className="space-y-1.5 pt-1">
+                            {q.optionsEn?.map((opt, oIdx) => (
+                              <div
+                                key={oIdx}
+                                className={`p-2 rounded-lg border flex items-center justify-between ${
+                                  oIdx === q.correctIndex
+                                    ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-200 font-medium'
+                                    : 'bg-stone-900 border-stone-800 text-stone-400'
+                                }`}
+                              >
+                                <span>{opt}</span>
+                                {oIdx === q.correctIndex && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-900 text-emerald-200 font-bold">
+                                    Correct Answer
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {q.explanationEn && (
+                            <div className="p-2 bg-stone-900/80 rounded-lg text-[11px] text-stone-400">
+                              <strong className="text-stone-300">Explanation:</strong> {q.explanationEn}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-2 border-t border-stone-900 text-[11px]">
+                            <span className="text-amber-400 font-mono text-[11px]">
+                              Provenance: {q.sourceRef?.sectionTitle} ({q.sourceRef?.location})
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleReviewMaterialAction('APPROVE_ITEM', 'QUIZ', q.id)}
+                                disabled={isReviewingMaterials || q.reviewStatus === 'APPROVED'}
+                                className="px-2.5 py-1 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 text-emerald-200 rounded-lg font-bold flex items-center gap-1"
+                              >
+                                <Check className="w-3 h-3" /> Approve
+                              </button>
+                              <button
+                                onClick={() => handleReviewMaterialAction('REJECT', 'QUIZ', q.id)}
+                                disabled={isReviewingMaterials || q.reviewStatus === 'REJECTED'}
+                                className="px-2.5 py-1 bg-stone-800 hover:bg-rose-900 disabled:opacity-40 text-stone-300 hover:text-rose-200 rounded-lg font-bold flex items-center gap-1"
+                              >
+                                <X className="w-3 h-3" /> Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

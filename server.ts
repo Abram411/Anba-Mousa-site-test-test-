@@ -1733,7 +1733,8 @@ const serverReviewState = {
   teacherAssignments: {} as Record<string, string[]>,
   teacherStudentRelationships: [] as Array<{ teacherId: string; studentId: string; relationshipType: string; createdAt: string }>,
   parentChildRelationships: [] as Array<{ parentId: string; childId: string; relationshipType: string; createdAt: string }>,
-  sources: {} as Record<string, any[]>
+  sources: {} as Record<string, any[]>,
+  generatedMaterials: {} as Record<string, any>
 };
 
 const CLASS_STATE_FILE = path.join(uploadsDir, "class_roster_persistence.json");
@@ -5584,10 +5585,13 @@ app.get("/api/church/lessons/:lessonId/materials", async (req, res) => {
       const activeVerId = lesson.active_version_id || 'v-test-multi-1';
       const stored = serverReviewState.generatedMaterials?.[activeVerId];
 
+      // Strict lesson/version containment check
+      const validStored = (stored && stored.lessonId === lessonId && stored.versionId === activeVerId) ? stored : null;
+
       // Student ONLY receives APPROVED items!
-      const approvedSlides = (stored?.slides || []).filter((s: any) => s.reviewStatus === 'APPROVED');
-      const approvedFlashcards = (stored?.flashcards || []).filter((f: any) => f.reviewStatus === 'APPROVED');
-      const approvedQuiz = (stored?.quiz || []).filter((q: any) => q.reviewStatus === 'APPROVED');
+      const approvedSlides = (validStored?.slides || []).filter((s: any) => s.reviewStatus === 'APPROVED');
+      const approvedFlashcards = (validStored?.flashcards || []).filter((f: any) => f.reviewStatus === 'APPROVED');
+      const approvedQuiz = (validStored?.quiz || []).filter((q: any) => q.reviewStatus === 'APPROVED');
 
       return res.json({
         success: true,
@@ -5618,7 +5622,17 @@ app.get("/api/church/lessons/:lessonId/materials", async (req, res) => {
     }
 
     const versionIdParam = req.query.versionId as string || lesson.active_version_id || 'v-test-multi-1';
-    const stored = serverReviewState.generatedMaterials?.[versionIdParam] || {
+    const stored = serverReviewState.generatedMaterials?.[versionIdParam];
+
+    if (stored && stored.lessonId !== lessonId) {
+      return res.status(400).json({
+        success: false,
+        error: "CROSS_LESSON_MISMATCH",
+        message: `Materials for version ${versionIdParam} belong to lesson ${stored.lessonId}, not ${lessonId}.`
+      });
+    }
+
+    const materialsResult = stored || {
       lessonId,
       versionId: versionIdParam,
       slides: [],
@@ -5631,7 +5645,7 @@ app.get("/api/church/lessons/:lessonId/materials", async (req, res) => {
       lessonId,
       versionId: versionIdParam,
       isStudentView: false,
-      materials: stored
+      materials: materialsResult
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || "Server error" });
@@ -5685,6 +5699,15 @@ app.post("/api/church/lessons/:lessonId/materials/review", async (req, res) => {
       });
     }
 
+    const allowedActions = ['APPROVE_ALL', 'APPROVE_ITEM', 'REJECT'];
+    if (!action || !allowedActions.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_ACTION",
+        message: `Invalid review action. Allowed actions: ${allowedActions.join(', ')}.`
+      });
+    }
+
     const packet = serverReviewState.generatedMaterials?.[versionId];
     if (!packet) {
       return res.status(404).json({
@@ -5694,9 +5717,27 @@ app.post("/api/church/lessons/:lessonId/materials/review", async (req, res) => {
       });
     }
 
+    // Strict cross-lesson and cross-version validation
+    if (packet.lessonId !== lessonId) {
+      return res.status(400).json({
+        success: false,
+        error: "CROSS_LESSON_MISMATCH",
+        message: `Cannot review materials belonging to lesson ${packet.lessonId} under lesson ${lessonId}.`
+      });
+    }
+
+    if (packet.versionId !== versionId) {
+      return res.status(400).json({
+        success: false,
+        error: "CROSS_VERSION_MISMATCH",
+        message: `Version mismatch: material packet is for ${packet.versionId}, but requested ${versionId}.`
+      });
+    }
+
+    // Server determines targetStatus strictly; client reviewStatus is ignored
     const targetStatus = action === 'REJECT' ? 'REJECTED' : 'APPROVED';
 
-    if (action === 'APPROVE_ALL' || !itemId) {
+    if (action === 'APPROVE_ALL' || (!itemId && action === 'REJECT')) {
       packet.slides.forEach((s: any) => s.reviewStatus = targetStatus);
       packet.flashcards.forEach((f: any) => f.reviewStatus = targetStatus);
       packet.quiz.forEach((q: any) => q.reviewStatus = targetStatus);
@@ -5716,9 +5757,9 @@ app.post("/api/church/lessons/:lessonId/materials/review", async (req, res) => {
     packet.reviewedAt = new Date().toISOString();
     packet.reviewedBy = currentUserId;
 
-    // Sync approved materials into version if approved
+    // Sync approved materials into version (only APPROVED items remain)
     const ver = serverReviewState.versions[versionId];
-    if (ver && targetStatus === 'APPROVED') {
+    if (ver) {
       ver.slides = packet.slides.filter((s: any) => s.reviewStatus === 'APPROVED');
       ver.flashcards = packet.flashcards.filter((f: any) => f.reviewStatus === 'APPROVED');
     }
