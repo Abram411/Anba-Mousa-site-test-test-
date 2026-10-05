@@ -50,6 +50,12 @@ export interface User {
   parentBlessingDate?: string;
   phone?: string;
   grade?: string;
+  activationStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  requestedClassGroupId?: ClassGroupId;
+  requestedGrade?: string;
+  activationRequestedAt?: string;
+  activationApprovedAt?: string;
+  activationApprovedBy?: string;
   parentPin?: string;
   requireRewardApproval?: boolean;
   pushNotificationsEnabled?: boolean;
@@ -57,6 +63,23 @@ export interface User {
   notifyEventReminders?: boolean;
   screenTimeSeconds?: number; // total screen time in seconds
   lastActive?: string;
+}
+
+export interface OnboardingActivationRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  email?: string;
+  phone?: string;
+  requestedClassGroupId: ClassGroupId;
+  requestedGrade: string;
+  notes?: string;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  assignedGrade?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
 }
 
 export interface MultilingualText {
@@ -126,8 +149,63 @@ export interface StudentClassAssociation {
   grade: string;
   classGroupId: ClassGroupId;
   className: string;
+  classNameAr?: string;
   servants: string[];
+  churchYear?: string;
+  classCode?: string;
 }
+
+export interface ChurchYear {
+  id: string;
+  year: string; // e.g. "2026–2027"
+  status: 'ACTIVE' | 'ARCHIVED';
+  startDate: string;
+  endDate?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface ChurchClassInstance {
+  id: string;
+  churchYear: string;
+  classGroupId: ClassGroupId;
+  nameEn: string;
+  nameAr: string;
+  code: string; // e.g. "MUSA-7K4P"
+  servantIds: string[];
+  servantNames?: string[];
+  status: 'ACTIVE' | 'ARCHIVED';
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ClassMembership {
+  id: string;
+  churchYear: string;
+  classGroupId: ClassGroupId;
+  classInstanceId: string;
+  studentId: string;
+  studentName: string;
+  exactGrade: string;
+  status: 'ACTIVE' | 'REMOVED' | 'GRADUATED' | 'TRANSFERRED';
+  enrolledAt: string;
+  enrolledBy: string;
+  removedAt?: string;
+  removedBy?: string;
+  removalReason?: string;
+}
+
+export interface AdminUserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  grade?: string;
+  avatar?: string;
+  assignedClasses?: ClassGroupId[];
+  createdAt?: string;
+}
+
 
 export type LessonStatus = 'draft' | 'published';
 

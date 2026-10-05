@@ -5,6 +5,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { registerWithSupabase, loginWithSupabase, signInWithGoogleSupabase } from '../../lib/supabaseAuth';
 import { isSupabaseConfigured } from '../../lib/supabase';
+import { CLASS_GROUPS } from '../../lib/classGroups';
+import { ClassGroupId } from '../../types';
+import { requestAccountActivation } from '../../lib/onboardingService';
 import { SupabaseConnectionTester } from './SupabaseConnectionTester';
 import { PrivacyPolicy } from '../legal/PrivacyPolicy';
 import { FAQ } from '../legal/FAQ';
@@ -22,6 +25,8 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'student'|'teacher'|'parent'>('student');
+  const [selectedClassGroupId, setSelectedClassGroupId] = useState<ClassGroupId>('primary_2');
+  const [selectedGrade, setSelectedGrade] = useState<string>('Grade 4');
   const [rememberMe, setRememberMe] = useState(() => {
     return localStorage.getItem('church_remember_me') !== 'false';
   });
@@ -41,13 +46,28 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
     if (isSupabaseConfigured) {
       try {
         if (isRegister) {
-          const res = await registerWithSupabase(email, password, fullName || 'Member', role);
+          const res = await registerWithSupabase(
+            email, 
+            password, 
+            fullName || 'Member', 
+            role,
+            role === 'student' ? selectedGrade : undefined
+          );
           if (!res.success) {
             setError(res.error || (lang === 'ar' ? 'فشل إنشاء الحساب' : 'Registration failed'));
             setLoading(false);
             return;
           }
           if (res.user) {
+            if (role === 'student') {
+              requestAccountActivation({
+                studentId: res.user.id,
+                studentName: fullName || 'Member',
+                email: email,
+                requestedClassGroupId: selectedClassGroupId,
+                requestedGrade: selectedGrade
+              }).catch(() => {});
+            }
             setUserDirectly(res.user);
           }
         } else {
@@ -230,6 +250,66 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                   className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--color-church-cream-dark)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-10"
                 />
                 <User size={18} className="absolute left-3 top-3.5 text-gray-400" />
+              </div>
+            </div>
+          )}
+
+          {/* Sunday School Class & Grade Selector for Student Registration */}
+          {isRegister && role === 'student' && (
+            <div className="space-y-3 p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 flex items-center justify-between">
+                  <span>{lang === 'copt' ? 'Ⲡⲓⲧⲁⲝⲓⲥ ⲛ̀ⲧⲉ ϯⲕⲩⲣⲓⲁⲕⲏ:' : lang === 'ar' ? 'فصل مدارس الأحد (المرحلة):' : 'Sunday School Class Group:'}</span>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold">
+                    {CLASS_GROUPS[selectedClassGroupId]?.name[lang === 'ar' ? 'ar' : 'en']}
+                  </span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {Object.values(CLASS_GROUPS).map((group) => {
+                    const isSelected = selectedClassGroupId === group.id;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedClassGroupId(group.id);
+                          const gList = CLASS_GROUPS[group.id]?.grades || [];
+                          if (gList.length > 0) setSelectedGrade(gList[0].code);
+                        }}
+                        className={`py-1.5 px-1 text-[11px] font-bold rounded-xl border transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-[var(--color-church-blue)] text-white border-[var(--color-church-blue)] shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-xs">{group.icon}</span>
+                        <span className="truncate max-w-[80px]">{group.name[lang === 'ar' ? 'ar' : 'en']}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  {lang === 'copt' ? 'ϯⲧⲁⲝⲓⲥ ⲉⲧⲥⲟⲧⲡ:' : lang === 'ar' ? 'الصف الدراسي المحدد:' : 'Specific Grade:'}
+                </label>
+                <select
+                  value={selectedGrade}
+                  onChange={(e) => setSelectedGrade(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-800 text-gray-800 dark:text-white border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)]"
+                >
+                  {(CLASS_GROUPS[selectedClassGroupId]?.grades || []).map((g) => (
+                    <option key={g.id} value={g.code}>
+                      {g.name[lang === 'ar' ? 'ar' : 'en']} ({g.code})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                  {lang === 'ar' 
+                    ? 'سيتم إرسال طلب تفعيل الحساب للخادم المسؤول عن هذا الفصل لاعتماده فوراً.' 
+                    : 'An account activation request will be sent to your Sunday School servant.'}
+                </p>
               </div>
             </div>
           )}

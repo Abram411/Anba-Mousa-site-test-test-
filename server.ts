@@ -1720,6 +1720,11 @@ app.post("/api/church/generate-tts", async (req, res) => {
 
 // In-memory review state store for zero-latency testing, demo, and offline resilience
 const serverReviewState = {
+  currentChurchYear: '2026–2027',
+  churchYears: {} as Record<string, any>,
+  classInstances: {} as Record<string, any>,
+  classMemberships: {} as Record<string, any>,
+  userRoles: {} as Record<string, 'student' | 'teacher' | 'parent' | 'admin'>,
   lessons: {} as Record<string, any>,
   versions: {} as Record<string, any>,
   conflicts: {} as Record<string, any[]>,
@@ -1734,19 +1739,29 @@ const serverReviewState = {
   teacherStudentRelationships: [] as Array<{ teacherId: string; studentId: string; relationshipType: string; createdAt: string }>,
   parentChildRelationships: [] as Array<{ parentId: string; childId: string; relationshipType: string; createdAt: string }>,
   sources: {} as Record<string, any[]>,
-  generatedMaterials: {} as Record<string, any>
+  generatedMaterials: {} as Record<string, any>,
+  activationRequests: {} as Record<string, any>
 };
 
 const CLASS_STATE_FILE = path.join(uploadsDir, "class_roster_persistence.json");
+const CHURCH_YEAR_STATE_FILE = path.join(uploadsDir, "church_year_classes_persistence.json");
 
 function savePersistentClassState() {
   try {
     const payload = {
+      currentChurchYear: serverReviewState.currentChurchYear,
+      churchYears: serverReviewState.churchYears,
+      classInstances: serverReviewState.classInstances,
+      classMemberships: serverReviewState.classMemberships,
+      teacherAssignments: serverReviewState.teacherAssignments,
+      userRoles: serverReviewState.userRoles,
       studentClasses: serverReviewState.studentClasses,
       teacherStudentRelationships: serverReviewState.teacherStudentRelationships,
-      parentChildRelationships: serverReviewState.parentChildRelationships
+      parentChildRelationships: serverReviewState.parentChildRelationships,
+      activationRequests: serverReviewState.activationRequests
     };
     fs.writeFileSync(CLASS_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
+    fs.writeFileSync(CHURCH_YEAR_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
   } catch (err) {
     console.warn("Could not save persistent class state:", err);
   }
@@ -1754,9 +1769,28 @@ function savePersistentClassState() {
 
 function loadPersistentClassState() {
   try {
-    if (fs.existsSync(CLASS_STATE_FILE)) {
-      const content = fs.readFileSync(CLASS_STATE_FILE, "utf-8");
+    const targetFile = fs.existsSync(CHURCH_YEAR_STATE_FILE) ? CHURCH_YEAR_STATE_FILE : (fs.existsSync(CLASS_STATE_FILE) ? CLASS_STATE_FILE : null);
+    if (targetFile) {
+      const content = fs.readFileSync(targetFile, "utf-8");
       const parsed = JSON.parse(content);
+      if (parsed.currentChurchYear) {
+        serverReviewState.currentChurchYear = parsed.currentChurchYear;
+      }
+      if (parsed.churchYears && typeof parsed.churchYears === 'object') {
+        serverReviewState.churchYears = { ...serverReviewState.churchYears, ...parsed.churchYears };
+      }
+      if (parsed.classInstances && typeof parsed.classInstances === 'object') {
+        serverReviewState.classInstances = { ...serverReviewState.classInstances, ...parsed.classInstances };
+      }
+      if (parsed.classMemberships && typeof parsed.classMemberships === 'object') {
+        serverReviewState.classMemberships = { ...serverReviewState.classMemberships, ...parsed.classMemberships };
+      }
+      if (parsed.teacherAssignments && typeof parsed.teacherAssignments === 'object') {
+        serverReviewState.teacherAssignments = { ...serverReviewState.teacherAssignments, ...parsed.teacherAssignments };
+      }
+      if (parsed.userRoles && typeof parsed.userRoles === 'object') {
+        serverReviewState.userRoles = { ...serverReviewState.userRoles, ...parsed.userRoles };
+      }
       if (parsed.studentClasses && typeof parsed.studentClasses === 'object') {
         serverReviewState.studentClasses = {
           ...serverReviewState.studentClasses,
@@ -1769,6 +1803,12 @@ function loadPersistentClassState() {
       if (Array.isArray(parsed.parentChildRelationships)) {
         serverReviewState.parentChildRelationships = parsed.parentChildRelationships;
       }
+      if (parsed.activationRequests && typeof parsed.activationRequests === 'object') {
+        serverReviewState.activationRequests = {
+          ...serverReviewState.activationRequests,
+          ...parsed.activationRequests
+        };
+      }
     }
   } catch (err) {
     console.warn("Could not load persistent class state:", err);
@@ -1777,10 +1817,34 @@ function loadPersistentClassState() {
 
 function getClassGroupIdForGrade(grade?: string | null): string {
   if (!grade) return 'primary_2';
-  const g = grade.toLowerCase();
-  if (g.includes('kg') || g.includes('kindergarten') || g.includes('حضانة')) return 'angels';
-  if (g.includes('grade 1') || g.includes('grade 2') || g.includes('grade 3') || g.includes('1st') || g.includes('2nd') || g.includes('3rd') || g.includes('ابتدائي 1')) return 'primary_1';
-  if (g.includes('grade 4') || g.includes('grade 5') || g.includes('grade 6') || g.includes('4th') || g.includes('5th') || g.includes('6th') || g.includes('primary_2') || g.includes('ابتدائي 2')) return 'primary_2';
+  const g = grade.toLowerCase().trim();
+  if (g.includes('kg') || g.includes('kindergarten') || g.includes('حضانة') || g.includes('كي جي')) return 'angels';
+  
+  // Primary 1–3
+  if (
+    g.includes('primary 1') || g.includes('primary 2') || g.includes('primary 3') ||
+    g.includes('grade 1') || g.includes('grade 2') || g.includes('grade 3') ||
+    g === '1' || g === '2' || g === '3' ||
+    g.includes('1st') || g.includes('2nd') || g.includes('3rd') ||
+    g.includes('ابتدائي 1') || g.includes('اولى ابتدائي') || g.includes('تانية ابتدائي') || g.includes('تالتة ابتدائي') ||
+    g.includes('الصف الاول الابتدائي') || g.includes('الصف الثاني الابتدائي') || g.includes('الصف الثالث الابتدائي')
+  ) {
+    return 'primary_1';
+  }
+
+  // Primary 4–6
+  if (
+    g.includes('primary 4') || g.includes('primary 5') || g.includes('primary 6') ||
+    g.includes('grade 4') || g.includes('grade 5') || g.includes('grade 6') ||
+    g === '4' || g === '5' || g === '6' ||
+    g.includes('4th') || g.includes('5th') || g.includes('6th') ||
+    g.includes('primary_2') || g.includes('ابتدائي 2') ||
+    g.includes('رابعة ابتدائي') || g.includes('خامسة ابتدائي') || g.includes('ساتة ابتدائي') || g.includes('سادس') ||
+    g.includes('الصف الرابع') || g.includes('الصف الخامس') || g.includes('الصف السادس')
+  ) {
+    return 'primary_2';
+  }
+
   if (g.includes('prep') || g.includes('grade 7') || g.includes('grade 8') || g.includes('grade 9') || g.includes('إعدادي')) return 'preparatory';
   if (g.includes('sec') || g.includes('grade 10') || g.includes('grade 11') || g.includes('grade 12') || g.includes('ثانوي')) return 'secondary';
   if (g.includes('univ') || g.includes('college') || g.includes('جامع')) return 'university';
@@ -1792,6 +1856,34 @@ function resetServerReviewState() {
   serverReviewState.attempts = {};
   serverReviewState.mastery = {};
   serverReviewState.teacherStudentRelationships = [];
+  serverReviewState.currentChurchYear = '2026–2027';
+
+  serverReviewState.churchYears = {
+    '2026–2027': {
+      id: 'year-2026-2027',
+      year: '2026–2027',
+      status: 'ACTIVE',
+      startDate: '2026-09-01',
+      createdAt: new Date().toISOString(),
+      createdBy: 'system'
+    }
+  };
+
+  serverReviewState.activationRequests = {
+    'req-demo-david-01': {
+      id: 'req-demo-david-01',
+      studentId: 'student-new-user-01',
+      studentName: 'Bishoy Raouf',
+      email: 'bishoy.raouf@church.org',
+      phone: '+20 100 987 6543',
+      requestedClassGroupId: 'primary_2',
+      requestedGrade: 'Grade 4',
+      notes: 'New student joining Sunday school with Servant Mina',
+      status: 'PENDING_APPROVAL',
+      requestedAt: new Date(Date.now() - 3600000).toISOString()
+    }
+  };
+
   serverReviewState.parentChildRelationships = [
     { parentId: 'mary', childId: 'mark', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
     { parentId: 'mary', childId: 'student-david', relationshipType: 'parent_child', createdAt: new Date().toISOString() },
@@ -1800,13 +1892,30 @@ function resetServerReviewState() {
     { parentId: 'other_parent', childId: 'other', relationshipType: 'parent_child', createdAt: new Date().toISOString() }
   ];
 
+  // All 6 Canonical Church Class Groups
   serverReviewState.classes = {
+    'angels': {
+      id: 'angels',
+      nameEn: 'Angels',
+      nameAr: 'فصل الملايكة',
+      stage: 'angels',
+      grades: ['KG1', 'KG2'],
+      servantIds: ['other', 'user_teacher_other_404']
+    },
+    'primary_1': {
+      id: 'primary_1',
+      nameEn: 'Primary 1–3',
+      nameAr: 'فصل ابتدائي 1–3',
+      stage: 'primary_1',
+      grades: ['Grade 1', 'Grade 2', 'Grade 3', 'Primary 1', 'Primary 2', 'Primary 3'],
+      servantIds: ['mina', 'user_teacher_mina_101']
+    },
     'primary_2': {
       id: 'primary_2',
-      nameEn: 'Primary 2',
-      nameAr: 'فصل ابتدائي 2',
+      nameEn: 'Primary 4–6',
+      nameAr: 'فصل ابتدائي 4–6',
       stage: 'primary_2',
-      grades: ['Grade 4', 'Grade 5', 'Grade 6'],
+      grades: ['Grade 4', 'Grade 5', 'Grade 6', 'Primary 4', 'Primary 5', 'Primary 6'],
       servantIds: ['mina', 'user_teacher_mina_101']
     },
     'preparatory': {
@@ -1817,13 +1926,130 @@ function resetServerReviewState() {
       grades: ['Prep 1', 'Prep 2', 'Prep 3'],
       servantIds: ['other', 'user_teacher_other_404']
     },
-    'angels': {
-      id: 'angels',
+    'secondary': {
+      id: 'secondary',
+      nameEn: 'Secondary',
+      nameAr: 'فصل ثانوي',
+      stage: 'secondary',
+      grades: ['Secondary 1', 'Secondary 2', 'Secondary 3', 'Sec 1', 'Sec 2', 'Sec 3'],
+      servantIds: ['other', 'user_teacher_other_404']
+    },
+    'university': {
+      id: 'university',
+      nameEn: 'University',
+      nameAr: 'فصل جامعة',
+      stage: 'university',
+      grades: ['University'],
+      servantIds: ['mina', 'user_teacher_mina_101']
+    }
+  };
+
+  // Class instances for the active church year 2026–2027
+  serverReviewState.classInstances = {
+    'inst_2026-2027_angels': {
+      id: 'inst_2026-2027_angels',
+      churchYear: '2026–2027',
+      classGroupId: 'angels',
       nameEn: 'Angels',
       nameAr: 'فصل الملايكة',
-      stage: 'angels',
-      grades: ['KG1', 'KG2'],
-      servantIds: ['other', 'user_teacher_other_404']
+      code: 'MUSA-ANG1',
+      servantIds: ['other', 'user_teacher_other_404'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    },
+    'inst_2026-2027_primary_1': {
+      id: 'inst_2026-2027_primary_1',
+      churchYear: '2026–2027',
+      classGroupId: 'primary_1',
+      nameEn: 'Primary 1–3',
+      nameAr: 'فصل ابتدائي 1–3',
+      code: 'MUSA-7K4P',
+      servantIds: ['mina', 'user_teacher_mina_101'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    },
+    'inst_2026-2027_primary_2': {
+      id: 'inst_2026-2027_primary_2',
+      churchYear: '2026–2027',
+      classGroupId: 'primary_2',
+      nameEn: 'Primary 4–6',
+      nameAr: 'فصل ابتدائي 4–6',
+      code: 'MUSA-P46B',
+      servantIds: ['mina', 'user_teacher_mina_101'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    },
+    'inst_2026-2027_preparatory': {
+      id: 'inst_2026-2027_preparatory',
+      churchYear: '2026–2027',
+      classGroupId: 'preparatory',
+      nameEn: 'Preparatory',
+      nameAr: 'فصل إعدادي',
+      code: 'MUSA-PRP1',
+      servantIds: ['other', 'user_teacher_other_404'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    },
+    'inst_2026-2027_secondary': {
+      id: 'inst_2026-2027_secondary',
+      churchYear: '2026–2027',
+      classGroupId: 'secondary',
+      nameEn: 'Secondary',
+      nameAr: 'فصل ثانوي',
+      code: 'MUSA-SEC1',
+      servantIds: ['other', 'user_teacher_other_404'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    },
+    'inst_2026-2027_university': {
+      id: 'inst_2026-2027_university',
+      churchYear: '2026–2027',
+      classGroupId: 'university',
+      nameEn: 'University',
+      nameAr: 'فصل جامعة',
+      code: 'MUSA-UNI1',
+      servantIds: ['mina', 'user_teacher_mina_101'],
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    }
+  };
+
+  serverReviewState.classMemberships = {
+    'mem_mark_2026-2027': {
+      id: 'mem_mark_2026-2027',
+      churchYear: '2026–2027',
+      classGroupId: 'primary_2',
+      classInstanceId: 'inst_2026-2027_primary_2',
+      studentId: 'mark',
+      studentName: 'Mark Shenouda',
+      exactGrade: 'Grade 4',
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: 'servant'
+    },
+    'mem_david_2026-2027': {
+      id: 'mem_david_2026-2027',
+      churchYear: '2026–2027',
+      classGroupId: 'primary_2',
+      classInstanceId: 'inst_2026-2027_primary_2',
+      studentId: 'student-david',
+      studentName: 'David Emad',
+      exactGrade: 'Grade 5',
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: 'servant'
+    },
+    'mem_other_2026-2027': {
+      id: 'mem_other_2026-2027',
+      churchYear: '2026–2027',
+      classGroupId: 'preparatory',
+      classInstanceId: 'inst_2026-2027_preparatory',
+      studentId: 'other',
+      studentName: 'Peter Fadi',
+      exactGrade: 'Prep 1',
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: 'servant'
     }
   };
 
@@ -1834,26 +2060,44 @@ function resetServerReviewState() {
     'user_teacher_other_404': ['preparatory', 'angels']
   };
 
+  serverReviewState.userRoles = {
+    'mina': 'teacher',
+    'user_teacher_mina_101': 'teacher',
+    'other': 'teacher',
+    'user_teacher_other_404': 'teacher',
+    'mark': 'student',
+    'user_student_mark_101': 'student',
+    'student-david': 'student',
+    'mary': 'parent',
+    'user_parent_mary_301': 'parent',
+    'admin': 'admin',
+    'admin_church': 'admin',
+    'admin_pishoy': 'admin'
+  };
+
   serverReviewState.studentClasses = {
     'mark': {
       studentId: 'mark',
       fullName: 'Mark Shenouda',
       grade: 'Grade 4',
       classGroupId: 'primary_2',
+      churchYear: '2026–2027',
       avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda'
     },
-    'u1': {
-      studentId: 'u1',
-      fullName: 'Youssef Mina',
+    'user_student_mark_101': {
+      studentId: 'user_student_mark_101',
+      fullName: 'Mark Shenouda',
       grade: 'Grade 4',
       classGroupId: 'primary_2',
-      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef'
+      churchYear: '2026–2027',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda'
     },
     'student-david': {
       studentId: 'student-david',
-      fullName: 'David Shenouda',
-      grade: 'Grade 4',
+      fullName: 'David Emad',
+      grade: 'Grade 5',
       classGroupId: 'primary_2',
+      churchYear: '2026–2027',
       avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David'
     },
     'c1': {
@@ -1861,6 +2105,7 @@ function resetServerReviewState() {
       fullName: 'Mina Emad',
       grade: 'Grade 4',
       classGroupId: 'primary_2',
+      churchYear: '2026–2027',
       avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MinaEmad'
     },
     'other': {
@@ -1868,6 +2113,7 @@ function resetServerReviewState() {
       fullName: 'Peter Fadi',
       grade: 'Prep 1',
       classGroupId: 'preparatory',
+      churchYear: '2026–2027',
       avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Peter'
     }
   };
@@ -4181,6 +4427,338 @@ app.get("/api/church/servant/relationships", async (req, res) => {
     const servantId = authContext.userId;
     const relationships = serverReviewState.teacherStudentRelationships.filter(r => r.teacherId === servantId);
     return res.json({ success: true, relationships });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// ONBOARDING & ACCOUNT ACTIVATION ENDPOINTS
+// Allows new users to select Sunday School class/grade, submit activation requests,
+// and enables servants/admins to review and assign students to the official roster.
+// ==============================================================================
+
+// 1. Submit Account Activation & Class Join Request (Students & New Users)
+app.post("/api/church/onboarding/request", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const { studentId: bodyStudentId, studentName, email, phone, requestedClassGroupId, requestedGrade, notes } = req.body;
+    const targetStudentId = bodyStudentId || authContext.userId;
+
+    if (!targetStudentId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "studentId is required"
+      });
+    }
+
+    if (!requestedClassGroupId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "requestedClassGroupId is required"
+      });
+    }
+
+    const validClassGroups = ['angels', 'primary_1', 'primary_2', 'preparatory', 'secondary', 'university'];
+    if (!validClassGroups.includes(requestedClassGroupId)) {
+      return res.status(404).json({
+        success: false,
+        error: "CLASS_NOT_FOUND",
+        message: `Class group "${requestedClassGroupId}" not recognized.`
+      });
+    }
+
+    const targetGrade = requestedGrade || 'Grade 4';
+    if (requestedGrade && getClassGroupIdForGrade(requestedGrade) !== requestedClassGroupId) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_GRADE",
+        message: `Grade "${requestedGrade}" does not belong to class group "${requestedClassGroupId}".`
+      });
+    }
+
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newRequest = {
+      id: requestId,
+      studentId: targetStudentId,
+      studentName: studentName || `Student ${targetStudentId}`,
+      email: email || '',
+      phone: phone || '',
+      requestedClassGroupId,
+      requestedGrade: targetGrade,
+      notes: notes || '',
+      status: 'PENDING_APPROVAL',
+      requestedAt: new Date().toISOString()
+    };
+
+    serverReviewState.activationRequests[requestId] = newRequest;
+
+    // Track pending enrollment in local state so student class lookup knows about pending status
+    serverReviewState.studentClasses[targetStudentId] = {
+      studentId: targetStudentId,
+      fullName: newRequest.studentName,
+      grade: targetGrade,
+      classGroupId: requestedClassGroupId,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetStudentId}`,
+      isPending: true
+    };
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      request: newRequest,
+      message: "Onboarding request submitted successfully. Pending servant review."
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Get My Activation Status (Student)
+app.get("/api/church/onboarding/my-status", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const targetStudentId = String(req.query.studentId || authContext.userId || '').trim();
+
+    if (!targetStudentId) {
+      return res.json({
+        success: true,
+        request: null,
+        isEnrolled: false
+      });
+    }
+
+    // Find latest request for this student
+    const allRequests = Object.values(serverReviewState.activationRequests || {}) as any[];
+    const studentRequests = allRequests
+      .filter((r: any) => r.studentId === targetStudentId)
+      .sort((a: any, b: any) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+
+    const latestRequest = studentRequests[0] || null;
+    const studentClass = serverReviewState.studentClasses[targetStudentId];
+    const isEnrolled = Boolean(studentClass && !studentClass.isPending);
+
+    return res.json({
+      success: true,
+      request: latestRequest,
+      isEnrolled,
+      studentClass: isEnrolled ? studentClass : null
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 3. Get Pending Activation Requests (Servants & Admins Only)
+app.get("/api/church/onboarding/requests", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    let targetClassGroupId = String(req.query.classGroupId || '');
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students cannot view activation requests."
+        });
+      }
+
+      if (authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Parents cannot view activation requests."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+        if (targetClassGroupId && !assignedClasses.includes(targetClassGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not authorized for class "${targetClassGroupId}".`
+          });
+        }
+        if (!targetClassGroupId) {
+          targetClassGroupId = assignedClasses[0] || 'primary_2';
+        }
+      }
+    } else {
+      // Demo / guest fallback
+      targetClassGroupId = targetClassGroupId || 'primary_2';
+    }
+
+    const allRequests = Object.values(serverReviewState.activationRequests || {}) as any[];
+    const filteredRequests = allRequests.filter((r: any) => {
+      if (targetClassGroupId && r.requestedClassGroupId !== targetClassGroupId) {
+        return false;
+      }
+      return true;
+    }).sort((a: any, b: any) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+
+    return res.json({
+      success: true,
+      classGroupId: targetClassGroupId || 'all',
+      requests: filteredRequests
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 4. Review & Approve/Reject Activation Request (Servants & Admins Only)
+app.post("/api/church/onboarding/review", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const { requestId, action, assignedGrade, reviewNotes } = req.body;
+
+    if (!requestId || !action) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_PARAMS",
+        message: "requestId and action are required"
+      });
+    }
+
+    if (action !== 'APPROVE' && action !== 'REJECT') {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_ACTION",
+        message: 'Action must be "APPROVE" or "REJECT"'
+      });
+    }
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student' || authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students and parents cannot review onboarding requests."
+        });
+      }
+    }
+
+    const targetRequest = serverReviewState.activationRequests[requestId];
+    if (!targetRequest) {
+      return res.status(404).json({
+        success: false,
+        error: "REQUEST_NOT_FOUND",
+        message: `Activation request "${requestId}" not found.`
+      });
+    }
+
+    if (authContext.isAuthenticated && authContext.role === 'teacher') {
+      const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+      if (!assignedClasses.includes(targetRequest.requestedClassGroupId)) {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: `Servant ${authContext.userId} is not authorized to review requests for class "${targetRequest.requestedClassGroupId}".`
+        });
+      }
+    }
+
+    if (action === 'APPROVE') {
+      const finalGrade = assignedGrade || targetRequest.requestedGrade || 'Grade 4';
+      if (assignedGrade && getClassGroupIdForGrade(assignedGrade) !== targetRequest.requestedClassGroupId) {
+        return res.status(400).json({
+          success: false,
+          error: "INVALID_GRADE",
+          message: `Assigned grade "${assignedGrade}" does not match class group "${targetRequest.requestedClassGroupId}".`
+        });
+      }
+
+      targetRequest.status = 'APPROVED';
+      targetRequest.assignedGrade = finalGrade;
+      targetRequest.reviewedBy = authContext.userId || 'Servant Mina';
+      targetRequest.reviewedAt = new Date().toISOString();
+      targetRequest.reviewNotes = reviewNotes || 'Approved by servant';
+
+      // Authoritative roster assignment
+      serverReviewState.studentClasses[targetRequest.studentId] = {
+        studentId: targetRequest.studentId,
+        fullName: targetRequest.studentName,
+        grade: finalGrade,
+        classGroupId: targetRequest.requestedClassGroupId,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetRequest.studentId}`,
+        enrolledAt: new Date().toISOString()
+      };
+
+      // Establish teacher-student relationship
+      const servantId = authContext.userId || 'user_teacher_mina_101';
+      const existingRel = serverReviewState.teacherStudentRelationships.find(
+        r => r.teacherId === servantId && r.studentId === targetRequest.studentId && r.relationshipType === 'teacher_student'
+      );
+      if (existingRel) {
+        existingRel.createdAt = new Date().toISOString();
+      } else {
+        serverReviewState.teacherStudentRelationships.push({
+          teacherId: servantId,
+          studentId: targetRequest.studentId,
+          relationshipType: 'teacher_student',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Real Supabase persistence if user has authenticated token
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+      if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+        try {
+          const client = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: `Bearer ${token}` } },
+            auth: { persistSession: false, autoRefreshToken: false }
+          });
+
+          await client
+            .from('profiles')
+            .update({ grade: finalGrade })
+            .eq('id', targetRequest.studentId);
+
+          await client
+            .from('user_relationships')
+            .upsert({
+              parent_id: servantId,
+              child_id: targetRequest.studentId,
+              relationship_type: 'teacher_student',
+              created_at: new Date().toISOString()
+            }, { onConflict: 'parent_id,child_id' });
+        } catch (sbErr) {
+          console.warn("Supabase onboarding approval sync note:", sbErr);
+        }
+      }
+
+      savePersistentClassState();
+
+      return res.json({
+        success: true,
+        request: targetRequest,
+        enrolledStudent: serverReviewState.studentClasses[targetRequest.studentId],
+        message: `Student "${targetRequest.studentName}" has been approved and enrolled in class roster.`
+      });
+    } else {
+      // REJECT
+      targetRequest.status = 'REJECTED';
+      targetRequest.reviewedBy = authContext.userId || 'Servant Mina';
+      targetRequest.reviewedAt = new Date().toISOString();
+      targetRequest.reviewNotes = reviewNotes || 'Request dismissed';
+
+      savePersistentClassState();
+
+      return res.json({
+        success: true,
+        request: targetRequest,
+        message: `Request "${requestId}" was rejected.`
+      });
+    }
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || "Server error" });
   }

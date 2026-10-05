@@ -230,9 +230,9 @@ export const CLASS_GROUPS: Record<ClassGroupId, ClassGroup> = {
     id: 'primary_1',
     order: 2,
     name: {
-      en: 'Primary 1',
-      ar: 'فصل ابتدائي 1',
-      cop: 'ϯⲧⲁⲝⲓⲥ ⲛ̀ϣⲟⲣⲡ ⲁ̅'
+      en: 'Primary 1–3',
+      ar: 'فصل ابتدائي 1–3',
+      cop: 'ϯⲧⲁⲝⲓⲥ ⲁ̅-ⲅ̅'
     },
     description: {
       en: 'Grades 1 to 3',
@@ -246,9 +246,9 @@ export const CLASS_GROUPS: Record<ClassGroupId, ClassGroup> = {
     id: 'primary_2',
     order: 3,
     name: {
-      en: 'Primary 2',
-      ar: 'فصل ابتدائي 2',
-      cop: 'ϯⲧⲁⲝⲓⲥ ⲛ̀ϣⲟⲣⲡ ⲃ̅'
+      en: 'Primary 4–6',
+      ar: 'فصل ابتدائي 4–6',
+      cop: 'ϯⲧⲁⲝⲓⲥ ⲇ̅-ⲋ̅'
     },
     description: {
       en: 'Grades 4 to 6',
@@ -552,3 +552,61 @@ export function formatStudentClassDisplay(
     icon: group.icon
   };
 }
+
+/**
+ * Calculates the next canonical grade for yearly promotion.
+ * Handles class-group transitions (e.g. Primary 3 -> Primary 4 changes group to Primary 4–6).
+ */
+export function getNextGrade(gradeRaw?: string | null): {
+  nextGrade: GradeItem | null;
+  nextClassGroupId: ClassGroupId | null;
+  isGraduated: boolean;
+  explanation: string;
+} {
+  const canonical = findCanonicalGrade(gradeRaw);
+  if (!canonical) {
+    return {
+      nextGrade: null,
+      nextClassGroupId: null,
+      isGraduated: false,
+      explanation: 'Unrecognized grade'
+    };
+  }
+
+  const ladder: Record<CanonicalGradeId, CanonicalGradeId | 'graduated'> = {
+    kg_1: 'kg_2',
+    kg_2: 'grade_1',
+    grade_1: 'grade_2',
+    grade_2: 'grade_3',
+    grade_3: 'grade_4',
+    grade_4: 'grade_5',
+    grade_5: 'grade_6',
+    grade_6: 'prep_1',
+    prep_1: 'prep_2',
+    prep_2: 'prep_3',
+    prep_3: 'sec_1',
+    sec_1: 'sec_2',
+    sec_2: 'sec_3',
+    sec_3: 'university',
+    university: 'graduated'
+  };
+
+  const nextId = ladder[canonical.id];
+  if (nextId === 'graduated') {
+    return {
+      nextGrade: canonical, // stays in university / graduated
+      nextClassGroupId: 'university',
+      isGraduated: true,
+      explanation: 'Student has completed Sunday School curriculum (University/Graduate)'
+    };
+  }
+
+  const nextItem = CANONICAL_GRADES[nextId];
+  return {
+    nextGrade: nextItem,
+    nextClassGroupId: nextItem.classGroupId,
+    isGraduated: false,
+    explanation: `Promoted from ${canonical.code} to ${nextItem.code}`
+  };
+}
+

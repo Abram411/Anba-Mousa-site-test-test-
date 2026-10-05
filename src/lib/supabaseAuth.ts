@@ -14,7 +14,8 @@ export async function registerWithSupabase(
   email: string,
   password: string,
   fullName: string,
-  role: 'student' | 'teacher' | 'parent'
+  role: 'student' | 'teacher' | 'parent',
+  grade?: string
 ): Promise<SupabaseAuthResult> {
   if (!isSupabaseConfigured || !supabase) {
     return {
@@ -31,6 +32,7 @@ export async function registerWithSupabase(
         data: {
           full_name: fullName,
           role: role,
+          grade: grade || undefined,
         },
       },
     });
@@ -48,6 +50,7 @@ export async function registerWithSupabase(
       id: userId,
       fullName: fullName,
       role: role,
+      grade: grade,
       avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
       points: 0,
       currentStreak: 0,
@@ -67,6 +70,7 @@ export async function registerWithSupabase(
         name: fullName,
         email: email.trim(),
         role: role,
+        grade: grade || null,
         avatar: profile.avatarUrl,
         points: 0,
         current_streak: 0,

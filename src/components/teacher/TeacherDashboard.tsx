@@ -38,6 +38,7 @@ import { LessonVersionStudio } from '../sunday-school/teacher/LessonVersionStudi
 import { TeacherMasteryReview } from '../sunday-school/teacher/TeacherMasteryReview';
 import { ServantClassManagement } from './ServantClassManagement';
 import { ServantSourceManagement } from './ServantSourceManagement';
+import { getPendingActivationRequests } from '../../lib/onboardingService';
 import { EvidenceCoverageModal } from '../sunday-school/evidence/EvidenceCoverageModal';
 import { PdfDocumentViewer } from '../sunday-school/viewers/PdfDocumentViewer';
 import { SlideDeckViewer } from '../sunday-school/viewers/SlideDeckViewer';
@@ -118,6 +119,21 @@ export function TeacherDashboard({
   
   // Lesson editing state
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+
+  // Pending activation requests count
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getPendingActivationRequests().then((res) => {
+      if (!isMounted) return;
+      if (res.success && res.requests) {
+        setPendingRequestsCount(res.requests.filter(r => r.status === 'PENDING_APPROVAL').length);
+      }
+    }).catch(() => {});
+
+    return () => { isMounted = false; };
+  }, [activeTab]);
 
   // Moderation state
   const [flaggedPosts, setFlaggedPosts] = useState<Array<{ id: string; author: string; content: string; flagReason: string }>>([
@@ -339,6 +355,28 @@ export function TeacherDashboard({
         </div>
       </div>
 
+      {/* Pending Account Activation Alert for Servant */}
+      {pendingRequestsCount > 0 && activeTab !== 'classManagement' && (
+        <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-2xl p-4 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs sm:text-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">🔔</span>
+            <div className="font-semibold">
+              <span>
+                {lang === 'ar' 
+                  ? `لديك (${pendingRequestsCount}) طلبات جديدة لتفعيل الحسابات والانضمام للفصل تحتاج لموافقتك.`
+                  : `You have (${pendingRequestsCount}) new student account activation requests pending approval.`}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('classManagement')}
+            className="px-3.5 py-1.5 bg-white text-amber-900 hover:bg-amber-50 font-bold rounded-xl text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
+          >
+            {lang === 'ar' ? 'مراجعة وتسكين الطلاب' : 'Review & Enroll'}
+          </button>
+        </div>
+      )}
+
       {/* Navigation tabs within Teacher Studio */}
       <div className="flex bg-gray-100 dark:bg-slate-800 p-1.5 rounded-2xl max-w-4xl mx-auto shadow-2xs overflow-x-auto">
         <button 
@@ -365,7 +403,7 @@ export function TeacherDashboard({
         </button>
         <button 
           onClick={() => setActiveTab('classManagement')}
-          className={`flex-1 min-w-[130px] py-2.5 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`flex-1 min-w-[130px] py-2.5 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
             activeTab === 'classManagement' 
               ? 'bg-amber-600 text-white shadow-md font-extrabold' 
               : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
@@ -373,6 +411,11 @@ export function TeacherDashboard({
         >
           <Users size={16} />
           <span>{lang === 'ar' ? 'فصلي وقائمة الطلاب' : 'My Class & Roster'}</span>
+          {pendingRequestsCount > 0 && (
+            <span className="px-1.5 py-0.2 bg-red-500 text-white text-[10px] font-black rounded-full shadow-xs">
+              {pendingRequestsCount}
+            </span>
+          )}
         </button>
         <button 
           onClick={() => setActiveTab('sources')}

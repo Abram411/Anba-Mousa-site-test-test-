@@ -16,7 +16,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { getMyClass, assignStudentClass, ClassRosterStudent, ServantClassInfo } from '../../lib/classRosterService';
 import { CLASS_GROUPS } from '../../lib/classGroups';
-import { ClassGroupId } from '../../types';
+import { ClassGroupId, OnboardingActivationRequest } from '../../types';
+import { getPendingActivationRequests, reviewActivationRequest } from '../../lib/onboardingService';
 import { StudentLearningReviewView } from './StudentLearningReviewView';
 
 interface ServantClassManagementProps {
@@ -36,12 +37,32 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
   // Drilldown state for student learning review
   const [selectedStudentForReview, setSelectedStudentForReview] = useState<string | null>(null);
 
+  // Pending activation requests state
+  const [pendingRequests, setPendingRequests] = useState<OnboardingActivationRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [requestActionSuccess, setRequestActionSuccess] = useState<string | null>(null);
+
   // Assignment form state
   const [studentIdInput, setStudentIdInput] = useState<string>('');
   const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [assignmentSuccess, setAssignmentSuccess] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+
+  // Load pending activation requests
+  const loadRequests = async (groupId?: string) => {
+    setLoadingRequests(true);
+    try {
+      const res = await getPendingActivationRequests(groupId);
+      if (res.success) {
+        setPendingRequests(res.requests || []);
+      }
+    } catch (_) {
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
 
   // Load authoritative class and roster
   const loadClassData = async () => {
@@ -65,6 +86,8 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
       } else if (info?.grades && info.grades.length > 0 && !selectedGrade) {
         setSelectedGrade(info.grades[0]);
       }
+
+      await loadRequests(info?.classGroupId);
     } catch (err: any) {
       setLoadError(err?.message || (isAr ? 'حدث خطأ غير متوقع' : 'Unexpected error loading class'));
     } finally {
@@ -75,6 +98,39 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
   useEffect(() => {
     loadClassData();
   }, []);
+
+  const handleReviewRequest = async (requestId: string, action: 'APPROVE' | 'REJECT', customGrade?: string) => {
+    setProcessingRequestId(requestId);
+    setRequestActionSuccess(null);
+    setAssignmentError(null);
+
+    try {
+      const res = await reviewActivationRequest({
+        requestId,
+        action,
+        assignedGrade: customGrade,
+        reviewNotes: action === 'APPROVE' ? 'Approved by class servant' : 'Dismissed by servant'
+      });
+
+      if (!res.success) {
+        setAssignmentError(res.error || (isAr ? 'فشل معالجة الطلب' : 'Failed to process request'));
+        return;
+      }
+
+      setRequestActionSuccess(
+        action === 'APPROVE'
+          ? (isAr ? 'تمت الموافقة على الطالب وتسكينه في كشف الفصل بنجاح!' : 'Student approved and enrolled into official roster successfully!')
+          : (isAr ? 'تم رفض الطلب' : 'Request rejected')
+      );
+
+      // Refresh both pending requests and authoritative roster
+      await loadClassData();
+    } catch (err: any) {
+      setAssignmentError(err?.message || 'Error processing request');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
 
   const handleAssignStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +257,126 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
           <span>{loadError}</span>
         </div>
       )}
+
+      {requestActionSuccess && (
+        <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-4 text-emerald-200 text-xs flex items-center gap-2.5">
+          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          <span>{requestActionSuccess}</span>
+        </div>
+      )}
+
+      {/* Pending Account Activations & Roster Approvals Section */}
+      <div className="bg-stone-900/90 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+              <Clock size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-stone-100">
+                  {isAr ? 'طلبات تفعيل الحسابات والتسكين بالكشف' : 'Pending Activation & Roster Requests'}
+                </h3>
+                {pendingRequests.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 animate-pulse">
+                    {pendingRequests.length} {isAr ? 'جديد' : 'New'}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-stone-400 mt-0.5">
+                {isAr
+                  ? 'طلبات الطلاب الجدد لاختيار الصف والانضمام إلى فصلك لاعتمادها يدوياً'
+                  : 'Student requests awaiting your manual approval for class roster assignment'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => loadRequests(classInfo?.classGroupId)}
+            disabled={loadingRequests}
+            className="text-[11px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
+          >
+            <RefreshCw size={11} className={loadingRequests ? 'animate-spin' : ''} />
+            <span>{isAr ? 'تحديث الطلبات' : 'Refresh'}</span>
+          </button>
+        </div>
+
+        {loadingRequests ? (
+          <div className="py-6 text-center text-xs text-stone-500 flex items-center justify-center gap-2">
+            <RefreshCw size={14} className="animate-spin text-amber-500" />
+            <span>{isAr ? 'جاري فحص الطلبات...' : 'Checking pending requests...'}</span>
+          </div>
+        ) : pendingRequests.length === 0 ? (
+          <div className="py-5 text-center text-xs text-stone-500">
+            {isAr
+              ? 'لا توجد طلبات تفعيل أو تسكين معلقة لهذا الفصل حالياً. كل الطلاب مسكنون رسمياً.'
+              : 'No pending onboarding or roster requests for this class. All students are approved.'}
+          </div>
+        ) : (
+          <div className="divide-y divide-stone-800 space-y-3">
+            {pendingRequests.map((req) => {
+              const isProcessing = processingRequestId === req.id;
+              return (
+                <div 
+                  key={req.id}
+                  className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs bg-stone-950/40 p-3 rounded-xl border border-stone-800/80"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                      {req.studentName.charAt(0) || 'S'}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-stone-100 text-sm">{req.studentName}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                          {req.requestedGrade}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-stone-400 flex items-center gap-2 flex-wrap">
+                        <span>ID: <code className="text-stone-300">{req.studentId}</code></span>
+                        {req.phone && <span>• 📞 {req.phone}</span>}
+                        {req.email && <span>• ✉️ {req.email}</span>}
+                        <span>• 🕒 {new Date(req.requestedAt).toLocaleDateString()}</span>
+                      </div>
+                      {req.notes && (
+                        <div className="text-[11px] text-amber-200/80 bg-amber-950/30 p-2 rounded-lg border border-amber-900/40 italic">
+                          "{req.notes}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleReviewRequest(req.id, 'REJECT')}
+                      className="px-3 py-1.5 rounded-lg border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-stone-200 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isAr ? 'رفض' : 'Reject'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleReviewRequest(req.id, 'APPROVE', req.requestedGrade)}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isProcessing ? (
+                        <RefreshCw size={12} className="animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={13} />
+                      )}
+                      <span>{isAr ? 'قبول وتسكين بالكشف' : 'Approve & Enroll'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Grid: Assignment Form + Roster View */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

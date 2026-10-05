@@ -16,6 +16,7 @@ import { DesignSystemPage } from './components/design-system/DesignSystemPage';
 import { BrandGuidelinesPage } from './components/design-system/BrandGuidelinesPage';
 import { TranslationQADashboard } from './components/design-system/TranslationQADashboard';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { StudentOnboardingModal } from './components/auth/StudentOnboardingModal';
 import { OfflineIndicator } from './components/layout/OfflineIndicator';
 import { GlobalMusicPlayer } from './components/layout/GlobalMusicPlayer';
 import { useAuth } from './context/AuthContext';
@@ -61,6 +62,17 @@ function AppContent() {
     }
     return null;
   });
+
+  // On first student login without exact grade, show onboarding modal
+  const [showStudentOnboardingModal, setShowStudentOnboardingModal] = useState<boolean>(false);
+  useEffect(() => {
+    if (userData && userData.role === 'student') {
+      const dismissed = sessionStorage.getItem('dismissed_student_onboarding_' + userData.id);
+      if (!userData.grade && !dismissed) {
+        setShowStudentOnboardingModal(true);
+      }
+    }
+  }, [userData?.id, userData?.role, userData?.grade]);
 
   // If parent opens app via child link, automatically navigate to family tab
   React.useEffect(() => {
@@ -245,11 +257,51 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {/* Student Pending Activation / Sunday School Grade Alert Banner */}
+      {role === 'student' && (!userData?.grade || userData?.activationStatus === 'PENDING_APPROVAL') && (
+        <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2.5 shadow-md flex items-center justify-between text-xs sm:text-sm font-semibold sticky top-14 z-30">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⏳</span>
+            <span>
+              {lang === 'ar'
+                ? `طلب تفعيل حسابك لمدارس الأحد قيد الاعتماد اليدوي (${userData.requestedGrade || userData.grade || 'لم يُحدد الصف'})`
+                : `Sunday School activation pending manual approval (${userData.requestedGrade || userData.grade || 'Grade not selected'})`}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowStudentOnboardingModal(true)}
+            className="bg-amber-300 hover:bg-amber-200 text-amber-950 font-black px-3 py-1 rounded-lg text-xs transition-colors cursor-pointer shadow-xs shrink-0"
+          >
+            {lang === 'ar' ? 'عرض / تحديد الصف' : 'Select / Review Grade'}
+          </button>
+        </div>
+      )}
       
       {/* Container for responsive layout */}
       <div className="mx-auto w-full md:pt-4 pb-20 md:pb-28">
         {renderMainContent()}
       </div>
+
+      {/* Student First-Login & Onboarding Modal */}
+      {showStudentOnboardingModal && (
+        <StudentOnboardingModal
+          isOpen={showStudentOnboardingModal}
+          onClose={() => {
+            setShowStudentOnboardingModal(false);
+            if (userData?.id) {
+              sessionStorage.setItem('dismissed_student_onboarding_' + userData.id, 'true');
+            }
+          }}
+          lang={lang}
+          onSuccess={() => {
+            setShowStudentOnboardingModal(false);
+            if (userData?.id) {
+              sessionStorage.setItem('dismissed_student_onboarding_' + userData.id, 'true');
+            }
+          }}
+        />
+      )}
 
       {/* Unified Bottom Nav: Always accessible across all tabs, hidden during active full-screen lesson */}
       {!activeLessonId && (

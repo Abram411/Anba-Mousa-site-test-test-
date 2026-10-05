@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Lesson, Language } from '../../types';
 import { LessonEditModal } from '../teacher/LessonEditModal';
 import { formatStudentClassDisplay } from '../../lib/classGroups';
+import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
 
 interface LessonsTabProps {
   onStartLesson: (id: string) => void;
@@ -19,6 +20,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'published' | 'drafts'>('all');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [showClassModal, setShowClassModal] = useState<boolean>(false);
 
   const isTeacher = userData?.role === 'teacher';
 
@@ -85,6 +87,27 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
               </button>
             )}
           </div>
+        )}
+
+        {/* Student Sunday School Class Selector / Status Pill */}
+        {!isTeacher && (
+          <button
+            onClick={() => setShowClassModal(true)}
+            className="px-3.5 py-2 rounded-2xl bg-white border border-[var(--color-church-cream-dark)] text-xs font-bold text-gray-700 hover:border-amber-400 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title={lang === 'ar' ? 'تعديل أو مراجعة فصلك الدراسي' : 'Change or review your Sunday School class'}
+          >
+            <span>⛪</span>
+            <span>
+              {userData?.grade 
+                ? (userData.activationStatus === 'PENDING_APPROVAL' 
+                    ? (lang === 'ar' ? `قيد المراجعة: ${userData.grade}` : `Pending: ${userData.grade}`) 
+                    : (lang === 'ar' ? `فصلي: ${userData.grade}` : `Class: ${userData.grade}`))
+                : (lang === 'ar' ? 'تحديد فصل مدارس الأحد' : 'Select Class')}
+            </span>
+            <span className="text-[10px] text-amber-600 underline">
+              {lang === 'ar' ? 'تعديل' : 'Change'}
+            </span>
+          </button>
         )}
       </div>
 
@@ -267,6 +290,18 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
             }
           }}
           lang={lang}
+        />
+      )}
+
+      {/* Student Onboarding & Class Selection Modal */}
+      {!isTeacher && (
+        <StudentOnboardingModal
+          isOpen={showClassModal}
+          onClose={() => setShowClassModal(false)}
+          lang={lang}
+          onSuccess={() => {
+            setShowClassModal(false);
+          }}
         />
       )}
     </motion.div>

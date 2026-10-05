@@ -6,6 +6,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { updateSupabaseProfile, uploadAvatarToSupabase } from '../../lib/supabaseDatabase';
 import { syncStudentSessionToParent, getShareableChildLink, getWhatsAppShareUrl, getOrCreateChildLinkCode } from '../../lib/parentChildService';
 import { ChildQrCodeModal } from '../common/ChildQrCodeModal';
+import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
+import { CLASS_GROUPS, getClassGroupForGrade } from '../../lib/classGroups';
 import { COPTIC_AVATARS, DEFAULT_STUDENT_AVATAR } from '../../data/copticAvatars';
 import { Language } from '../../types';
 
@@ -44,6 +46,7 @@ export function ProfileTab({
   const [showQrModal, setShowQrModal] = useState(false);
   const [manualParentEmail, setManualParentEmail] = useState('');
   const [isLinkingParent, setIsLinkingParent] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isStudent = !userData?.role || userData?.role === 'student';
@@ -559,6 +562,74 @@ export function ProfileTab({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* For Students: Sunday School Class & Grade Card */}
+              {isStudent && (
+                <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center font-bold">
+                        <GraduationCap size={24} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-base">
+                          {lang === 'ar' ? 'فصل وصف مدارس الأحد' : 'Sunday School Class & Grade'}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {lang === 'ar' ? 'تسكين الكشف الرسمي واعتماد خادم الفصل' : 'Official roster enrollment & servant approval'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')
+                        ? (lang === 'ar' ? 'مسجل بالكشف الرسمي ✅' : 'Roster Enrolled ✅')
+                        : (lang === 'ar' ? 'قيد المراجعة والاعتماد ⏳' : 'Pending Approval ⏳')}
+                    </span>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-blue-50/60 to-amber-50/50 rounded-2xl p-4 border border-blue-100 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'الصف الدراسي المحدد:' : 'Exact Grade:'}</span>
+                        <span className="font-bold text-gray-900 text-sm">
+                          {userData?.requestedGrade || userData?.grade || (lang === 'ar' ? 'لم يتم التحديد بعد' : 'Not Selected')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'فصل مدارس الأحد الكنسي:' : 'Church Class Group:'}</span>
+                        <span className="font-bold text-[var(--color-church-blue)] text-sm">
+                          {(() => {
+                            const g = userData?.requestedGrade || userData?.grade;
+                            const group = g ? getClassGroupForGrade(g) : null;
+                            return group ? group.name[lang === 'ar' ? 'ar' : 'en'] : (lang === 'ar' ? 'بانتظار الاختيار' : 'Pending Selection');
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-blue-200/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <p className="text-[11px] text-gray-600 leading-relaxed">
+                        {lang === 'ar' 
+                          ? 'يقوم الخادم المسؤول بمراجعة طلبك واعتماد تسكينك في الكشف لتلقي دروس المرحلة ومتابعة التقدم.' 
+                          : 'Your servant reviews and approves your roster placement to unlock the official curriculum.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowOnboardingModal(true)}
+                        className="px-4 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+                      >
+                        <Edit3 size={13} />
+                        <span>{lang === 'ar' ? 'تحديد / تعديل الصف' : 'Select / Change Grade'}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1144,6 +1215,16 @@ export function ProfileTab({
         linkCode={studentLinkCode}
         lang={lang}
       />
+
+      {/* Student Sunday School Onboarding & Grade Selector Modal */}
+      {showOnboardingModal && (
+        <StudentOnboardingModal
+          isOpen={showOnboardingModal}
+          onClose={() => setShowOnboardingModal(false)}
+          lang={lang}
+          onSuccess={() => setShowOnboardingModal(false)}
+        />
+      )}
     </div>
   );
 }
