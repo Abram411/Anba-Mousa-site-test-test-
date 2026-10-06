@@ -117,6 +117,9 @@ export interface ServantClassInfo {
   grades?: string[];
   stage?: string;
   servants?: string[];
+  churchYear?: string;
+  classCode?: string;
+  classInstanceId?: string;
 }
 
 export interface MyClassResult {

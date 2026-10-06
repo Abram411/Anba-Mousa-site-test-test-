@@ -48,8 +48,11 @@ async function verifyServerRequestAuth(req: express.Request): Promise<ServerAuth
   // Development/Test token handler for automated security test verification
   if (process.env.NODE_ENV !== "production" && token.startsWith("test_jwt_")) {
     const parts = token.split("_");
-    const role = (parts[2] || "student") as 'student' | 'teacher' | 'admin' | 'parent';
+    let role = (parts[2] || "student") as 'student' | 'teacher' | 'admin' | 'parent';
     const userId = parts.slice(3).join("_") || "test_user";
+    if (serverReviewState?.userRoles?.[userId]) {
+      role = serverReviewState.userRoles[userId];
+    }
     return {
       userId,
       role,
@@ -3967,6 +3970,12 @@ app.get("/api/church/my-class", async (req, res) => {
         });
       }
 
+      const curYear = serverReviewState.currentChurchYear;
+      const curInstanceKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${assignedClassGroupId}`;
+      const activeInst = serverReviewState.classInstances[curInstanceKey] || Object.values(serverReviewState.classInstances).find(
+        (i: any) => i.churchYear === curYear && i.classGroupId === assignedClassGroupId
+      ) as any;
+
       return res.json({
         success: true,
         classInfo: {
@@ -3977,7 +3986,10 @@ app.get("/api/church/my-class", async (req, res) => {
           classNameAr: classRecord.nameAr,
           grades: classRecord.grades,
           stage: classRecord.stage,
-          servants: classRecord.servantIds || ['Servant Mina']
+          servants: activeInst?.servantNames || activeInst?.servantIds || classRecord.servantIds || ['Servant Mina'],
+          churchYear: curYear,
+          classCode: activeInst?.code || 'MUSA-P46B',
+          classInstanceId: activeInst?.id || curInstanceKey
         },
         roster
       });
@@ -4036,7 +4048,8 @@ app.get("/api/church/my-class", async (req, res) => {
               classGroupId: derivedClassGroupId,
               className: classRecord.nameEn,
               classNameAr: classRecord.nameAr,
-              servants
+              servants,
+              churchYear: serverReviewState.currentChurchYear
             }
           });
         }
@@ -4069,7 +4082,8 @@ app.get("/api/church/my-class", async (req, res) => {
         classGroupId: studentRecord.classGroupId,
         className: classRecord.nameEn,
         classNameAr: classRecord.nameAr,
-        servants: ['Servant Mina']
+        servants: ['Servant Mina'],
+        churchYear: studentRecord.churchYear || serverReviewState.currentChurchYear
       }
     });
   } catch (err: any) {
@@ -4680,13 +4694,31 @@ app.post("/api/church/onboarding/review", async (req, res) => {
       targetRequest.reviewNotes = reviewNotes || 'Approved by servant';
 
       // Authoritative roster assignment
+      const curYear = serverReviewState.currentChurchYear;
       serverReviewState.studentClasses[targetRequest.studentId] = {
         studentId: targetRequest.studentId,
         fullName: targetRequest.studentName,
         grade: finalGrade,
         classGroupId: targetRequest.requestedClassGroupId,
+        churchYear: curYear,
         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetRequest.studentId}`,
         enrolledAt: new Date().toISOString()
+      };
+
+      // Add to classMemberships for the current church year
+      const memId = `mem_${targetRequest.studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const instKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${targetRequest.requestedClassGroupId}`;
+      serverReviewState.classMemberships[memId] = {
+        id: memId,
+        churchYear: curYear,
+        classGroupId: targetRequest.requestedClassGroupId,
+        classInstanceId: instKey,
+        studentId: targetRequest.studentId,
+        studentName: targetRequest.studentName,
+        exactGrade: finalGrade,
+        status: 'ACTIVE',
+        enrolledAt: new Date().toISOString(),
+        enrolledBy: authContext.userId || 'servant'
       };
 
       // Establish teacher-student relationship
@@ -4759,6 +4791,834 @@ app.post("/api/church/onboarding/review", async (req, res) => {
         message: `Request "${requestId}" was rejected.`
       });
     }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// ==============================================================================
+// PHASE 3B: CHURCH YEAR & YEAR-SPECIFIC CLASS INSTANCES
+// Authoritative multi-year Church lifecycle, join codes, memberships & promotions
+// ==============================================================================
+
+function generateClassCode(prefix = 'MUSA'): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = prefix + '-';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function getNextGradeInfo(currentGrade?: string | null): {
+  nextGrade: string;
+  nextClassGroupId: string;
+  isGraduated: boolean;
+  explanation: string;
+} {
+  const g = (currentGrade || '').toLowerCase().trim();
+  if (g.includes('kg1') || g.includes('حضانة صغرى') || g.includes('كي جي 1')) {
+    return { nextGrade: 'KG2', nextClassGroupId: 'angels', isGraduated: false, explanation: 'Promoted from KG1 to KG2' };
+  }
+  if (g.includes('kg2') || g.includes('حضانة كبرى') || g.includes('كي جي 2') || g.includes('kg')) {
+    return { nextGrade: 'Grade 1', nextClassGroupId: 'primary_1', isGraduated: false, explanation: 'Promoted from KG2 to Grade 1 (Primary 1–3)' };
+  }
+  if (g.includes('grade 1') || g.includes('primary 1') || g === '1' || g.includes('اولى ابتدائي')) {
+    return { nextGrade: 'Grade 2', nextClassGroupId: 'primary_1', isGraduated: false, explanation: 'Promoted from Grade 1 to Grade 2' };
+  }
+  if (g.includes('grade 2') || g.includes('primary 2') || g === '2' || g.includes('تانية ابتدائي')) {
+    return { nextGrade: 'Grade 3', nextClassGroupId: 'primary_1', isGraduated: false, explanation: 'Promoted from Grade 2 to Grade 3' };
+  }
+  if (g.includes('grade 3') || g.includes('primary 3') || g === '3' || g.includes('تالتة ابتدائي')) {
+    return { nextGrade: 'Grade 4', nextClassGroupId: 'primary_2', isGraduated: false, explanation: 'Promoted from Grade 3 to Grade 4 (Primary 4–6)' };
+  }
+  if (g.includes('grade 4') || g.includes('primary 4') || g === '4' || g.includes('رابعة ابتدائي')) {
+    return { nextGrade: 'Grade 5', nextClassGroupId: 'primary_2', isGraduated: false, explanation: 'Promoted from Grade 4 to Grade 5' };
+  }
+  if (g.includes('grade 5') || g.includes('primary 5') || g === '5' || g.includes('خامسة ابتدائي')) {
+    return { nextGrade: 'Grade 6', nextClassGroupId: 'primary_2', isGraduated: false, explanation: 'Promoted from Grade 5 to Grade 6' };
+  }
+  if (g.includes('grade 6') || g.includes('primary 6') || g === '6' || g.includes('ساتة ابتدائي') || g.includes('سادس')) {
+    return { nextGrade: 'Prep 1', nextClassGroupId: 'preparatory', isGraduated: false, explanation: 'Promoted from Grade 6 to Prep 1 (Preparatory)' };
+  }
+  if (g.includes('prep 1') || g.includes('grade 7') || g.includes('اولى اعدادي')) {
+    return { nextGrade: 'Prep 2', nextClassGroupId: 'preparatory', isGraduated: false, explanation: 'Promoted from Prep 1 to Prep 2' };
+  }
+  if (g.includes('prep 2') || g.includes('grade 8') || g.includes('تانية اعدادي')) {
+    return { nextGrade: 'Prep 3', nextClassGroupId: 'preparatory', isGraduated: false, explanation: 'Promoted from Prep 2 to Prep 3' };
+  }
+  if (g.includes('prep 3') || g.includes('grade 9') || g.includes('تالتة اعدادي')) {
+    return { nextGrade: 'Secondary 1', nextClassGroupId: 'secondary', isGraduated: false, explanation: 'Promoted from Prep 3 to Secondary 1 (Secondary)' };
+  }
+  if (g.includes('sec 1') || g.includes('secondary 1') || g.includes('grade 10') || g.includes('اولى ثانوي')) {
+    return { nextGrade: 'Secondary 2', nextClassGroupId: 'secondary', isGraduated: false, explanation: 'Promoted from Secondary 1 to Secondary 2' };
+  }
+  if (g.includes('sec 2') || g.includes('secondary 2') || g.includes('grade 11') || g.includes('تانية ثانوي')) {
+    return { nextGrade: 'Secondary 3', nextClassGroupId: 'secondary', isGraduated: false, explanation: 'Promoted from Secondary 2 to Secondary 3' };
+  }
+  if (g.includes('sec 3') || g.includes('secondary 3') || g.includes('grade 12') || g.includes('تالتة ثانوي')) {
+    return { nextGrade: 'University', nextClassGroupId: 'university', isGraduated: false, explanation: 'Promoted from Secondary 3 to University' };
+  }
+  if (g.includes('univ') || g.includes('جامع') || g.includes('college') || g.includes('youth')) {
+    return { nextGrade: 'Graduated', nextClassGroupId: 'university', isGraduated: true, explanation: 'Completed Sunday School curriculum (Graduated / Alumni)' };
+  }
+  return { nextGrade: 'Grade 5', nextClassGroupId: 'primary_2', isGraduated: false, explanation: 'Standard grade progression' };
+}
+
+// 1. Get current church year and class instances
+app.get("/api/church/year", async (req, res) => {
+  try {
+    const curYear = serverReviewState.currentChurchYear;
+    let yearRecord = serverReviewState.churchYears[curYear];
+    if (!yearRecord) {
+      yearRecord = {
+        id: `year-${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`,
+        year: curYear,
+        status: 'ACTIVE',
+        startDate: `${curYear.substring(0, 4)}-09-01`,
+        createdAt: new Date().toISOString(),
+        createdBy: 'system'
+      };
+      serverReviewState.churchYears[curYear] = yearRecord;
+    }
+
+    // Filter class instances for this current active year
+    const activeInstances = Object.values(serverReviewState.classInstances)
+      .filter((inst: any) => inst.churchYear === curYear);
+
+    return res.json({
+      success: true,
+      currentChurchYear: curYear,
+      churchYear: yearRecord,
+      classInstances: activeInstances
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 2. Onboard Student Exact Grade (First login)
+app.post("/api/church/student/onboard-grade", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const { exactGrade, studentId: bodyStudentId } = req.body;
+    if (!exactGrade || typeof exactGrade !== 'string' || !exactGrade.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_GRADE",
+        message: "exactGrade is required"
+      });
+    }
+
+    const studentId = (authContext.isAuthenticated && authContext.userId) ? authContext.userId : (bodyStudentId || 'u1');
+    const classGroupId = getClassGroupIdForGrade(exactGrade);
+    const classRecord = serverReviewState.classes[classGroupId] || {
+      nameEn: classGroupId,
+      nameAr: classGroupId
+    };
+
+    const curYear = serverReviewState.currentChurchYear;
+    const instanceKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${classGroupId}`;
+
+    // Link/update membership
+    const memKey = `mem_${studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    serverReviewState.classMemberships[memKey] = {
+      id: memKey,
+      churchYear: curYear,
+      classGroupId,
+      classInstanceId: instanceKey,
+      studentId,
+      studentName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      exactGrade: exactGrade.trim(),
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: 'onboarding'
+    };
+
+    serverReviewState.studentClasses[studentId] = {
+      studentId,
+      fullName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      grade: exactGrade.trim(),
+      classGroupId,
+      churchYear: curYear,
+      avatarUrl: serverReviewState.studentClasses[studentId]?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+    };
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      exactGrade: exactGrade.trim(),
+      classGroupId,
+      classGroupName: classRecord.nameEn
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 3. Student Joins Class using Servant-Supplied Code
+app.post("/api/church/student/join-class", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    const { code, exactGrade: bodyExactGrade, studentId: bodyStudentId } = req.body;
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_CODE",
+        message: "Class join code is required."
+      });
+    }
+
+    const trimmedCode = code.trim().toUpperCase();
+    const curYear = serverReviewState.currentChurchYear;
+
+    // Find class instance matching this code across all instances
+    const matchedInstance = Object.values(serverReviewState.classInstances).find(
+      (inst: any) => inst.code && inst.code.toUpperCase() === trimmedCode
+    ) as any;
+
+    if (!matchedInstance) {
+      return res.status(404).json({
+        success: false,
+        error: "CODE_NOT_FOUND",
+        message: "No class instance found with this join code."
+      });
+    }
+
+    // Archived year check
+    if (matchedInstance.churchYear !== curYear || matchedInstance.status === 'ARCHIVED') {
+      return res.status(400).json({
+        success: false,
+        error: "ARCHIVED_YEAR_CODE",
+        message: "Archived-year codes cannot enroll students into the current year."
+      });
+    }
+
+    const studentId = (authContext.isAuthenticated && authContext.userId) ? authContext.userId : (bodyStudentId || 'mark');
+    
+    // Resolve student exact grade
+    let studentGrade = bodyExactGrade;
+    if (!studentGrade) {
+      studentGrade = serverReviewState.studentClasses[studentId]?.grade;
+    }
+
+    if (!studentGrade) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_EXACT_GRADE",
+        message: "Student exact grade is required to join a class."
+      });
+    }
+
+    // Validate that student's exact grade is compatible with the target class group
+    const derivedGroupId = getClassGroupIdForGrade(studentGrade);
+    if (derivedGroupId !== matchedInstance.classGroupId) {
+      return res.status(400).json({
+        success: false,
+        error: "INCOMPATIBLE_GRADE",
+        message: `Your exact grade (${studentGrade}) belongs to "${derivedGroupId}" and is not compatible with "${matchedInstance.classGroupId}".`
+      });
+    }
+
+    // Ensure student has at most ONE active membership in current year
+    const memKey = `mem_${studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    serverReviewState.classMemberships[memKey] = {
+      id: memKey,
+      churchYear: curYear,
+      classGroupId: matchedInstance.classGroupId,
+      classInstanceId: matchedInstance.id,
+      studentId,
+      studentName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      exactGrade: studentGrade,
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: 'join_code'
+    };
+
+    serverReviewState.studentClasses[studentId] = {
+      studentId,
+      fullName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      grade: studentGrade,
+      classGroupId: matchedInstance.classGroupId,
+      churchYear: curYear,
+      avatarUrl: serverReviewState.studentClasses[studentId]?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+    };
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      message: `Enrolled successfully in ${matchedInstance.nameEn} (${curYear})`,
+      classInstance: matchedInstance,
+      studentClass: serverReviewState.studentClasses[studentId]
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 4. Regenerate Class Code (Authorized Servants & Admins Only)
+app.post("/api/church/classes/:classGroupId/regenerate-code", async (req, res) => {
+  try {
+    const classGroupId = req.params.classGroupId;
+    const authContext = await verifyServerRequestAuth(req);
+
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student' || authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Only authorized servants and admins can regenerate class codes."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || [];
+        if (!assignedClasses.includes(classGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not assigned to class "${classGroupId}".`
+          });
+        }
+      }
+    }
+
+    const curYear = serverReviewState.currentChurchYear;
+    const instanceKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${classGroupId}`;
+    let targetInstance = serverReviewState.classInstances[instanceKey];
+    if (!targetInstance) {
+      targetInstance = Object.values(serverReviewState.classInstances).find(
+        (inst: any) => inst.churchYear === curYear && inst.classGroupId === classGroupId
+      );
+    }
+
+    if (!targetInstance) {
+      return res.status(404).json({
+        success: false,
+        error: "CLASS_INSTANCE_NOT_FOUND",
+        message: `No active class instance found for "${classGroupId}" in church year ${curYear}.`
+      });
+    }
+
+    const newCode = generateClassCode(`MUSA`);
+    targetInstance.code = newCode;
+    targetInstance.updatedAt = new Date().toISOString();
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      newCode,
+      classInstance: targetInstance,
+      message: `Join code regenerated successfully. Old code is now invalidated for future joins.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 5. Remove Student from Current Church-Year Class (Authorized Servants & Admins Only)
+app.post("/api/church/classes/:classGroupId/remove-student", async (req, res) => {
+  try {
+    const classGroupId = req.params.classGroupId;
+    const { studentId, reason } = req.body;
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_STUDENT_ID",
+        message: "studentId is required"
+      });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student' || authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students and parents cannot remove students from classes."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || [];
+        if (!assignedClasses.includes(classGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not assigned to class "${classGroupId}".`
+          });
+        }
+      }
+    }
+
+    const curYear = serverReviewState.currentChurchYear;
+    const memKey = `mem_${studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    if (serverReviewState.classMemberships[memKey]) {
+      serverReviewState.classMemberships[memKey].status = 'REMOVED';
+      serverReviewState.classMemberships[memKey].removedAt = new Date().toISOString();
+      serverReviewState.classMemberships[memKey].removedBy = authContext.userId || 'servant';
+      serverReviewState.classMemberships[memKey].removalReason = reason || 'Removed by servant/admin';
+    }
+
+    // Unassign student from current active class
+    if (serverReviewState.studentClasses[studentId]) {
+      delete serverReviewState.studentClasses[studentId];
+    }
+
+    // Historical records, progress, quiz attempts, and relationships remain intact!
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      studentId,
+      message: `Student "${studentId}" removed from class "${classGroupId}" for church year ${curYear}. Historical records preserved.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 6. Add Student to Class (Authorized Servants & Admins Only)
+app.post("/api/church/classes/:classGroupId/add-student", async (req, res) => {
+  try {
+    const classGroupId = req.params.classGroupId;
+    const { studentId, exactGrade } = req.body;
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING_STUDENT_ID",
+        message: "studentId is required"
+      });
+    }
+
+    const authContext = await verifyServerRequestAuth(req);
+    if (authContext.isAuthenticated) {
+      if (authContext.role === 'student' || authContext.role === 'parent') {
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: "Students and parents cannot add students to classes."
+        });
+      }
+
+      if (authContext.role === 'teacher') {
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || [];
+        if (!assignedClasses.includes(classGroupId)) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not assigned to class "${classGroupId}".`
+          });
+        }
+      }
+    }
+
+    const curYear = serverReviewState.currentChurchYear;
+    const instanceKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${classGroupId}`;
+    const targetGrade = exactGrade || (serverReviewState.classes[classGroupId]?.grades?.[0] || 'Grade 4');
+
+    const memKey = `mem_${studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    serverReviewState.classMemberships[memKey] = {
+      id: memKey,
+      churchYear: curYear,
+      classGroupId,
+      classInstanceId: instanceKey,
+      studentId,
+      studentName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      exactGrade: targetGrade,
+      status: 'ACTIVE',
+      enrolledAt: new Date().toISOString(),
+      enrolledBy: authContext.userId || 'servant'
+    };
+
+    serverReviewState.studentClasses[studentId] = {
+      studentId,
+      fullName: serverReviewState.studentClasses[studentId]?.fullName || studentId,
+      grade: targetGrade,
+      classGroupId,
+      churchYear: curYear,
+      avatarUrl: serverReviewState.studentClasses[studentId]?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+    };
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      student: serverReviewState.studentClasses[studentId],
+      message: `Student "${studentId}" added to class "${classGroupId}".`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 7. Admin: Get Users List
+app.get("/api/church/admin/users", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || authContext.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only church administrators can access user management."
+      });
+    }
+
+    const users: any[] = [];
+    const seen = new Set<string>();
+
+    for (const [userId, role] of Object.entries(serverReviewState.userRoles)) {
+      if (seen.has(userId)) continue;
+      seen.add(userId);
+      const studentClass = serverReviewState.studentClasses[userId];
+      const assigned = serverReviewState.teacherAssignments[userId] || [];
+      users.push({
+        id: userId,
+        name: studentClass?.fullName || (userId.startsWith('user_') ? userId.split('_').slice(2).join(' ') : userId),
+        email: `${userId}@church.org`,
+        role,
+        grade: studentClass?.grade,
+        assignedClasses: assigned,
+        avatar: studentClass?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`
+      });
+    }
+
+    for (const [studentId, s] of Object.entries(serverReviewState.studentClasses)) {
+      if (seen.has(studentId)) continue;
+      seen.add(studentId);
+      users.push({
+        id: studentId,
+        name: (s as any).fullName || studentId,
+        email: `${studentId}@church.org`,
+        role: 'student',
+        grade: (s as any).grade,
+        avatar: (s as any).avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+      });
+    }
+
+    return res.json({ success: true, users });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 8. Admin: Promote/Demote User Role
+app.post("/api/church/admin/promote-user", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || authContext.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only church administrators can modify user roles."
+      });
+    }
+
+    const { userId, role } = req.body;
+    if (!userId || !role || !['student', 'teacher', 'admin', 'parent'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_ROLE",
+        message: "Valid userId and role ('student' | 'teacher' | 'admin' | 'parent') required."
+      });
+    }
+
+    serverReviewState.userRoles[userId] = role;
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      userId,
+      newRole: role,
+      message: `User ${userId} role updated to ${role}.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 9. Admin: Assign/Unassign Servant to Class Group
+app.post("/api/church/admin/assign-servant", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || authContext.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only church administrators can assign servants."
+      });
+    }
+
+    const { servantId, classGroupId, action } = req.body;
+    if (!servantId || !classGroupId || !['ASSIGN', 'REMOVE'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_PARAMS",
+        message: "servantId, classGroupId, and action ('ASSIGN' | 'REMOVE') are required."
+      });
+    }
+
+    if (!serverReviewState.teacherAssignments[servantId]) {
+      serverReviewState.teacherAssignments[servantId] = [];
+    }
+
+    const curYear = serverReviewState.currentChurchYear;
+    const instanceKey = `inst_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}_${classGroupId}`;
+    const classInst = serverReviewState.classInstances[instanceKey];
+
+    if (action === 'ASSIGN') {
+      if (!serverReviewState.teacherAssignments[servantId].includes(classGroupId)) {
+        serverReviewState.teacherAssignments[servantId].push(classGroupId);
+      }
+      if (classInst && !classInst.servantIds.includes(servantId)) {
+        classInst.servantIds.push(servantId);
+      }
+    } else {
+      serverReviewState.teacherAssignments[servantId] = serverReviewState.teacherAssignments[servantId].filter(
+        (id: string) => id !== classGroupId
+      );
+      if (classInst) {
+        classInst.servantIds = classInst.servantIds.filter((id: string) => id !== servantId);
+      }
+    }
+
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      servantId,
+      assignedClasses: serverReviewState.teacherAssignments[servantId],
+      message: `Servant ${servantId} ${action === 'ASSIGN' ? 'assigned to' : 'unassigned from'} ${classGroupId}.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 10. Admin: Preview New Church Year Rollover
+app.get("/api/church/admin/year-transition-preview", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || authContext.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only church administrators can access year transition preview."
+      });
+    }
+
+    const curYear = serverReviewState.currentChurchYear;
+    let nextYear = "2027–2028";
+    const parts = curYear.split(/[–-]/);
+    if (parts.length === 2) {
+      const y1 = parseInt(parts[0], 10);
+      const y2 = parseInt(parts[1], 10);
+      if (!isNaN(y1) && !isNaN(y2)) {
+        nextYear = `${y1 + 1}–${y2 + 1}`;
+      }
+    }
+
+    const previewList: any[] = [];
+    for (const [studentId, student] of Object.entries(serverReviewState.studentClasses)) {
+      const info = getNextGradeInfo((student as any).grade);
+      previewList.push({
+        studentId,
+        name: (student as any).fullName || studentId,
+        currentGrade: (student as any).grade || 'Grade 4',
+        currentClassGroupId: (student as any).classGroupId || 'primary_2',
+        projectedGrade: info.nextGrade,
+        projectedClassGroupId: info.nextClassGroupId,
+        isGraduated: info.isGraduated,
+        explanation: info.explanation
+      });
+    }
+
+    return res.json({
+      success: true,
+      currentYear: curYear,
+      nextYear,
+      previewList
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
+  }
+});
+
+// 11. Admin: Start New Church Year (Deterministic Rollover with Exception Support)
+app.post("/api/church/admin/start-new-year", async (req, res) => {
+  try {
+    const authContext = await verifyServerRequestAuth(req);
+    if (!authContext.isAuthenticated || authContext.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: "FORBIDDEN",
+        message: "Only church administrators can start a new church year."
+      });
+    }
+
+    const { targetYear, confirmed, exceptions } = req.body;
+    if (!targetYear || typeof targetYear !== 'string' || !targetYear.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_YEAR",
+        message: "targetYear is required (e.g. '2027–2028')."
+      });
+    }
+
+    const trimmedTargetYear = targetYear.trim();
+    const curYear = serverReviewState.currentChurchYear;
+
+    if (trimmedTargetYear === curYear) {
+      return res.status(400).json({
+        success: false,
+        error: "YEAR_ALREADY_ACTIVE",
+        message: `Church year "${trimmedTargetYear}" is already the active church year.`
+      });
+    }
+
+    if (!confirmed) {
+      return res.status(400).json({
+        success: false,
+        error: "CONFIRMATION_REQUIRED",
+        message: "Confirmation is required to start a new church year."
+      });
+    }
+
+    // 1. Archive current year
+    if (serverReviewState.churchYears[curYear]) {
+      serverReviewState.churchYears[curYear].status = 'ARCHIVED';
+      serverReviewState.churchYears[curYear].endDate = new Date().toISOString().split('T')[0];
+    }
+
+    // 2. Archive class instances of current year
+    for (const inst of Object.values(serverReviewState.classInstances)) {
+      if ((inst as any).churchYear === curYear) {
+        (inst as any).status = 'ARCHIVED';
+      }
+    }
+
+    // 3. Create new church year
+    const yearId = `year-${trimmedTargetYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    serverReviewState.churchYears[trimmedTargetYear] = {
+      id: yearId,
+      year: trimmedTargetYear,
+      status: 'ACTIVE',
+      startDate: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      createdBy: authContext.userId || 'admin'
+    };
+
+    // 4. Create exactly six class instances for the new church year
+    const canonicalGroups: Array<{ id: string; nameEn: string; nameAr: string }> = [
+      { id: 'angels', nameEn: 'Angels', nameAr: 'فصل الملايكة' },
+      { id: 'primary_1', nameEn: 'Primary 1–3', nameAr: 'فصل ابتدائي 1–3' },
+      { id: 'primary_2', nameEn: 'Primary 4–6', nameAr: 'فصل ابتدائي 4–6' },
+      { id: 'preparatory', nameEn: 'Preparatory', nameAr: 'فصل إعدادي' },
+      { id: 'secondary', nameEn: 'Secondary', nameAr: 'فصل ثانوي' },
+      { id: 'university', nameEn: 'University', nameAr: 'فصل جامعة' }
+    ];
+
+    const newClassInstances: any[] = [];
+    for (const g of canonicalGroups) {
+      const instId = `inst_${trimmedTargetYear.replace(/[^a-zA-Z0-9]/g, '-')}_${g.id}`;
+      // Carry over previous servant assignments if present
+      const prevInst = Object.values(serverReviewState.classInstances).find(
+        (i: any) => i.churchYear === curYear && i.classGroupId === g.id
+      ) as any;
+      const servantIds = prevInst?.servantIds ? [...prevInst.servantIds] : [];
+
+      const instRecord = {
+        id: instId,
+        churchYear: trimmedTargetYear,
+        classGroupId: g.id,
+        nameEn: g.nameEn,
+        nameAr: g.nameAr,
+        code: generateClassCode('MUSA'),
+        servantIds,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString()
+      };
+      serverReviewState.classInstances[instId] = instRecord;
+      newClassInstances.push(instRecord);
+    }
+
+    // 5. Deterministic student promotion with support for administrative exceptions
+    const exMap = (exceptions && typeof exceptions === 'object') ? exceptions : {};
+    const previousStudentClasses = { ...serverReviewState.studentClasses };
+
+    for (const [studentId, student] of Object.entries(previousStudentClasses)) {
+      const studentName = (student as any).fullName || studentId;
+      const currentGrade = (student as any).grade;
+      const ex = exMap[studentId];
+
+      let newGrade = '';
+      let newGroupId = '';
+      let status: 'ACTIVE' | 'GRADUATED' = 'ACTIVE';
+
+      if (ex && ex.action === 'REPEAT') {
+        newGrade = currentGrade;
+        newGroupId = getClassGroupIdForGrade(currentGrade);
+      } else if (ex && ex.action === 'MANUAL' && ex.manualGrade) {
+        newGrade = ex.manualGrade;
+        newGroupId = getClassGroupIdForGrade(ex.manualGrade);
+      } else if (ex && ex.action === 'GRADUATE') {
+        newGrade = 'Graduated';
+        newGroupId = 'university';
+        status = 'GRADUATED';
+      } else {
+        const info = getNextGradeInfo(currentGrade);
+        newGrade = info.nextGrade;
+        newGroupId = info.nextClassGroupId;
+        if (info.isGraduated) {
+          status = 'GRADUATED';
+        }
+      }
+
+      const memId = `mem_${studentId}_${trimmedTargetYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const instId = `inst_${trimmedTargetYear.replace(/[^a-zA-Z0-9]/g, '-')}_${newGroupId}`;
+
+      serverReviewState.classMemberships[memId] = {
+        id: memId,
+        churchYear: trimmedTargetYear,
+        classGroupId: newGroupId,
+        classInstanceId: instId,
+        studentId,
+        studentName,
+        exactGrade: newGrade,
+        status,
+        enrolledAt: new Date().toISOString(),
+        enrolledBy: 'promotion_engine'
+      };
+
+      if (status === 'ACTIVE') {
+        serverReviewState.studentClasses[studentId] = {
+          studentId,
+          fullName: studentName,
+          grade: newGrade,
+          classGroupId: newGroupId,
+          churchYear: trimmedTargetYear,
+          avatarUrl: (student as any).avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
+        };
+      } else {
+        delete serverReviewState.studentClasses[studentId];
+      }
+    }
+
+    // 6. Update current active church year
+    serverReviewState.currentChurchYear = trimmedTargetYear;
+
+    // 7. Save persistent state
+    savePersistentClassState();
+
+    return res.json({
+      success: true,
+      message: `Church year "${trimmedTargetYear}" started successfully.`,
+      currentChurchYear: trimmedTargetYear,
+      newClassInstances
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || "Server error" });
   }

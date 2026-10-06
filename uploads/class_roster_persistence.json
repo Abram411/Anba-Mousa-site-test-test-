@@ -132,6 +132,18 @@
       "status": "ACTIVE",
       "enrolledAt": "2026-10-05T13:40:15.455Z",
       "enrolledBy": "servant"
+    },
+    "mem_student_new_youssef_777_2026-2027": {
+      "id": "mem_student_new_youssef_777_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2026-2027_primary_2",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-06T12:58:52.680Z",
+      "enrolledBy": "mina"
     }
   },
   "teacherAssignments": {
@@ -203,6 +215,23 @@
       "classGroupId": "preparatory",
       "churchYear": "2026–2027",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Peter"
+    },
+    "student_new_youssef_777": {
+      "studentId": "student_new_youssef_777",
+      "fullName": "Youssef Mina",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "churchYear": "2026–2027",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_new_youssef_777",
+      "enrolledAt": "2026-10-06T12:58:52.680Z"
+    },
+    "student_reject_test_99": {
+      "studentId": "student_reject_test_99",
+      "fullName": "Temp Student",
+      "grade": "Grade 5",
+      "classGroupId": "primary_2",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_reject_test_99",
+      "isPending": true
     }
   },
   "teacherStudentRelationships": [
@@ -211,6 +240,12 @@
       "studentId": "student-david",
       "relationshipType": "teacher_student",
       "createdAt": "2026-10-05T13:40:15.463Z"
+    },
+    {
+      "teacherId": "mina",
+      "studentId": "student_new_youssef_777",
+      "relationshipType": "teacher_student",
+      "createdAt": "2026-10-06T12:58:52.680Z"
     }
   ],
   "parentChildRelationships": [
@@ -257,6 +292,68 @@
       "notes": "New student joining Sunday school with Servant Mina",
       "status": "PENDING_APPROVAL",
       "requestedAt": "2026-10-05T12:40:15.455Z"
+    },
+    "req_1791291002745_xct10": {
+      "id": "req_1791291002745_xct10",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "email": "",
+      "phone": "+20 100 123 4567",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 4",
+      "notes": "New student joining Sunday school Grade 4",
+      "status": "APPROVED",
+      "requestedAt": "2026-10-06T12:50:02.745Z",
+      "assignedGrade": "Grade 4",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-06T12:50:02.770Z",
+      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
+    },
+    "req_1791291002779_o0lni": {
+      "id": "req_1791291002779_o0lni",
+      "studentId": "student_reject_test_99",
+      "studentName": "Temp Student",
+      "email": "",
+      "phone": "",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 5",
+      "notes": "",
+      "status": "REJECTED",
+      "requestedAt": "2026-10-06T12:50:02.779Z",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-06T12:50:02.782Z",
+      "reviewNotes": "Duplicate submission"
+    },
+    "req_1791291532659_g5xdk": {
+      "id": "req_1791291532659_g5xdk",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "email": "",
+      "phone": "+20 100 123 4567",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 4",
+      "notes": "New student joining Sunday school Grade 4",
+      "status": "APPROVED",
+      "requestedAt": "2026-10-06T12:58:52.659Z",
+      "assignedGrade": "Grade 4",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-06T12:58:52.680Z",
+      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
+    },
+    "req_1791291532687_7ovkg": {
+      "id": "req_1791291532687_7ovkg",
+      "studentId": "student_reject_test_99",
+      "studentName": "Temp Student",
+      "email": "",
+      "phone": "",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 5",
+      "notes": "",
+      "status": "REJECTED",
+      "requestedAt": "2026-10-06T12:58:52.687Z",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-06T12:58:52.689Z",
+      "reviewNotes": "Duplicate submission"
     }
   }
 }

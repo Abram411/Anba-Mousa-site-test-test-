@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, LogOut, Shield, Info, Edit3, ArrowLeft, Save, HelpCircle, FileText, Camera, Moon, Sun, Award, BookOpen, Heart, Flame, CheckCircle2, AlertCircle, Loader2, Mail, Phone, GraduationCap, X, Clock, QrCode, Copy, Check, HeartHandshake, Link as LinkIcon, Users, Sparkles, KeyRound, Share2, ShieldCheck, Upload, UserCheck, Palette } from 'lucide-react';
+import { Settings, LogOut, Shield, Info, Edit3, ArrowLeft, Save, HelpCircle, FileText, Camera, Moon, Sun, Award, BookOpen, Heart, Flame, CheckCircle2, AlertCircle, Loader2, Mail, Phone, GraduationCap, X, Clock, QrCode, Copy, Check, HeartHandshake, Link as LinkIcon, Users, Sparkles, KeyRound, Share2, ShieldCheck, Upload, UserCheck, Palette, Calendar, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,6 +9,7 @@ import { ChildQrCodeModal } from '../common/ChildQrCodeModal';
 import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
 import { CLASS_GROUPS, getClassGroupForGrade } from '../../lib/classGroups';
 import { COPTIC_AVATARS, DEFAULT_STUDENT_AVATAR } from '../../data/copticAvatars';
+import { getCurrentChurchYear, joinClassWithCode } from '../../lib/churchYearService';
 import { Language } from '../../types';
 
 type ProfileScreen = 'main' | 'edit' | 'settings' | 'parental' | 'help' | 'parental_dashboard';
@@ -47,6 +48,59 @@ export function ProfileTab({
   const [manualParentEmail, setManualParentEmail] = useState('');
   const [isLinkingParent, setIsLinkingParent] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+  // Church Year & Student Join Code state
+  const [churchYear, setChurchYear] = useState<string>('2026–2027');
+  const [showJoinCodeModal, setShowJoinCodeModal] = useState<boolean>(false);
+  const [inputJoinCode, setInputJoinCode] = useState<string>('');
+  const [isJoiningCode, setIsJoiningCode] = useState<boolean>(false);
+  const [joinCodeError, setJoinCodeError] = useState<string | null>(null);
+  const [joinCodeSuccess, setJoinCodeSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getCurrentChurchYear().then((res) => {
+      if (mounted && res.success && res.currentChurchYear) {
+        setChurchYear(res.currentChurchYear);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const handleJoinWithCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputJoinCode.trim()) return;
+    setIsJoiningCode(true);
+    setJoinCodeError(null);
+    setJoinCodeSuccess(null);
+    try {
+      const res = await joinClassWithCode(inputJoinCode.trim());
+      if (res.success) {
+        setJoinCodeSuccess(lang === 'ar' ? `تم الانضمام بنجاح إلى ${res.classInstance?.nameAr || res.classInstance?.nameEn}!` : `Successfully joined ${res.classInstance?.nameEn}!`);
+        showToast('success', lang === 'ar' ? 'تم الانضمام للفصل بنجاح! ✝️' : 'Successfully joined class! ✝️');
+        setTimeout(() => {
+          setShowJoinCodeModal(false);
+          setInputJoinCode('');
+          setJoinCodeSuccess(null);
+        }, 1500);
+      } else {
+        let msg = res.error || (lang === 'ar' ? 'فشل الانضمام بالكود' : 'Failed to join class');
+        if (msg.includes('INCOMPATIBLE_GRADE')) {
+          msg = lang === 'ar' ? 'مرحلتك الدراسية غير متوافقة مع هذا الفصل. تأكد من إدخال كود فصلك الصحيح.' : 'Your exact grade is not compatible with this class group.';
+        } else if (msg.includes('ARCHIVED_YEAR_CODE')) {
+          msg = lang === 'ar' ? 'هذا الكود ينتمي لعام كنسي سابق ومؤرشف. لا يمكن استخدامه.' : 'This code belongs to an archived church year and cannot be used.';
+        } else if (msg.includes('CODE_NOT_FOUND')) {
+          msg = lang === 'ar' ? 'رمز الفصل غير صحيح. يرجى التأكد من الخادم المسؤول.' : 'Class join code was not found. Please verify with your servant.';
+        }
+        setJoinCodeError(msg);
+      }
+    } catch (err: any) {
+      setJoinCodeError(err?.message || 'Error joining class');
+    } finally {
+      setIsJoiningCode(false);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isStudent = !userData?.role || userData?.role === 'student';
@@ -595,7 +649,14 @@ export function ProfileTab({
                   </div>
 
                   <div className="bg-gradient-to-r from-blue-50/60 to-amber-50/50 rounded-2xl p-4 border border-blue-100 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'العام الكنسي:' : 'Church Year:'}</span>
+                        <span className="font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded text-xs inline-flex items-center gap-1">
+                          <Calendar size={11} className="text-amber-600" />
+                          <span>{churchYear}</span>
+                        </span>
+                      </div>
                       <div>
                         <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'الصف الدراسي المحدد:' : 'Exact Grade:'}</span>
                         <span className="font-bold text-gray-900 text-sm">
@@ -620,16 +681,119 @@ export function ProfileTab({
                           ? 'يقوم الخادم المسؤول بمراجعة طلبك واعتماد تسكينك في الكشف لتلقي دروس المرحلة ومتابعة التقدم.' 
                           : 'Your servant reviews and approves your roster placement to unlock the official curriculum.'}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowOnboardingModal(true)}
-                        className="px-4 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
-                      >
-                        <Edit3 size={13} />
-                        <span>{lang === 'ar' ? 'تحديد / تعديل الصف' : 'Select / Change Grade'}</span>
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowJoinCodeModal(true);
+                            setJoinCodeError(null);
+                            setJoinCodeSuccess(null);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+                        >
+                          <Key size={13} className="text-amber-700" />
+                          <span>{lang === 'ar' ? 'الانضمام برمز الفصل' : 'Join with Class Code'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowOnboardingModal(true)}
+                          className="px-3.5 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+                        >
+                          <Edit3 size={13} />
+                          <span>{lang === 'ar' ? 'تحديد / تعديل الصف' : 'Select / Change Grade'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Join Class with Code Modal for Students */}
+                  <AnimatePresence>
+                    {showJoinCodeModal && (
+                      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+                        <motion.div
+                          initial={{ scale: 0.95, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.95, opacity: 0 }}
+                          className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 space-y-4 text-xs"
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                                <Key size={18} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm text-gray-900">
+                                  {lang === 'ar' ? 'الانضمام لكود الفصل للعام الحالي' : 'Join Current-Year Class Code'}
+                                </h4>
+                                <p className="text-[11px] text-gray-400">
+                                  {lang === 'ar' ? `العام الكنسي: ${churchYear}` : `Church Year: ${churchYear}`}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowJoinCodeModal(false)}
+                              className="text-gray-400 hover:text-gray-600 p-1"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleJoinWithCode} className="space-y-3">
+                            <div>
+                              <label className="block text-gray-700 font-bold mb-1">
+                                {lang === 'ar' ? 'أدخل كود الفصل (من الخادم):' : 'Enter Class Code from Servant:'}
+                              </label>
+                              <input
+                                type="text"
+                                value={inputJoinCode}
+                                onChange={(e) => setInputJoinCode(e.target.value)}
+                                placeholder="e.g. MUSA-P46B"
+                                className="w-full font-mono uppercase bg-gray-50 border border-gray-200 focus:border-[var(--color-church-blue)] rounded-xl px-3.5 py-2.5 text-gray-900 outline-none font-bold text-sm"
+                                disabled={isJoiningCode}
+                              />
+                            </div>
+
+                            {joinCodeError && (
+                              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-start gap-2">
+                                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                                <span>{joinCodeError}</span>
+                              </div>
+                            )}
+
+                            {joinCodeSuccess && (
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-start gap-2">
+                                <CheckCircle2 size={15} className="shrink-0 mt-0.5" />
+                                <span>{joinCodeSuccess}</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setShowJoinCodeModal(false)}
+                                className="px-3.5 py-2 rounded-xl border border-gray-200 text-gray-600 font-semibold cursor-pointer"
+                              >
+                                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={isJoiningCode || !inputJoinCode.trim()}
+                                className="px-4 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 disabled:opacity-40 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                {isJoiningCode ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle2 size={13} />
+                                )}
+                                <span>{lang === 'ar' ? 'تأكيد الانضمام' : 'Join Class'}</span>
+                              </button>
+                            </div>
+                          </form>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 
