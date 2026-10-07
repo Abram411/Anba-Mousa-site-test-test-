@@ -1,221 +1,72 @@
 -- ==============================================================================
--- Coptic Sunday School & Church Education Platform - Supabase PostgreSQL Schema
--- Run this in your Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
+-- PHASE 3B: AUTHORITATIVE CHURCH YEARS & CLASS INSTANCES STRUCTURAL MIGRATION
+-- Run in Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
 -- ==============================================================================
 
--- 1. Create Profiles Table (linked to Supabase Auth users)
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('student', 'teacher', 'parent', 'admin')),
-  grade TEXT DEFAULT '4th Grade',
-  avatar TEXT DEFAULT 'https://api.dicebear.com/7.x/bottts/svg?seed=coptic_student',
-  points INTEGER DEFAULT 0,
-  current_streak INTEGER DEFAULT 1,
-  longest_streak INTEGER DEFAULT 1,
-  parent_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  require_reward_approval BOOLEAN DEFAULT true,
-  push_notifications_enabled BOOLEAN DEFAULT true,
-  notify_lesson_completion BOOLEAN DEFAULT true,
-  notify_event_reminders BOOLEAN DEFAULT true,
-  screen_time_seconds INTEGER DEFAULT 0,
-  last_active TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
+BEGIN;
 
--- Enable Row Level Security (RLS)
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+-- 1. Preflight Safety Gate: Check state-machine
+DO $$
+DECLARE
+  v_has_church_years BOOLEAN := false;
+  v_has_instances BOOLEAN := false;
+  v_has_memberships BOOLEAN := false;
+  v_has_assignments BOOLEAN := false;
+  v_year_exists BOOLEAN := false;
+  v_instance_count INT := 0;
+BEGIN
+  SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'church_years') INTO v_has_church_years;
+  SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'class_instances') INTO v_has_instances;
+  SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'class_memberships') INTO v_has_memberships;
+  SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'servant_class_assignments') INTO v_has_assignments;
 
--- Profiles Policies
-CREATE POLICY "Public profiles are viewable by authenticated users" 
-  ON public.profiles FOR SELECT 
-  TO authenticated 
-  USING (true);
+  IF v_has_church_years AND v_has_instances AND v_has_memberships AND v_has_assignments THEN
+    SELECT EXISTS (SELECT 1 FROM public.church_years WHERE id = '2026-2027' AND is_active = true) INTO v_year_exists;
+    SELECT count(*) INTO v_instance_count FROM public.class_instances WHERE church_year_id = '2026-2027';
 
-CREATE POLICY "Users can insert their own profile" 
-  ON public.profiles FOR INSERT 
-  TO authenticated 
-  WITH CHECK (auth.uid() = id);
+    IF v_year_exists AND v_instance_count = 6 THEN
+      RAISE EXCEPTION 'Migration Aborted: Phase 3B church year (2026-2027) is already completely applied.';
+    END IF;
 
-CREATE POLICY "Users can update their own profile or parents can update children" 
-  ON public.profiles FOR UPDATE 
-  TO authenticated 
-  USING (auth.uid() = id OR auth.uid() = parent_id);
+    IF v_year_exists OR v_instance_count > 0 THEN
+      RAISE EXCEPTION 'Migration Aborted: Inconsistent partial state detected. Manual audit required.';
+    END IF;
+  ELSIF v_has_church_years OR v_has_instances OR v_has_memberships OR v_has_assignments THEN
+    RAISE EXCEPTION 'Migration Aborted: Partial table setup detected. Manual audit required.';
+  END IF;
+END;
+$$;
 
--- 2. Create Lessons Table (Curriculum, Quizzes & Multimedia References)
-CREATE TABLE IF NOT EXISTS public.lessons (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title_en TEXT NOT NULL,
-  title_ar TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('bible', 'hymns', 'history', 'virtues')),
-  grade_level TEXT NOT NULL,
-  summary_en TEXT,
-  summary_ar TEXT,
-  scripture_verse_en TEXT,
-  scripture_verse_ar TEXT,
-  verse_reference TEXT,
-  audio_url TEXT, -- Link to Supabase Storage hymn/reading
-  pdf_worksheet_url TEXT, -- Link to Supabase Storage coloring sheet/PDF
-  points_reward INTEGER DEFAULT 100,
-  quiz_questions JSONB DEFAULT '[]'::jsonb,
-  created_by UUID REFERENCES public.profiles(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Everyone can read lessons" 
-  ON public.lessons FOR SELECT 
-  TO authenticated 
-  USING (true);
-
-CREATE POLICY "Teachers and admins can manage lessons" 
-  ON public.lessons FOR ALL 
-  TO authenticated 
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles 
-      WHERE profiles.id = auth.uid() AND (profiles.role = 'teacher' OR profiles.role = 'admin')
-    )
-  );
-
--- 3. Create Lesson Completions / Progress Table
-CREATE TABLE IF NOT EXISTS public.lesson_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  lesson_id UUID NOT NULL REFERENCES public.lessons(id) ON DELETE CASCADE,
-  completed BOOLEAN DEFAULT false,
-  quiz_score INTEGER DEFAULT 0,
-  verse_memorized BOOLEAN DEFAULT false,
-  points_earned INTEGER DEFAULT 0,
-  servant_feedback TEXT,
-  completed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  UNIQUE(student_id, lesson_id)
-);
-
-ALTER TABLE public.lesson_progress ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users and their parents can view progress" 
-  ON public.lesson_progress FOR SELECT 
-  TO authenticated 
-  USING (
-    auth.uid() = student_id 
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = student_id AND profiles.parent_id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role IN ('teacher', 'admin'))
-  );
-
-CREATE POLICY "Students can update their progress" 
-  ON public.lesson_progress FOR ALL 
-  TO authenticated 
-  USING (auth.uid() = student_id OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role IN ('teacher', 'admin')));
-
--- 4. Create Church Events & Liturgy Notifications Table
-CREATE TABLE IF NOT EXISTS public.church_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title_en TEXT NOT NULL,
-  title_ar TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('liturgy', 'sunday_school', 'parent_meeting', 'hymns', 'feast', 'service')),
-  date_time TIMESTAMP WITH TIME ZONE NOT NULL,
-  location_en TEXT,
-  location_ar TEXT,
-  description_en TEXT,
-  description_ar TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
-ALTER TABLE public.church_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can read church events" 
-  ON public.church_events FOR SELECT 
-  TO authenticated 
-  USING (true);
-
--- 5. Create Reward Approval Requests Table
-CREATE TABLE IF NOT EXISTS public.reward_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  reward_id TEXT NOT NULL,
-  reward_name_en TEXT NOT NULL,
-  reward_name_ar TEXT NOT NULL,
-  cost_points INTEGER NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  parent_id UUID REFERENCES public.profiles(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  decided_at TIMESTAMP WITH TIME ZONE
-);
-
-ALTER TABLE public.reward_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Reward requests access policy" 
-  ON public.reward_requests FOR ALL 
-  TO authenticated 
-  USING (
-    auth.uid() = student_id 
-    OR auth.uid() = parent_id 
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
-  );
-
--- 6. Create User Relationships Table (Parent-Child and Guardian-Student Linking)
-CREATE TABLE IF NOT EXISTS public.user_relationships (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  parent_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  child_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  child_code TEXT,
-  relationship_type TEXT DEFAULT 'parent_child' CHECK (relationship_type IN ('parent_child', 'guardian_student', 'teacher_student')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  UNIQUE(parent_id, child_id)
-);
-
-ALTER TABLE public.user_relationships ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own relationships" 
-  ON public.user_relationships FOR SELECT 
-  TO authenticated 
-  USING (auth.uid() = parent_id OR auth.uid() = child_id OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role IN ('admin', 'teacher')));
-
-CREATE POLICY "Parents can insert and manage child relationships" 
-  ON public.user_relationships FOR ALL 
-  TO authenticated 
-  USING (auth.uid() = parent_id OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
-
--- 7. Supabase Storage Buckets Setup Note:
--- Create three public buckets in Supabase Dashboard -> Storage:
--- 1) 'avatars' (for high-resolution student and servant profile photos)
--- 2) 'hymns-audio' (for MP3/M4A liturgical chant recordings)
--- 3) 'lesson-worksheets' (for Sunday School PDF coloring sheets and handouts)
-
--- ==============================================================================
--- 8. PHASE 3B: AUTHORITATIVE CHURCH YEARS & CLASS INSTANCES SCHEMA
--- ==============================================================================
-
--- Church Years Table
-CREATE TABLE IF NOT EXISTS public.church_years (
+-- 2. Create Normalized Tables & Constraints
+CREATE TABLE public.church_years (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.timezone('utc'::text, pg_catalog.now()),
   activated_at TIMESTAMPTZ,
   archived_at TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_church_years_single_active 
+CREATE UNIQUE INDEX idx_church_years_single_active 
 ON public.church_years (is_active) 
 WHERE is_active = true;
 
--- Year-Specific Class Instances (Exactly 6 per year)
-CREATE TABLE IF NOT EXISTS public.class_instances (
+CREATE TABLE public.class_instances (
   id TEXT PRIMARY KEY,
   church_year_id TEXT NOT NULL REFERENCES public.church_years(id) ON DELETE RESTRICT,
   class_group_id TEXT NOT NULL CHECK (class_group_id IN ('angels', 'primary_1', 'primary_2', 'preparatory', 'secondary', 'university')),
   name_en TEXT NOT NULL,
   name_ar TEXT NOT NULL,
   join_code TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.timezone('utc'::text, pg_catalog.now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.timezone('utc'::text, pg_catalog.now()),
   CONSTRAINT uq_year_class_group UNIQUE (church_year_id, class_group_id),
   CONSTRAINT uq_class_instance_join_code UNIQUE (join_code),
   CONSTRAINT uq_class_instances_id_year UNIQUE (id, church_year_id)
 );
 
--- Public Directory View (Security Invoker, strictly omits join_code)
 CREATE OR REPLACE VIEW public.class_instances_directory
 WITH (security_invoker = true)
 AS
@@ -229,15 +80,14 @@ SELECT
   updated_at
 FROM public.class_instances;
 
--- Student Class Memberships (At most 1 per student per year, preserved upon removal)
-CREATE TABLE IF NOT EXISTS public.class_memberships (
+CREATE TABLE public.class_memberships (
   id TEXT PRIMARY KEY,
   church_year_id TEXT NOT NULL REFERENCES public.church_years(id) ON DELETE RESTRICT,
   class_instance_id TEXT NOT NULL,
   student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   exact_grade TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'transferred', 'graduated')),
-  joined_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.timezone('utc'::text, pg_catalog.now()),
   left_at TIMESTAMPTZ,
   removal_reason TEXT,
   enrolled_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -248,14 +98,13 @@ CREATE TABLE IF NOT EXISTS public.class_memberships (
     ON DELETE RESTRICT
 );
 
--- Servant Class Assignments
-CREATE TABLE IF NOT EXISTS public.servant_class_assignments (
+CREATE TABLE public.servant_class_assignments (
   id TEXT PRIMARY KEY,
   church_year_id TEXT NOT NULL REFERENCES public.church_years(id) ON DELETE RESTRICT,
   class_instance_id TEXT NOT NULL,
   servant_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   assigned_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  assigned_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.timezone('utc'::text, pg_catalog.now()),
   is_active BOOLEAN NOT NULL DEFAULT true,
   CONSTRAINT uq_servant_class_year UNIQUE (church_year_id, class_instance_id, servant_id),
   CONSTRAINT fk_servant_instance_and_year 
@@ -264,18 +113,17 @@ CREATE TABLE IF NOT EXISTS public.servant_class_assignments (
     ON DELETE RESTRICT
 );
 
--- Performance Indexes
-CREATE INDEX IF NOT EXISTS idx_class_memberships_student ON public.class_memberships(student_id, church_year_id);
-CREATE INDEX IF NOT EXISTS idx_class_memberships_instance ON public.class_memberships(class_instance_id, status);
-CREATE INDEX IF NOT EXISTS idx_servant_assignments_servant ON public.servant_class_assignments(servant_id, church_year_id, is_active);
+-- 3. Indexes
+CREATE INDEX idx_class_memberships_student ON public.class_memberships(student_id, church_year_id);
+CREATE INDEX idx_class_memberships_instance ON public.class_memberships(class_instance_id, status);
+CREATE INDEX idx_servant_assignments_servant ON public.servant_class_assignments(servant_id, church_year_id, is_active);
 
--- Enable RLS
+-- 4. Row Level Security Setup
 ALTER TABLE public.church_years ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_instances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.servant_class_assignments ENABLE ROW LEVEL SECURITY;
 
--- Policies
 CREATE POLICY "church_years_select" ON public.church_years FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "class_instances_authorized_select" ON public.class_instances
@@ -324,12 +172,10 @@ USING (
   OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
 );
 
--- Seed Initial Active Church Year (2026-2027)
+-- 5. Seed 2026-2027 Active Church Year & 6 Verified Class Instances
 INSERT INTO public.church_years (id, name, start_date, end_date, is_active, activated_at)
-VALUES ('2026-2027', '2026 / 2027', '2026-09-01', '2027-08-31', true, timezone('utc'::text, now()))
-ON CONFLICT (id) DO NOTHING;
+VALUES ('2026-2027', '2026 / 2027', '2026-09-01', '2027-08-31', true, pg_catalog.timezone('utc'::text, pg_catalog.now()));
 
--- Seed Exactly 6 Class Instances for 2026-2027
 INSERT INTO public.class_instances (id, church_year_id, class_group_id, name_en, name_ar, join_code)
 VALUES
   ('inst_2026-2027_angels', '2026-2027', 'angels', 'Angels', 'فصل الملايكة', 'MUSA-ANG1'),
@@ -337,10 +183,9 @@ VALUES
   ('inst_2026-2027_primary_2', '2026-2027', 'primary_2', 'Primary 4–6', 'فصل ابتدائي 4–6', 'MUSA-P46B'),
   ('inst_2026-2027_preparatory', '2026-2027', 'preparatory', 'Preparatory', 'فصل إعدادي', 'MUSA-PRP1'),
   ('inst_2026-2027_secondary', '2026-2027', 'secondary', 'Secondary', 'فصل ثانوي', 'MUSA-SEC1'),
-  ('inst_2026-2027_university', '2026-2027', 'university', 'University & Youth', 'فصل شباب جامعة', 'MUSA-UNI1')
-ON CONFLICT (id) DO NOTHING;
+  ('inst_2026-2027_university', '2026-2027', 'university', 'University & Youth', 'فصل شباب جامعة', 'MUSA-UNI1');
 
--- Security Definer Procedures (Hardened search_path = '')
+-- 6. Functions (Hardened search_path = '')
 CREATE OR REPLACE FUNCTION public.generate_class_join_code() 
 RETURNS TEXT 
 LANGUAGE plpgsql 
@@ -768,3 +613,4 @@ GRANT EXECUTE ON FUNCTION public.join_class_by_code(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.enroll_student_in_class(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.remove_student_from_class(TEXT, TEXT) TO authenticated;
 
+COMMIT;

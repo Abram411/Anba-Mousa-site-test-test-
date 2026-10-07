@@ -142,7 +142,7 @@
       "studentName": "Youssef Mina",
       "exactGrade": "Grade 4",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-06T12:58:52.680Z",
+      "enrolledAt": "2026-10-07T13:19:58.376Z",
       "enrolledBy": "mina"
     }
   },
@@ -223,7 +223,7 @@
       "classGroupId": "primary_2",
       "churchYear": "2026–2027",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_new_youssef_777",
-      "enrolledAt": "2026-10-06T12:58:52.680Z"
+      "enrolledAt": "2026-10-07T13:19:58.376Z"
     },
     "student_reject_test_99": {
       "studentId": "student_reject_test_99",
@@ -245,7 +245,7 @@
       "teacherId": "mina",
       "studentId": "student_new_youssef_777",
       "relationshipType": "teacher_student",
-      "createdAt": "2026-10-06T12:58:52.680Z"
+      "createdAt": "2026-10-07T13:19:58.376Z"
     }
   ],
   "parentChildRelationships": [
@@ -353,6 +353,37 @@
       "requestedAt": "2026-10-06T12:58:52.687Z",
       "reviewedBy": "mina",
       "reviewedAt": "2026-10-06T12:58:52.689Z",
+      "reviewNotes": "Duplicate submission"
+    },
+    "req_1791379198351_ge3ue": {
+      "id": "req_1791379198351_ge3ue",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "email": "",
+      "phone": "+20 100 123 4567",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 4",
+      "notes": "New student joining Sunday school Grade 4",
+      "status": "APPROVED",
+      "requestedAt": "2026-10-07T13:19:58.351Z",
+      "assignedGrade": "Grade 4",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-07T13:19:58.376Z",
+      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
+    },
+    "req_1791379198384_8duqg": {
+      "id": "req_1791379198384_8duqg",
+      "studentId": "student_reject_test_99",
+      "studentName": "Temp Student",
+      "email": "",
+      "phone": "",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 5",
+      "notes": "",
+      "status": "REJECTED",
+      "requestedAt": "2026-10-07T13:19:58.384Z",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-07T13:19:58.386Z",
       "reviewNotes": "Duplicate submission"
     }
   }
