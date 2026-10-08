@@ -3850,7 +3850,7 @@ app.get("/api/church/my-class", async (req, res) => {
       const targetUserId = authContext.userId;
       let assignedClassGroupId = 'primary_2';
 
-      // 1. Authoritative Supabase persistence check for authenticated online users
+      // 1. Authoritative Supabase persistence check for authenticated online users (Phase 3C.2 & Phase 3C.3)
       if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
         try {
           const client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -3858,69 +3858,122 @@ app.get("/api/church/my-class", async (req, res) => {
             auth: { persistSession: false, autoRefreshToken: false }
           });
 
-          const { data: profile } = await client
-            .from('profiles')
-            .select('id, name, grade, role')
-            .eq('id', targetUserId)
+          // Query active church year from public.church_years
+          const { data: activeYear, error: yErr } = await client
+            .from('church_years')
+            .select('id, name, start_date, end_date')
+            .eq('is_active', true)
             .maybeSingle();
 
-          if (profile && profile.grade) {
-            assignedClassGroupId = getClassGroupIdForGrade(profile.grade);
-          } else {
-            const assigned = serverReviewState.teacherAssignments[targetUserId] || ['primary_2'];
-            assignedClassGroupId = assigned[0] || 'primary_2';
+          if (yErr || !activeYear) {
+            console.warn("Supabase active church year read note:", yErr);
           }
 
+          const curYearId = activeYear?.id || '2026-2027';
+          const curYearName = activeYear?.name || '2026 / 2027';
+
+          // Resolve servant assigned class instance from public.servant_class_assignments & public.class_instances
+          let assignedInstance: any = null;
+          let assignedClassGroupId = (req.query.classGroupId as string) || 'primary_2';
+
+          if (authContext.role === 'teacher') {
+            const { data: assignments } = await client
+              .from('servant_class_assignments')
+              .select('class_instance_id')
+              .eq('servant_id', targetUserId)
+              .eq('church_year_id', curYearId)
+              .eq('is_active', true);
+
+            if (assignments && assignments.length > 0) {
+              const { data: inst } = await client
+                .from('class_instances')
+                .select('id, class_group_id, name_en, name_ar, join_code')
+                .eq('id', assignments[0].class_instance_id)
+                .maybeSingle();
+              if (inst) {
+                assignedInstance = inst;
+                assignedClassGroupId = inst.class_group_id;
+              }
+            }
+          } else if (authContext.role === 'admin') {
+            const { data: inst } = await client
+              .from('class_instances')
+              .select('id, class_group_id, name_en, name_ar, join_code')
+              .eq('church_year_id', curYearId)
+              .eq('class_group_id', assignedClassGroupId)
+              .maybeSingle();
+            if (inst) {
+              assignedInstance = inst;
+            }
+          }
+
+          // Fetch authoritative class definition
           const classRecord = serverReviewState.classes[assignedClassGroupId] || {
             id: assignedClassGroupId,
-            nameEn: assignedClassGroupId.toUpperCase(),
-            nameAr: 'فصل دراسي',
+            nameEn: assignedInstance?.name_en || assignedClassGroupId.toUpperCase(),
+            nameAr: assignedInstance?.name_ar || 'فصل دراسي',
             grades: ['Grade 4', 'Grade 5', 'Grade 6'],
-            servantIds: [profile?.name || 'Servant Mina']
+            servantIds: ['Servant Mina']
           };
 
-          // Fetch authoritative roster from Supabase profiles
-          const { data: dbStudents } = await client
-            .from('profiles')
-            .select('id, name, grade, avatar, role')
-            .eq('role', 'student');
-
-          const matchingDbStudents = (dbStudents || []).filter(
-            (s: any) => getClassGroupIdForGrade(s.grade) === assignedClassGroupId
-          );
-
+          // Fetch authoritative active roster from public.class_memberships
           const roster: any[] = [];
-          for (const s of matchingDbStudents) {
-            const mKey = `${s.id}_l-test-multiversion-01`;
-            const mastery = serverReviewState.mastery[mKey];
-            const pKey = `${s.id}_l-test-multiversion-01`;
-            const progress = serverReviewState.progress[pKey];
+          if (assignedInstance?.id) {
+            const { data: memberships, error: memErr } = await client
+              .from('class_memberships')
+              .select('id, student_id, exact_grade, status, joined_at')
+              .eq('church_year_id', curYearId)
+              .eq('class_instance_id', assignedInstance.id)
+              .eq('status', 'active');
 
-            roster.push({
-              id: s.id,
-              name: s.name,
-              grade: s.grade || 'Grade 4',
-              classGroupId: assignedClassGroupId,
-              avatarUrl: s.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.id}`,
-              learningSummary: {
-                latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
-                lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
-                latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+            if (memberships && memberships.length > 0) {
+              const studentIds = memberships.map((m: any) => m.student_id);
+              const { data: profiles } = await client
+                .from('profiles')
+                .select('id, name, avatar, grade, role')
+                .in('id', studentIds);
+
+              const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+              for (const mem of memberships) {
+                const p = profilesMap.get(mem.student_id);
+                const mKey = `${mem.student_id}_l-test-multiversion-01`;
+                const mastery = serverReviewState.mastery[mKey];
+                const pKey = `${mem.student_id}_l-test-multiversion-01`;
+                const progress = serverReviewState.progress[pKey];
+
+                roster.push({
+                  id: mem.student_id,
+                  membershipId: mem.id,
+                  name: p?.name || `Student ${mem.student_id.slice(0, 8)}`,
+                  grade: mem.exact_grade,
+                  classGroupId: assignedClassGroupId,
+                  avatarUrl: p?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mem.student_id}`,
+                  joinedAt: mem.joined_at,
+                  learningSummary: {
+                    latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
+                    lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
+                    latestQuizScore: mastery ? mastery.quizScore : (progress ? progress.quizScore : 0)
+                  }
+                });
               }
-            });
+            }
           }
 
           return res.json({
             success: true,
             classInfo: {
-              servantId: profile?.id || targetUserId,
+              servantId: targetUserId,
               role: authContext.role,
               classGroupId: assignedClassGroupId,
-              className: classRecord.nameEn,
-              classNameAr: classRecord.nameAr,
+              className: assignedInstance?.name_en || classRecord.nameEn,
+              classNameAr: assignedInstance?.name_ar || classRecord.nameAr,
               grades: classRecord.grades,
               stage: classRecord.stage,
-              servants: classRecord.servantIds || [profile?.name || 'Servant Mina']
+              servants: classRecord.servantIds || ['Servant Mina'],
+              churchYear: curYearName,
+              classCode: assignedInstance?.join_code,
+              classInstanceId: assignedInstance?.id
             },
             roster
           });
@@ -3996,7 +4049,7 @@ app.get("/api/church/my-class", async (req, res) => {
     }
 
     // B. Student or Guest calling my-class: return student class association
-    // 1. Authoritative Supabase persistence check for authenticated online students
+    // 1. Authoritative Supabase persistence check for authenticated online students (Phase 3C.2)
     if (authContext.isAuthenticated && supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
       try {
         const client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -4004,57 +4057,106 @@ app.get("/api/church/my-class", async (req, res) => {
           auth: { persistSession: false, autoRefreshToken: false }
         });
 
-        const { data: profile } = await client
-          .from('profiles')
-          .select('id, name, grade, avatar')
-          .eq('id', targetStudentId)
+        // 1. Authoritative active church year from public.church_years
+        const { data: activeYear, error: yErr } = await client
+          .from('church_years')
+          .select('id, name, start_date, end_date')
+          .eq('is_active', true)
           .maybeSingle();
 
-        if (profile) {
-          const derivedClassGroupId = getClassGroupIdForGrade(profile.grade);
+        if (yErr) {
+          console.warn("Supabase active church year read error:", yErr);
+          return res.status(500).json({
+            success: false,
+            error: "DATABASE_ERROR",
+            message: "Failed to read active church year from database"
+          });
+        }
+
+        if (!activeYear) {
+          return res.json({
+            success: true,
+            isEnrolled: false,
+            membership: null,
+            classInfo: null,
+            message: "No active church year configured in database."
+          });
+        }
+
+        // 2. Authoritative active class membership from public.class_memberships
+        const { data: mem, error: mErr } = await client
+          .from('class_memberships')
+          .select('id, church_year_id, class_instance_id, student_id, exact_grade, status, joined_at')
+          .eq('student_id', targetStudentId)
+          .eq('church_year_id', activeYear.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (mErr) {
+          console.warn("Supabase class membership read error:", mErr);
+          return res.status(500).json({
+            success: false,
+            error: "DATABASE_ERROR",
+            message: "Failed to read student class membership from database"
+          });
+        }
+
+        if (mem) {
+          const derivedClassGroupId = getClassGroupIdForGrade(mem.exact_grade);
           const classRecord = serverReviewState.classes[derivedClassGroupId] || {
             id: derivedClassGroupId,
             nameEn: derivedClassGroupId.toUpperCase(),
             nameAr: 'فصل دراسي',
-            servantIds: ['Servant Mina']
+            servantIds: []
           };
-
-          // Find assigned servants from user_relationships if available
-          let servants: string[] = ['Servant Mina'];
-          try {
-            const { data: rels } = await client
-              .from('user_relationships')
-              .select('parent_id')
-              .eq('child_id', targetStudentId)
-              .eq('relationship_type', 'teacher_student');
-
-            if (rels && rels.length > 0) {
-              const teacherIds = rels.map((r: any) => r.parent_id);
-              const { data: teachers } = await client
-                .from('profiles')
-                .select('name')
-                .in('id', teacherIds);
-              if (teachers && teachers.length > 0) {
-                servants = teachers.map((t: any) => t.name);
-              }
-            }
-          } catch (_) {}
 
           return res.json({
             success: true,
+            isEnrolled: true,
+            activeChurchYear: {
+              id: activeYear.id,
+              name: activeYear.name
+            },
+            membership: {
+              id: mem.id,
+              churchYearId: mem.church_year_id,
+              churchYearName: activeYear.name,
+              classInstanceId: mem.class_instance_id,
+              exactGrade: mem.exact_grade,
+              status: mem.status,
+              joinedAt: mem.joined_at
+            },
             classInfo: {
-              studentId: profile.id,
-              grade: profile.grade || 'Grade 4',
+              studentId: targetStudentId,
+              grade: mem.exact_grade,
               classGroupId: derivedClassGroupId,
               className: classRecord.nameEn,
               classNameAr: classRecord.nameAr,
-              servants,
-              churchYear: serverReviewState.currentChurchYear
+              servants: [],
+              churchYear: activeYear.name || activeYear.id
             }
           });
         }
+
+        // Student has NO active membership in the active church year.
+        // Phase 3C.2: MUST NOT fabricate a fake class from profile.grade or mock state!
+        return res.json({
+          success: true,
+          isEnrolled: false,
+          activeChurchYear: {
+            id: activeYear.id,
+            name: activeYear.name
+          },
+          membership: null,
+          classInfo: null
+        });
       } catch (sbErr) {
-        console.warn("Supabase my-class read fallback to local state:", sbErr);
+        console.warn("Supabase my-class student query error:", sbErr);
+        return res.status(500).json({
+          success: false,
+          error: "DATABASE_ERROR",
+          message: "Failed to read student class membership from database"
+        });
       }
     }
 
@@ -4149,7 +4251,7 @@ app.get("/api/church/class-roster", async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
 
-    // 1. Authoritative Supabase persistence check for authenticated online users
+    // 1. Authoritative Supabase persistence check for authenticated online users (Phase 3C.2 & 3C.3)
     if (authContext.isAuthenticated && supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
       try {
         const client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -4157,31 +4259,72 @@ app.get("/api/church/class-roster", async (req, res) => {
           auth: { persistSession: false, autoRefreshToken: false }
         });
 
-        // Query students from public.profiles
-        const { data: dbStudents, error: sErr } = await client
-          .from('profiles')
-          .select('id, name, grade, avatar, role')
-          .eq('role', 'student');
+        // 1. Query active church year
+        const { data: activeYear } = await client
+          .from('church_years')
+          .select('id, name')
+          .eq('is_active', true)
+          .maybeSingle();
 
-        if (!sErr && dbStudents && dbStudents.length > 0) {
-          const matchingDbStudents = dbStudents.filter(
-            (s: any) => getClassGroupIdForGrade(s.grade) === targetClassGroupId
-          );
+        const curYearId = activeYear?.id || '2026-2027';
 
-          if (matchingDbStudents.length > 0) {
-            const roster: any[] = [];
-            for (const s of matchingDbStudents) {
-              const mKey = `${s.id}_l-test-multiversion-01`;
+        // 2. Resolve class instance for targetClassGroupId
+        let targetInstanceId: string | null = null;
+        if (authContext.role === 'teacher') {
+          const { data: assignments } = await client
+            .from('servant_class_assignments')
+            .select('class_instance_id')
+            .eq('servant_id', authContext.userId)
+            .eq('church_year_id', curYearId)
+            .eq('is_active', true);
+
+          if (assignments && assignments.length > 0) {
+            targetInstanceId = assignments[0].class_instance_id;
+          }
+        } else if (authContext.role === 'admin') {
+          const { data: inst } = await client
+            .from('class_instances')
+            .select('id')
+            .eq('church_year_id', curYearId)
+            .eq('class_group_id', targetClassGroupId)
+            .maybeSingle();
+          targetInstanceId = inst?.id || null;
+        }
+
+        // 3. Query active memberships from public.class_memberships
+        const roster: any[] = [];
+        if (targetInstanceId) {
+          const { data: memberships } = await client
+            .from('class_memberships')
+            .select('id, student_id, exact_grade, status, joined_at')
+            .eq('church_year_id', curYearId)
+            .eq('class_instance_id', targetInstanceId)
+            .eq('status', 'active');
+
+          if (memberships && memberships.length > 0) {
+            const studentIds = memberships.map((m: any) => m.student_id);
+            const { data: profiles } = await client
+              .from('profiles')
+              .select('id, name, avatar, grade, role')
+              .in('id', studentIds);
+
+            const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+            for (const mem of memberships) {
+              const p = profilesMap.get(mem.student_id);
+              const mKey = `${mem.student_id}_l-test-multiversion-01`;
               const mastery = serverReviewState.mastery[mKey];
-              const pKey = `${s.id}_l-test-multiversion-01`;
+              const pKey = `${mem.student_id}_l-test-multiversion-01`;
               const progress = serverReviewState.progress[pKey];
 
               roster.push({
-                id: s.id,
-                name: s.name,
-                grade: s.grade || 'Grade 4',
+                id: mem.student_id,
+                membershipId: mem.id,
+                name: p?.name || `Student ${mem.student_id.slice(0, 8)}`,
+                grade: mem.exact_grade,
                 classGroupId: targetClassGroupId,
-                avatarUrl: s.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.id}`,
+                avatarUrl: p?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mem.student_id}`,
+                joinedAt: mem.joined_at,
                 learningSummary: {
                   latestMasteryStatus: mastery ? mastery.status : 'NOT_STARTED',
                   lessonsCompletedCount: progress && progress.status === 'COMPLETED' ? 1 : 0,
@@ -4189,14 +4332,14 @@ app.get("/api/church/class-roster", async (req, res) => {
                 }
               });
             }
-
-            return res.json({
-              success: true,
-              classGroupId: targetClassGroupId,
-              roster
-            });
           }
         }
+
+        return res.json({
+          success: true,
+          classGroupId: targetClassGroupId,
+          roster
+        });
       } catch (sbErr) {
         console.warn("Supabase class-roster read fallback to local state:", sbErr);
       }
@@ -4313,7 +4456,7 @@ app.post("/api/church/student/class", async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
 
-    // 2. Real Supabase Persistence when online with valid user token
+    // 2. Real Supabase Persistence when online with valid user token (Phase 3C.3)
     if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
       try {
         const client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -4321,9 +4464,19 @@ app.post("/api/church/student/class", async (req, res) => {
           auth: { persistSession: false, autoRefreshToken: false }
         });
 
+        // 1. Check active church year
+        const { data: activeYear } = await client
+          .from('church_years')
+          .select('id, name')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        const curYearId = activeYear?.id || '2026-2027';
+
+        // 2. Look up target student profile
         const { data: profileCheck, error: checkErr } = await client
           .from('profiles')
-          .select('id, name')
+          .select('id, name, role, grade')
           .eq('id', studentId)
           .maybeSingle();
 
@@ -4335,7 +4488,7 @@ app.post("/api/church/student/class", async (req, res) => {
           });
         }
 
-        if (!profileCheck && !existing) {
+        if (!profileCheck) {
           return res.status(404).json({
             success: false,
             error: "STUDENT_NOT_FOUND",
@@ -4343,41 +4496,71 @@ app.post("/api/church/student/class", async (req, res) => {
           });
         }
 
-        // Persist to public.profiles.grade
-        const { error: updateErr } = await client
-          .from('profiles')
-          .update({ grade: targetGrade })
-          .eq('id', studentId);
-
-        if (updateErr) {
-          return res.status(500).json({
+        if (profileCheck.role !== 'student') {
+          return res.status(400).json({
             success: false,
-            error: "PERSISTENCE_FAILED",
-            message: `Supabase grade persistence failed: ${updateErr.message}`
+            error: "NOT_A_STUDENT",
+            message: `Target user does not hold the student role.`
           });
         }
 
-        // Persist servant relationship to public.user_relationships
-        if (authContext.role === 'teacher' || authContext.role === 'admin') {
-          const servantId = authContext.userId;
-          const { error: relErr } = await client
-            .from('user_relationships')
-            .upsert({
-              parent_id: servantId,
-              child_id: studentId,
-              relationship_type: 'teacher_student',
-              created_at: new Date().toISOString()
-            }, { onConflict: 'parent_id,child_id' });
-
-          if (relErr) {
-            console.warn("Supabase user_relationships sync note:", relErr.message);
+        // 3. Resolve class_instance_id
+        let resolvedInstanceId = req.body.classInstanceId;
+        if (!resolvedInstanceId) {
+          if (authContext.role === 'admin') {
+            const { data: inst } = await client
+              .from('class_instances')
+              .select('id')
+              .eq('church_year_id', curYearId)
+              .eq('class_group_id', classGroupId)
+              .maybeSingle();
+            resolvedInstanceId = inst?.id;
+          } else {
+            const { data: assignment } = await client
+              .from('servant_class_assignments')
+              .select('class_instance_id')
+              .eq('servant_id', authContext.userId)
+              .eq('church_year_id', curYearId)
+              .eq('is_active', true)
+              .maybeSingle();
+            resolvedInstanceId = assignment?.class_instance_id;
           }
         }
+
+        if (!resolvedInstanceId) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: "Unauthorized: Servant is not assigned to this class instance in the active church year."
+          });
+        }
+
+        // 4. Execute the approved Phase 3B SECURITY DEFINER RPC: public.enroll_student_in_class(p_student_id, p_class_instance_id)
+        const { data: rpcData, error: rpcErr } = await client.rpc('enroll_student_in_class', {
+          p_student_id: profileCheck.id,
+          p_class_instance_id: resolvedInstanceId
+        });
+
+        if (rpcErr) {
+          return res.status(400).json({
+            success: false,
+            error: rpcErr.message.includes('Unauthorized') ? 'FORBIDDEN' : (rpcErr.message.includes('Grade') ? 'INVALID_GRADE' : 'ENROLLMENT_FAILED'),
+            message: rpcErr.message
+          });
+        }
+
+        return res.json({
+          success: true,
+          action: rpcData?.action || 'enrolled',
+          membershipId: rpcData?.membershipId,
+          classInstanceId: rpcData?.classInstanceId,
+          message: `Student successfully enrolled in class.`
+        });
       } catch (sbErr: any) {
         return res.status(500).json({
           success: false,
-          error: "PERSISTENCE_FAILED",
-          message: sbErr?.message || "Failed to persist to Supabase"
+          error: "ENROLLMENT_ERROR",
+          message: sbErr?.message || "Failed to execute enrollment"
         });
       }
     } else if (!existing && !['mark', 'u1', 'student-david', 'c1', 'other', 'user_student_mark_101', 'user_student_other_102'].includes(studentId)) {
@@ -4868,6 +5051,40 @@ function getNextGradeInfo(currentGrade?: string | null): {
 // 1. Get current church year and class instances
 app.get("/api/church/year", async (req, res) => {
   try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        const { data: dbYear } = await client
+          .from('church_years')
+          .select('id, name, start_date, end_date, is_active, activated_at')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (dbYear) {
+          return res.json({
+            success: true,
+            currentChurchYear: dbYear.name || dbYear.id,
+            churchYear: {
+              id: dbYear.id,
+              year: dbYear.name || dbYear.id,
+              status: 'ACTIVE',
+              startDate: dbYear.start_date || `${dbYear.id.substring(0, 4)}-09-01`,
+              endDate: dbYear.end_date,
+              createdAt: dbYear.activated_at || new Date().toISOString(),
+              createdBy: 'system'
+            },
+            classInstances: []
+          });
+        }
+      } catch (sbErr) {
+        console.warn("Supabase church year read fallback:", sbErr);
+      }
+    }
+
     const curYear = serverReviewState.currentChurchYear;
     let yearRecord = serverReviewState.churchYears[curYear];
     if (!yearRecord) {
@@ -5213,6 +5430,112 @@ app.post("/api/church/classes/:classGroupId/add-student", async (req, res) => {
             message: `Servant ${authContext.userId} is not assigned to class "${classGroupId}".`
           });
         }
+      }
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    // Real Supabase persistence via Phase 3B RPC when online (Phase 3C.3)
+    if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        // 1. Check active church year
+        const { data: activeYear } = await client
+          .from('church_years')
+          .select('id, name')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        const curYearId = activeYear?.id || '2026-2027';
+
+        // 2. Query student profile
+        const { data: studentProfile, error: pErr } = await client
+          .from('profiles')
+          .select('id, name, role, grade')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        if (pErr || !studentProfile) {
+          return res.status(404).json({
+            success: false,
+            error: "STUDENT_NOT_FOUND",
+            message: `Student with ID "${studentId}" was not found.`
+          });
+        }
+
+        if (studentProfile.role !== 'student') {
+          return res.status(400).json({
+            success: false,
+            error: "NOT_A_STUDENT",
+            message: `Target user does not hold the student role.`
+          });
+        }
+
+        // 3. Resolve class_instance_id
+        let resolvedInstanceId = req.body.classInstanceId;
+        if (!resolvedInstanceId) {
+          if (authContext.role === 'admin') {
+            const { data: inst } = await client
+              .from('class_instances')
+              .select('id')
+              .eq('church_year_id', curYearId)
+              .eq('class_group_id', classGroupId)
+              .maybeSingle();
+            resolvedInstanceId = inst?.id;
+          } else {
+            const { data: assignment } = await client
+              .from('servant_class_assignments')
+              .select('class_instance_id')
+              .eq('servant_id', authContext.userId)
+              .eq('church_year_id', curYearId)
+              .eq('is_active', true)
+              .maybeSingle();
+            resolvedInstanceId = assignment?.class_instance_id;
+          }
+        }
+
+        if (!resolvedInstanceId) {
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: "Unauthorized: Servant is not assigned to this class instance in the active church year."
+          });
+        }
+
+        // 4. Call approved Phase 3B RPC
+        const { data: rpcData, error: rpcErr } = await client.rpc('enroll_student_in_class', {
+          p_student_id: studentProfile.id,
+          p_class_instance_id: resolvedInstanceId
+        });
+
+        if (rpcErr) {
+          return res.status(400).json({
+            success: false,
+            error: rpcErr.message.includes('Unauthorized') ? 'FORBIDDEN' : (rpcErr.message.includes('Grade') ? 'INVALID_GRADE' : 'ENROLLMENT_FAILED'),
+            message: rpcErr.message
+          });
+        }
+
+        return res.json({
+          success: true,
+          action: rpcData?.action || 'enrolled',
+          membershipId: rpcData?.membershipId,
+          classInstanceId: rpcData?.classInstanceId,
+          message: `Student "${studentId}" enrolled in class "${classGroupId}".`
+        });
+      } catch (sbErr: any) {
+        return res.status(500).json({
+          success: false,
+          error: "ENROLLMENT_ERROR",
+          message: sbErr?.message || "Failed to execute enrollment"
+        });
       }
     }
 

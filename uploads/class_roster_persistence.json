@@ -6,7 +6,7 @@
       "year": "2026–2027",
       "status": "ACTIVE",
       "startDate": "2026-09-01",
-      "createdAt": "2026-10-05T13:40:15.455Z",
+      "createdAt": "2026-10-08T10:40:36.976Z",
       "createdBy": "system"
     }
   },
@@ -23,7 +23,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     "inst_2026-2027_primary_1": {
       "id": "inst_2026-2027_primary_1",
@@ -37,7 +37,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     "inst_2026-2027_primary_2": {
       "id": "inst_2026-2027_primary_2",
@@ -51,7 +51,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     "inst_2026-2027_preparatory": {
       "id": "inst_2026-2027_preparatory",
@@ -65,7 +65,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     "inst_2026-2027_secondary": {
       "id": "inst_2026-2027_secondary",
@@ -79,7 +79,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     "inst_2026-2027_university": {
       "id": "inst_2026-2027_university",
@@ -93,7 +93,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     }
   },
   "classMemberships": {
@@ -106,7 +106,7 @@
       "studentName": "Mark Shenouda",
       "exactGrade": "Grade 4",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-05T13:40:15.455Z",
+      "enrolledAt": "2026-10-08T10:40:36.976Z",
       "enrolledBy": "servant"
     },
     "mem_david_2026-2027": {
@@ -118,7 +118,7 @@
       "studentName": "David Emad",
       "exactGrade": "Grade 5",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-05T13:40:15.455Z",
+      "enrolledAt": "2026-10-08T10:40:36.976Z",
       "enrolledBy": "servant"
     },
     "mem_other_2026-2027": {
@@ -130,20 +130,8 @@
       "studentName": "Peter Fadi",
       "exactGrade": "Prep 1",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-05T13:40:15.455Z",
+      "enrolledAt": "2026-10-08T10:40:36.976Z",
       "enrolledBy": "servant"
-    },
-    "mem_student_new_youssef_777_2026-2027": {
-      "id": "mem_student_new_youssef_777_2026-2027",
-      "churchYear": "2026–2027",
-      "classGroupId": "primary_2",
-      "classInstanceId": "inst_2026-2027_primary_2",
-      "studentId": "student_new_youssef_777",
-      "studentName": "Youssef Mina",
-      "exactGrade": "Grade 4",
-      "status": "ACTIVE",
-      "enrolledAt": "2026-10-07T13:19:58.376Z",
-      "enrolledBy": "mina"
     }
   },
   "teacherAssignments": {
@@ -215,23 +203,6 @@
       "classGroupId": "preparatory",
       "churchYear": "2026–2027",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Peter"
-    },
-    "student_new_youssef_777": {
-      "studentId": "student_new_youssef_777",
-      "fullName": "Youssef Mina",
-      "grade": "Grade 4",
-      "classGroupId": "primary_2",
-      "churchYear": "2026–2027",
-      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_new_youssef_777",
-      "enrolledAt": "2026-10-07T13:19:58.376Z"
-    },
-    "student_reject_test_99": {
-      "studentId": "student_reject_test_99",
-      "fullName": "Temp Student",
-      "grade": "Grade 5",
-      "classGroupId": "primary_2",
-      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_reject_test_99",
-      "isPending": true
     }
   },
   "teacherStudentRelationships": [
@@ -239,13 +210,7 @@
       "teacherId": "mina",
       "studentId": "student-david",
       "relationshipType": "teacher_student",
-      "createdAt": "2026-10-05T13:40:15.463Z"
-    },
-    {
-      "teacherId": "mina",
-      "studentId": "student_new_youssef_777",
-      "relationshipType": "teacher_student",
-      "createdAt": "2026-10-07T13:19:58.376Z"
+      "createdAt": "2026-10-08T10:40:36.990Z"
     }
   ],
   "parentChildRelationships": [
@@ -253,31 +218,31 @@
       "parentId": "mary",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     {
       "parentId": "mary",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     },
     {
       "parentId": "other_parent",
       "childId": "other",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-05T13:40:15.455Z"
+      "createdAt": "2026-10-08T10:40:36.976Z"
     }
   ],
   "activationRequests": {
@@ -291,100 +256,7 @@
       "requestedGrade": "Grade 4",
       "notes": "New student joining Sunday school with Servant Mina",
       "status": "PENDING_APPROVAL",
-      "requestedAt": "2026-10-05T12:40:15.455Z"
-    },
-    "req_1791291002745_xct10": {
-      "id": "req_1791291002745_xct10",
-      "studentId": "student_new_youssef_777",
-      "studentName": "Youssef Mina",
-      "email": "",
-      "phone": "+20 100 123 4567",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 4",
-      "notes": "New student joining Sunday school Grade 4",
-      "status": "APPROVED",
-      "requestedAt": "2026-10-06T12:50:02.745Z",
-      "assignedGrade": "Grade 4",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-06T12:50:02.770Z",
-      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
-    },
-    "req_1791291002779_o0lni": {
-      "id": "req_1791291002779_o0lni",
-      "studentId": "student_reject_test_99",
-      "studentName": "Temp Student",
-      "email": "",
-      "phone": "",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 5",
-      "notes": "",
-      "status": "REJECTED",
-      "requestedAt": "2026-10-06T12:50:02.779Z",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-06T12:50:02.782Z",
-      "reviewNotes": "Duplicate submission"
-    },
-    "req_1791291532659_g5xdk": {
-      "id": "req_1791291532659_g5xdk",
-      "studentId": "student_new_youssef_777",
-      "studentName": "Youssef Mina",
-      "email": "",
-      "phone": "+20 100 123 4567",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 4",
-      "notes": "New student joining Sunday school Grade 4",
-      "status": "APPROVED",
-      "requestedAt": "2026-10-06T12:58:52.659Z",
-      "assignedGrade": "Grade 4",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-06T12:58:52.680Z",
-      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
-    },
-    "req_1791291532687_7ovkg": {
-      "id": "req_1791291532687_7ovkg",
-      "studentId": "student_reject_test_99",
-      "studentName": "Temp Student",
-      "email": "",
-      "phone": "",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 5",
-      "notes": "",
-      "status": "REJECTED",
-      "requestedAt": "2026-10-06T12:58:52.687Z",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-06T12:58:52.689Z",
-      "reviewNotes": "Duplicate submission"
-    },
-    "req_1791379198351_ge3ue": {
-      "id": "req_1791379198351_ge3ue",
-      "studentId": "student_new_youssef_777",
-      "studentName": "Youssef Mina",
-      "email": "",
-      "phone": "+20 100 123 4567",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 4",
-      "notes": "New student joining Sunday school Grade 4",
-      "status": "APPROVED",
-      "requestedAt": "2026-10-07T13:19:58.351Z",
-      "assignedGrade": "Grade 4",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-07T13:19:58.376Z",
-      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
-    },
-    "req_1791379198384_8duqg": {
-      "id": "req_1791379198384_8duqg",
-      "studentId": "student_reject_test_99",
-      "studentName": "Temp Student",
-      "email": "",
-      "phone": "",
-      "requestedClassGroupId": "primary_2",
-      "requestedGrade": "Grade 5",
-      "notes": "",
-      "status": "REJECTED",
-      "requestedAt": "2026-10-07T13:19:58.384Z",
-      "reviewedBy": "mina",
-      "reviewedAt": "2026-10-07T13:19:58.386Z",
-      "reviewNotes": "Duplicate submission"
+      "requestedAt": "2026-10-08T09:40:36.976Z"
     }
   }
 }

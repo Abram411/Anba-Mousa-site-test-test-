@@ -295,28 +295,45 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
       const { success, error } = await assignStudentClass(
         trimmedId,
         classInfo.classGroupId as ClassGroupId,
-        selectedGrade
+        selectedGrade,
+        classInfo.classInstanceId
       );
 
       if (!success || error) {
         const rawErr = error?.message || '';
-        let friendlyMsg = isAr ? 'فشل تعيين الطالب' : 'Failed to assign student';
+        let friendlyMsg = isAr ? 'فشل قيد وتسكين الطالب' : 'Failed to enroll student';
 
-        if (rawErr.includes('INVALID_GRADE')) {
+        if (rawErr.includes('UNAUTHORIZED_SERVANT') || rawErr.includes('Servant is not assigned')) {
+          friendlyMsg = isAr
+            ? 'ليس لديك الصلاحية: الخادم غير مسكن رسمياً على هذا الفصل في العام الكنسي الحالي.'
+            : 'You are not assigned to this class instance in the active church year.';
+        } else if (rawErr.includes('INCOMPATIBLE_GRADE') || rawErr.includes('Grade Incompatibility') || rawErr.includes('INVALID_GRADE')) {
           friendlyMsg = isAr 
-            ? 'المرحلة الدراسية المختارة غير مطابقة لهذا الفصل الدراسي.' 
-            : 'The selected grade does not belong to this class group.';
+            ? 'المرحلة الدراسية المختارة غير مطابقة لهذا الفصل الدراسي وفقاً للائحة الكنسية.' 
+            : 'The selected grade is not compatible with this class group.';
+        } else if (rawErr.includes('ALREADY_ENROLLED') || rawErr.includes('already has an active class membership')) {
+          friendlyMsg = isAr
+            ? 'الطالب مسجل بالفعل في كشف فصل نشط لهذا العام الكنسي.'
+            : 'The student already has an active class membership in this church year.';
+        } else if (rawErr.includes('NOT_A_STUDENT') || rawErr.includes('does not hold the student role')) {
+          friendlyMsg = isAr
+            ? 'المستخدم المحدد ليس في مرحلة طالب.'
+            : 'The selected user does not hold the student role.';
+        } else if (rawErr.includes('NO_ACTIVE_YEAR')) {
+          friendlyMsg = isAr
+            ? 'لا يوجد عام كنسي نشط ومفعل حالياً في قاعدة البيانات.'
+            : 'No active church year configured in the database.';
         } else if (rawErr.includes('STUDENT_NOT_FOUND')) {
           friendlyMsg = isAr 
-            ? `لم يتم العثور على طالب بالمعرّف "${trimmedId}". تأكد من صحة الكود.` 
+            ? `لم يتم العثور على طالب بالمعرّف "${trimmedId}". تأكد من صحة المعرّف أو السجل.` 
             : `Student with ID "${trimmedId}" was not found in church records.`;
-        } else if (rawErr.includes('FORBIDDEN')) {
+        } else if (rawErr.includes('FORBIDDEN') || rawErr.includes('Unauthorized')) {
           friendlyMsg = isAr 
-            ? 'ليس لديك الصلاحية لإدارة هذا الفصل أو تعيين طلاب له.' 
-            : 'You are not authorized to assign students to this class.';
+            ? 'ليس لديك الصلاحية لإدارة هذا الفصل أو تسكين طلاب به.' 
+            : 'You are not authorized to enroll students in this class.';
         } else if (rawErr.includes('PERSISTENCE_FAILED')) {
           friendlyMsg = isAr 
-            ? 'فشل حفظ التعيين في قاعدة البيانات. لم يتم التعديل.' 
+            ? 'فشل حفظ التسكين في قاعدة البيانات. لم يتم التعديل.' 
             : 'Database persistence failed. Changes were not saved.';
         } else if (rawErr) {
           friendlyMsg = rawErr;
@@ -326,11 +343,11 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
         return;
       }
 
-      // Success confirmed by server
+      // Success confirmed by authoritative RPC
       setAssignmentSuccess(
         isAr 
-          ? `تم تعيين الطالب (${trimmedId}) بنجاح إلى ${selectedGrade} وتم حفظ السجل رسمياً!`
-          : `Student (${trimmedId}) successfully assigned to ${selectedGrade} and persisted!`
+          ? `تم قيد وتسكين الطالب (${trimmedId}) رسمياً في كشف الفصل للعام الكنسي الحالي!`
+          : `Student (${trimmedId}) successfully enrolled and persisted in active class roster!`
       );
       setStudentIdInput('');
 

@@ -7,6 +7,48 @@ import {
   ClassGroupId,
   StudentClassAssociation 
 } from '../types';
+import { CLASS_GROUPS, getClassGroupForGrade } from './classGroups';
+
+export function resolveClassGroupId(classInstanceId?: string, exactGrade?: string): ClassGroupId {
+  if (classInstanceId) {
+    for (const g of ['angels', 'primary_1', 'primary_2', 'preparatory', 'secondary', 'university'] as ClassGroupId[]) {
+      if (classInstanceId.endsWith(`_${g}`)) {
+        return g;
+      }
+    }
+  }
+  if (exactGrade) {
+    const matched = getClassGroupForGrade(exactGrade);
+    if (matched) return matched.id;
+  }
+  return 'primary_2';
+}
+
+export interface StudentMembershipResult {
+  success: boolean;
+  isEnrolled: boolean;
+  activeChurchYear?: {
+    id: string;
+    name: string;
+    startDate?: string;
+    endDate?: string;
+  };
+  membership?: {
+    id: string;
+    churchYearId: string;
+    classInstanceId: string;
+    studentId: string;
+    exactGrade: string;
+    status: string;
+    joinedAt?: string;
+  } | null;
+  classGroup?: {
+    id: ClassGroupId;
+    nameEn: string;
+    nameAr: string;
+  } | null;
+  error?: string;
+}
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -25,6 +67,198 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 
 /**
+ * Phase 3C.2: Authoritative Student Class Membership Reader
+ * For authenticated online students: queries live Phase 3B tables:
+ *   1. public.church_years (is_active = true)
+ *   2. public.class_memberships (student_id = auth.uid(), church_year_id = active_year.id, status = 'active')
+ * If no row exists, returns isEnrolled: false, membership: null (does NOT fabricate from profile.grade or mock state).
+ * For Demo/Guest/Offline mode: returns guest or server fallback.
+ */
+export async function getStudentActiveMembership(
+  targetStudentId?: string
+): Promise<StudentMembershipResult> {
+  // 1. Authenticated Online Student Flow via Supabase
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+
+      if (user) {
+        const studentUid = targetStudentId || user.id;
+
+        // Query active church year from authoritative public.church_years
+        const { data: activeYear, error: yearError } = await supabase
+          .from('church_years')
+          .select('id, name, start_date, end_date, is_active')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (yearError) {
+          return {
+            success: false,
+            isEnrolled: false,
+            error: `Failed to query active church year: ${yearError.message}`
+          };
+        }
+
+        if (!activeYear) {
+          return {
+            success: true,
+            isEnrolled: false,
+            membership: null,
+            error: 'No active church year configured in database.'
+          };
+        }
+
+        // Query student's active membership in the active church year from public.class_memberships
+        const { data: memRow, error: memError } = await supabase
+          .from('class_memberships')
+          .select('id, church_year_id, class_instance_id, student_id, exact_grade, status, joined_at')
+          .eq('student_id', studentUid)
+          .eq('church_year_id', activeYear.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (memError) {
+          return {
+            success: false,
+            isEnrolled: false,
+            activeChurchYear: {
+              id: activeYear.id,
+              name: activeYear.name,
+              startDate: activeYear.start_date,
+              endDate: activeYear.end_date
+            },
+            error: `Failed to query student class membership: ${memError.message}`
+          };
+        }
+
+        if (!memRow) {
+          // Authenticated student has NO active membership row in the active church year
+          return {
+            success: true,
+            isEnrolled: false,
+            activeChurchYear: {
+              id: activeYear.id,
+              name: activeYear.name,
+              startDate: activeYear.start_date,
+              endDate: activeYear.end_date
+            },
+            membership: null,
+            classGroup: null
+          };
+        }
+
+        // Student has an active membership row
+        const classGroupId = resolveClassGroupId(memRow.class_instance_id, memRow.exact_grade);
+        const groupDef = CLASS_GROUPS[classGroupId];
+
+        return {
+          success: true,
+          isEnrolled: true,
+          activeChurchYear: {
+            id: activeYear.id,
+            name: activeYear.name,
+            startDate: activeYear.start_date,
+            endDate: activeYear.end_date
+          },
+          membership: {
+            id: memRow.id,
+            churchYearId: memRow.church_year_id,
+            classInstanceId: memRow.class_instance_id,
+            studentId: memRow.student_id,
+            exactGrade: memRow.exact_grade,
+            status: memRow.status,
+            joinedAt: memRow.joined_at
+          },
+          classGroup: {
+            id: classGroupId,
+            nameEn: groupDef?.name?.en || classGroupId,
+            nameAr: groupDef?.name?.ar || classGroupId
+          }
+        };
+      }
+    } catch (err: any) {
+      console.warn('Supabase getStudentActiveMembership error:', err);
+      return {
+        success: false,
+        isEnrolled: false,
+        error: err?.message || 'Error querying student membership'
+      };
+    }
+  }
+
+  // 2. Guest / Demo / Offline fallback via server endpoint
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch('/api/church/my-class', {
+      method: 'GET',
+      headers
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        success: false,
+        isEnrolled: false,
+        error: json?.message || json?.error || 'Failed to fetch student class from server'
+      };
+    }
+
+    if (json.isEnrolled && json.membership) {
+      const classGroupId = resolveClassGroupId(json.membership.classInstanceId, json.membership.exactGrade);
+      const groupDef = CLASS_GROUPS[classGroupId];
+      return {
+        success: true,
+        isEnrolled: true,
+        activeChurchYear: json.activeChurchYear || { id: json.membership.churchYearId, name: json.membership.churchYearName || json.membership.churchYearId },
+        membership: json.membership,
+        classGroup: {
+          id: classGroupId,
+          nameEn: groupDef?.name?.en || classGroupId,
+          nameAr: groupDef?.name?.ar || classGroupId
+        }
+      };
+    }
+
+    if (json.classInfo) {
+      const classGroupId = (json.classInfo.classGroupId || 'primary_2') as ClassGroupId;
+      const groupDef = CLASS_GROUPS[classGroupId];
+      return {
+        success: true,
+        isEnrolled: true,
+        activeChurchYear: { id: json.classInfo.churchYear || '2026-2027', name: json.classInfo.churchYear || '2026 / 2027' },
+        membership: {
+          id: 'demo-membership',
+          churchYearId: json.classInfo.churchYear || '2026-2027',
+          classInstanceId: `inst_${json.classInfo.churchYear || '2026-2027'}_${classGroupId}`,
+          studentId: json.classInfo.studentId || 'u1',
+          exactGrade: json.classInfo.grade || 'Grade 4',
+          status: 'active'
+        },
+        classGroup: {
+          id: classGroupId,
+          nameEn: groupDef?.name?.en || json.classInfo.className || classGroupId,
+          nameAr: groupDef?.name?.ar || json.classInfo.classNameAr || classGroupId
+        }
+      };
+    }
+
+    return {
+      success: true,
+      isEnrolled: false,
+      membership: null,
+      classGroup: null
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      isEnrolled: false,
+      error: err?.message || 'Network error fetching membership'
+    };
+  }
+}
+
+/**
  * 1. Get current church year and class instances
  */
 export async function getCurrentChurchYear(): Promise<{
@@ -34,6 +268,33 @@ export async function getCurrentChurchYear(): Promise<{
   classInstances: ChurchClassInstance[];
   error?: string;
 }> {
+  if (supabase) {
+    try {
+      const { data: cy, error: cyError } = await supabase
+        .from('church_years')
+        .select('id, name, start_date, end_date, is_active, activated_at')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!cyError && cy) {
+        return {
+          success: true,
+          currentChurchYear: cy.name || cy.id,
+          churchYear: {
+            id: cy.id,
+            year: cy.name || cy.id,
+            status: 'ACTIVE',
+            startDate: cy.start_date || '2026-09-01',
+            endDate: cy.end_date,
+            createdAt: cy.activated_at || new Date().toISOString(),
+            createdBy: 'system'
+          },
+          classInstances: []
+        };
+      }
+    } catch (_) {}
+  }
+
   const headers = await getAuthHeader();
   try {
     const res = await fetch('/api/church/year', {
@@ -44,10 +305,10 @@ export async function getCurrentChurchYear(): Promise<{
     if (!res.ok || !json?.success) {
       return {
         success: false,
-        currentChurchYear: '2026–2027',
+        currentChurchYear: '2026 / 2027',
         churchYear: {
-          id: 'year-2026-2027',
-          year: '2026–2027',
+          id: '2026-2027',
+          year: '2026 / 2027',
           status: 'ACTIVE',
           startDate: '2026-09-01',
           createdAt: new Date().toISOString(),
@@ -61,10 +322,10 @@ export async function getCurrentChurchYear(): Promise<{
   } catch (err: any) {
     return {
       success: false,
-      currentChurchYear: '2026–2027',
+      currentChurchYear: '2026 / 2027',
       churchYear: {
-        id: 'year-2026-2027',
-        year: '2026–2027',
+        id: '2026-2027',
+        year: '2026 / 2027',
         status: 'ACTIVE',
         startDate: '2026-09-01',
         createdAt: new Date().toISOString(),
@@ -113,6 +374,9 @@ export async function onboardStudentGrade(
 
 /**
  * 3. Student Joins Class using Servant-Supplied Code
+ * For authenticated online students: directly calls the live Phase 3B Supabase RPC:
+ *   public.join_class_by_code(p_join_code)
+ * For offline/guest students: calls the Express server fallback endpoint.
  */
 export async function joinClassWithCode(
   code: string
@@ -123,12 +387,108 @@ export async function joinClassWithCode(
   studentClass?: StudentClassAssociation;
   error?: string;
 }> {
+  const trimmedCode = (code || '').trim().toUpperCase();
+  if (!trimmedCode) {
+    return {
+      success: false,
+      error: 'Class join code is required.'
+    };
+  }
+
+  // 1. Authenticated Online Student Flow via Supabase RPC
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+
+      if (user) {
+        // Call the live Phase 3B SECURITY DEFINER RPC
+        const { data: rpcData, error: rpcError } = await supabase.rpc('join_class_by_code', {
+          p_join_code: trimmedCode
+        });
+
+        if (rpcError) {
+          const rawMsg = rpcError.message || '';
+          let errorTag = rawMsg;
+          if (rawMsg.includes('Grade Incompatibility')) {
+            errorTag = 'INCOMPATIBLE_GRADE: ' + rawMsg;
+          } else if (rawMsg.includes('Invalid or expired class join code')) {
+            errorTag = 'CODE_NOT_FOUND: ' + rawMsg;
+          } else if (rawMsg.includes('already actively enrolled')) {
+            errorTag = 'ALREADY_ENROLLED: ' + rawMsg;
+          } else if (rawMsg.includes('Forbidden')) {
+            errorTag = 'FORBIDDEN: ' + rawMsg;
+          } else if (rawMsg.includes('No active church year')) {
+            errorTag = 'ARCHIVED_YEAR_CODE: ' + rawMsg;
+          }
+          return {
+            success: false,
+            error: errorTag
+          };
+        }
+
+        // RPC succeeded: resolve class group details from canonical definition
+        const instId = rpcData?.classInstanceId;
+        const classGroupId = resolveClassGroupId(instId);
+        const groupDef = CLASS_GROUPS[classGroupId];
+
+        let matchedInstance: ChurchClassInstance = {
+          id: instId || `inst_2026-2027_${classGroupId}`,
+          churchYear: '2026-2027',
+          classGroupId,
+          nameEn: groupDef?.name?.en || classGroupId,
+          nameAr: groupDef?.name?.ar || classGroupId,
+          code: trimmedCode,
+          status: 'ACTIVE',
+          servantIds: [],
+          servantNames: [],
+          createdAt: new Date().toISOString()
+        };
+
+        let studentClassAssoc: StudentClassAssociation | undefined;
+
+        try {
+          const { data: profileRow } = await supabase
+            .from('profiles')
+            .select('id, name, grade, avatar')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          studentClassAssoc = {
+            studentId: user.id,
+            grade: profileRow?.grade || '',
+            classGroupId,
+            className: groupDef?.name?.en || classGroupId,
+            classNameAr: groupDef?.name?.ar || classGroupId,
+            servants: [],
+            churchYear: '2026 / 2027',
+            classCode: trimmedCode
+          };
+        } catch (_) {
+          // If profile lookup fails, minimal confirmation is still successful
+        }
+
+        return {
+          success: true,
+          message: rpcData?.action === 'reactivated'
+            ? 'Membership reactivated in class!'
+            : 'Successfully enrolled in class!',
+          classInstance: matchedInstance,
+          studentClass: studentClassAssoc
+        };
+      }
+    } catch (err: any) {
+      console.warn('Supabase join_class_by_code attempt failed, falling back to server endpoint:', err);
+    }
+  }
+
+  // 2. Guest / Offline / Fallback Flow via Server Endpoint
   const headers = await getAuthHeader();
   try {
     const res = await fetch('/api/church/student/join-class', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ code: code.trim() })
+      body: JSON.stringify({ code: trimmedCode })
     });
     const json = await res.json().catch(() => null);
     if (!res.ok || !json?.success) {
@@ -215,40 +575,241 @@ export async function removeStudentFromClass(
   }
 }
 
+export interface EnrollStudentResult {
+  success: boolean;
+  action?: 'enrolled' | 'reactivated';
+  membershipId?: string;
+  classInstanceId?: string;
+  error?: string;
+}
+
+/**
+ * 5b. Phase 3C.3: Servant / Admin Authorized Manual Student Enrollment
+ * Authorized servants & admins call the live Phase 3B SECURITY DEFINER RPC:
+ *   public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
+ *
+ * For online authenticated users: executes with caller JWT auth.uid().
+ * The database RPC is the sole authority that creates/reactivates class_memberships.
+ * For offline/guest mode: falls back to the server endpoint.
+ */
+export async function enrollStudentInClass(
+  studentIdentifier: string,
+  classInstanceId?: string,
+  classGroupId?: ClassGroupId,
+  grade?: string
+): Promise<EnrollStudentResult> {
+  const trimmedId = (studentIdentifier || '').trim();
+  if (!trimmedId) {
+    return {
+      success: false,
+      error: 'Student identifier is required.'
+    };
+  }
+
+  // 1. Authenticated Online Flow via Supabase RPC
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+
+      if (user) {
+        // Query active church year from authoritative public.church_years
+        const { data: activeYear, error: yErr } = await supabase
+          .from('church_years')
+          .select('id, name')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (yErr || !activeYear) {
+          return {
+            success: false,
+            error: 'NO_ACTIVE_YEAR: No active church year configured in database.'
+          };
+        }
+
+        // Look up student profile in database
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedId);
+        let studentQuery = supabase
+          .from('profiles')
+          .select('id, name, role, grade');
+
+        if (isUuid) {
+          studentQuery = studentQuery.eq('id', trimmedId);
+        } else {
+          studentQuery = studentQuery.or(`id.eq.${trimmedId},name.eq.${trimmedId}`);
+        }
+
+        const { data: studentProfile, error: pErr } = await studentQuery.maybeSingle();
+
+        if (pErr || !studentProfile) {
+          return {
+            success: false,
+            error: `STUDENT_NOT_FOUND: Student "${trimmedId}" was not found in church records.`
+          };
+        }
+
+        if (studentProfile.role !== 'student') {
+          return {
+            success: false,
+            error: `NOT_A_STUDENT: Target user "${studentProfile.name || trimmedId}" does not hold the student role (role: ${studentProfile.role}).`
+          };
+        }
+
+        const studentUuid = studentProfile.id;
+
+        // Resolve authoritative class_instance_id
+        let targetInstanceId = classInstanceId;
+
+        // If not provided directly, query class_instances for active year
+        if (!targetInstanceId) {
+          // Check caller role in profiles
+          const { data: callerProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const callerRole = callerProfile?.role || (user.user_metadata?.role as string) || '';
+
+          if (callerRole === 'admin') {
+            const { data: inst } = await supabase
+              .from('class_instances')
+              .select('id')
+              .eq('church_year_id', activeYear.id)
+              .eq('class_group_id', classGroupId || 'primary_2')
+              .maybeSingle();
+            targetInstanceId = inst?.id;
+          } else {
+            // For teacher, query servant_class_assignments
+            const { data: assignment } = await supabase
+              .from('servant_class_assignments')
+              .select('class_instance_id')
+              .eq('servant_id', user.id)
+              .eq('church_year_id', activeYear.id)
+              .eq('is_active', true)
+              .maybeSingle();
+            targetInstanceId = assignment?.class_instance_id;
+          }
+        }
+
+        if (!targetInstanceId) {
+          return {
+            success: false,
+            error: 'UNAUTHORIZED_SERVANT: Servant is not assigned to this class instance in the active church year.'
+          };
+        }
+
+        // Call the approved SECURITY DEFINER RPC: public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('enroll_student_in_class', {
+          p_student_id: studentUuid,
+          p_class_instance_id: targetInstanceId
+        });
+
+        if (rpcError) {
+          const rawMsg = rpcError.message || '';
+          let errorTag = rawMsg;
+          if (rawMsg.includes('Unauthenticated')) {
+            errorTag = 'UNAUTHENTICATED: ' + rawMsg;
+          } else if (rawMsg.includes('Only servants or administrators')) {
+            errorTag = 'UNAUTHORIZED: ' + rawMsg;
+          } else if (rawMsg.includes('Servant is not assigned to this class instance')) {
+            errorTag = 'UNAUTHORIZED_SERVANT: ' + rawMsg;
+          } else if (rawMsg.includes('does not hold the student role')) {
+            errorTag = 'NOT_A_STUDENT: ' + rawMsg;
+          } else if (rawMsg.includes('Grade Incompatibility')) {
+            errorTag = 'INCOMPATIBLE_GRADE: ' + rawMsg;
+          } else if (rawMsg.includes('already has an active class membership')) {
+            errorTag = 'ALREADY_ENROLLED: ' + rawMsg;
+          } else if (rawMsg.includes('Invalid class instance')) {
+            errorTag = 'INVALID_CLASS_INSTANCE: ' + rawMsg;
+          } else if (rawMsg.includes('No active church year')) {
+            errorTag = 'NO_ACTIVE_YEAR: ' + rawMsg;
+          }
+          return {
+            success: false,
+            error: errorTag
+          };
+        }
+
+        return {
+          success: true,
+          action: rpcData?.action,
+          membershipId: rpcData?.membershipId,
+          classInstanceId: rpcData?.classInstanceId
+        };
+      }
+    } catch (sbErr: any) {
+      console.warn('Supabase enroll_student_in_class error:', sbErr);
+      return {
+        success: false,
+        error: sbErr?.message || 'Error executing student enrollment'
+      };
+    }
+  }
+
+  // 2. Offline / Guest fallback via server endpoint
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch('/api/church/student/class', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        studentId: trimmedId,
+        classGroupId,
+        grade,
+        classInstanceId
+      })
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        success: false,
+        error: json?.message || json?.error || 'Failed to enroll student'
+      };
+    }
+    return {
+      success: true,
+      action: json.action || 'enrolled',
+      membershipId: json.membershipId,
+      classInstanceId: json.classInstanceId
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error enrolling student'
+    };
+  }
+}
+
 /**
  * 6. Add Student to Class (Servant & Admin)
  */
 export async function addStudentToClass(
   classGroupId: string,
   studentId: string,
-  exactGrade?: string
+  exactGrade?: string,
+  classInstanceId?: string
 ): Promise<{
   success: boolean;
   student?: any;
+  membershipId?: string;
   message?: string;
   error?: string;
 }> {
-  const headers = await getAuthHeader();
-  try {
-    const res = await fetch(`/api/church/classes/${encodeURIComponent(classGroupId)}/add-student`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ studentId, exactGrade })
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok || !json?.success) {
-      return {
-        success: false,
-        error: json?.message || json?.error || 'Failed to add student'
-      };
-    }
-    return json;
-  } catch (err: any) {
+  // Delegate to authoritative enrollStudentInClass
+  const enrollRes = await enrollStudentInClass(studentId, classInstanceId, classGroupId as ClassGroupId, exactGrade);
+  if (enrollRes.success) {
     return {
-      success: false,
-      error: err?.message || 'Network error'
+      success: true,
+      membershipId: enrollRes.membershipId,
+      message: 'Student enrolled successfully'
     };
   }
+
+  return {
+    success: false,
+    error: enrollRes.error || 'Failed to add student'
+  };
 }
 
 /**

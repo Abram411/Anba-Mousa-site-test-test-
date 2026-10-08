@@ -9,8 +9,8 @@ import { ChildQrCodeModal } from '../common/ChildQrCodeModal';
 import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
 import { CLASS_GROUPS, getClassGroupForGrade } from '../../lib/classGroups';
 import { COPTIC_AVATARS, DEFAULT_STUDENT_AVATAR } from '../../data/copticAvatars';
-import { getCurrentChurchYear, joinClassWithCode } from '../../lib/churchYearService';
-import { Language } from '../../types';
+import { getCurrentChurchYear, joinClassWithCode, getStudentActiveMembership } from '../../lib/churchYearService';
+import { Language, ClassGroupId } from '../../types';
 
 type ProfileScreen = 'main' | 'edit' | 'settings' | 'parental' | 'help' | 'parental_dashboard';
 
@@ -27,7 +27,7 @@ export function ProfileTab({
   onNavigate?: (tab: string) => void;
   lang: Language;
 }) {
-  const { userData, updateUserProfile } = useAuth();
+  const { userData, updateUserProfile, isGuest } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
   const [screen, setScreen] = useState<ProfileScreen>('main');
   const [userName, setUserName] = useState(userData?.fullName || '');
@@ -50,12 +50,89 @@ export function ProfileTab({
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // Church Year & Student Join Code state
-  const [churchYear, setChurchYear] = useState<string>('2026–2027');
+  const [churchYear, setChurchYear] = useState<string>('2026 / 2027');
   const [showJoinCodeModal, setShowJoinCodeModal] = useState<boolean>(false);
   const [inputJoinCode, setInputJoinCode] = useState<string>('');
   const [isJoiningCode, setIsJoiningCode] = useState<boolean>(false);
   const [joinCodeError, setJoinCodeError] = useState<string | null>(null);
   const [joinCodeSuccess, setJoinCodeSuccess] = useState<string | null>(null);
+
+  // Phase 3C.2: Authoritative Student Class Membership State
+  const [studentMembership, setStudentMembership] = useState<{
+    isEnrolled: boolean;
+    churchYearName?: string;
+    churchYearId?: string;
+    exactGrade?: string;
+    classGroupNameEn?: string;
+    classGroupNameAr?: string;
+    classGroupId?: ClassGroupId;
+    classInstanceId?: string;
+    joinedAt?: string;
+    membershipId?: string;
+  } | null>(null);
+  const [loadingMembership, setLoadingMembership] = useState<boolean>(false);
+
+  const isStudent = !userData?.role || userData?.role === 'student';
+
+  const loadMembership = async () => {
+    if (!isStudent) return;
+    setLoadingMembership(true);
+    try {
+      const res = await getStudentActiveMembership(userData?.id);
+      if (res.success) {
+        if (res.activeChurchYear?.name) {
+          setChurchYear(res.activeChurchYear.name);
+        }
+        if (res.isEnrolled && res.membership) {
+          setStudentMembership({
+            isEnrolled: true,
+            churchYearName: res.activeChurchYear?.name || churchYear,
+            churchYearId: res.membership.churchYearId,
+            exactGrade: res.membership.exactGrade,
+            classGroupNameEn: res.classGroup?.nameEn,
+            classGroupNameAr: res.classGroup?.nameAr,
+            classGroupId: res.classGroup?.id,
+            classInstanceId: res.membership.classInstanceId,
+            joinedAt: res.membership.joinedAt,
+            membershipId: res.membership.id
+          });
+        } else {
+          setStudentMembership({
+            isEnrolled: false,
+            churchYearName: res.activeChurchYear?.name || churchYear,
+            churchYearId: res.activeChurchYear?.id
+          });
+        }
+      } else {
+        if (isGuest) {
+          setStudentMembership({
+            isEnrolled: Boolean(userData?.grade),
+            churchYearName: churchYear,
+            exactGrade: userData?.grade,
+            classGroupNameEn: userData?.grade ? getClassGroupForGrade(userData.grade)?.name.en : undefined,
+            classGroupNameAr: userData?.grade ? getClassGroupForGrade(userData.grade)?.name.ar : undefined,
+          });
+        } else {
+          setStudentMembership({
+            isEnrolled: false,
+            churchYearName: churchYear
+          });
+        }
+      }
+    } catch (_) {
+      if (isGuest) {
+        setStudentMembership({
+          isEnrolled: Boolean(userData?.grade),
+          churchYearName: churchYear,
+          exactGrade: userData?.grade,
+          classGroupNameEn: userData?.grade ? getClassGroupForGrade(userData.grade)?.name.en : undefined,
+          classGroupNameAr: userData?.grade ? getClassGroupForGrade(userData.grade)?.name.ar : undefined,
+        });
+      }
+    } finally {
+      setLoadingMembership(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -64,8 +141,12 @@ export function ProfileTab({
         setChurchYear(res.currentChurchYear);
       }
     }).catch(() => {});
+
+    if (isStudent) {
+      loadMembership();
+    }
     return () => { mounted = false; };
-  }, []);
+  }, [userData?.id, isStudent, isGuest]);
 
   const handleJoinWithCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +159,7 @@ export function ProfileTab({
       if (res.success) {
         setJoinCodeSuccess(lang === 'ar' ? `تم الانضمام بنجاح إلى ${res.classInstance?.nameAr || res.classInstance?.nameEn}!` : `Successfully joined ${res.classInstance?.nameEn}!`);
         showToast('success', lang === 'ar' ? 'تم الانضمام للفصل بنجاح! ✝️' : 'Successfully joined class! ✝️');
+        await loadMembership();
         setTimeout(() => {
           setShowJoinCodeModal(false);
           setInputJoinCode('');
@@ -90,7 +172,11 @@ export function ProfileTab({
         } else if (msg.includes('ARCHIVED_YEAR_CODE')) {
           msg = lang === 'ar' ? 'هذا الكود ينتمي لعام كنسي سابق ومؤرشف. لا يمكن استخدامه.' : 'This code belongs to an archived church year and cannot be used.';
         } else if (msg.includes('CODE_NOT_FOUND')) {
-          msg = lang === 'ar' ? 'رمز الفصل غير صحيح. يرجى التأكد من الخادم المسؤول.' : 'Class join code was not found. Please verify with your servant.';
+          msg = lang === 'ar' ? 'رمز الفصل غير صحيح أو منتهي الصلاحية. يرجى التأكد من الخادم المسؤول.' : 'Class join code was not found or is invalid for the active year. Please verify with your servant.';
+        } else if (msg.includes('ALREADY_ENROLLED')) {
+          msg = lang === 'ar' ? 'أنت مسجل بالفعل في فصل نشط لهذا العام الكنسي.' : 'You already have an active class membership in this church year.';
+        } else if (msg.includes('FORBIDDEN')) {
+          msg = lang === 'ar' ? 'غير مصرح: حسابات الطلاب فقط يمكنها الانضمام للفصول بالكود.' : 'Forbidden: Only student accounts can join a class via code.';
         }
         setJoinCodeError(msg);
       }
@@ -102,8 +188,6 @@ export function ProfileTab({
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const isStudent = !userData?.role || userData?.role === 'student';
   const isParent = userData?.role === 'parent';
   const isTeacher = userData?.role === 'teacher';
 
@@ -638,13 +722,13 @@ export function ProfileTab({
                     </div>
 
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')
+                      (isGuest ? (userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')) : studentMembership?.isEnrolled)
                         ? 'bg-emerald-100 text-emerald-800'
                         : 'bg-amber-100 text-amber-800'
                     }`}>
-                      {userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')
+                      {(isGuest ? (userData?.activationStatus === 'APPROVED' || (userData?.grade && userData?.activationStatus !== 'PENDING_APPROVAL')) : studentMembership?.isEnrolled)
                         ? (lang === 'ar' ? 'مسجل بالكشف الرسمي ✅' : 'Roster Enrolled ✅')
-                        : (lang === 'ar' ? 'قيد المراجعة والاعتماد ⏳' : 'Pending Approval ⏳')}
+                        : (lang === 'ar' ? 'غير مسجل في الكشف للعام الحالي ⏳' : 'Not Enrolled in Active Year ⏳')}
                     </span>
                   </div>
 
@@ -654,19 +738,25 @@ export function ProfileTab({
                         <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'العام الكنسي:' : 'Church Year:'}</span>
                         <span className="font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded text-xs inline-flex items-center gap-1">
                           <Calendar size={11} className="text-amber-600" />
-                          <span>{churchYear}</span>
+                          <span>{studentMembership?.churchYearName || churchYear}</span>
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'الصف الدراسي المحدد:' : 'Exact Grade:'}</span>
                         <span className="font-bold text-gray-900 text-sm">
-                          {userData?.requestedGrade || userData?.grade || (lang === 'ar' ? 'لم يتم التحديد بعد' : 'Not Selected')}
+                          {studentMembership?.exactGrade || userData?.requestedGrade || userData?.grade || (lang === 'ar' ? 'لم يتم التحديد بعد' : 'Not Selected')}
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'فصل مدارس الأحد الكنسي:' : 'Church Class Group:'}</span>
                         <span className="font-bold text-[var(--color-church-blue)] text-sm">
                           {(() => {
+                            if (!isGuest && !studentMembership?.isEnrolled) {
+                              return lang === 'ar' ? 'غير مسجل في فصل بعد' : 'Not Enrolled in Class';
+                            }
+                            if (studentMembership?.classGroupNameEn) {
+                              return lang === 'ar' ? (studentMembership.classGroupNameAr || studentMembership.classGroupNameEn) : studentMembership.classGroupNameEn;
+                            }
                             const g = userData?.requestedGrade || userData?.grade;
                             const group = g ? getClassGroupForGrade(g) : null;
                             return group ? group.name[lang === 'ar' ? 'ar' : 'en'] : (lang === 'ar' ? 'بانتظار الاختيار' : 'Pending Selection');
@@ -677,9 +767,13 @@ export function ProfileTab({
 
                     <div className="pt-2 border-t border-blue-200/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <p className="text-[11px] text-gray-600 leading-relaxed">
-                        {lang === 'ar' 
-                          ? 'يقوم الخادم المسؤول بمراجعة طلبك واعتماد تسكينك في الكشف لتلقي دروس المرحلة ومتابعة التقدم.' 
-                          : 'Your servant reviews and approves your roster placement to unlock the official curriculum.'}
+                        {studentMembership?.isEnrolled
+                          ? (lang === 'ar'
+                              ? `مسجل بنجاح في الفصل للعام الكنسي الحالي (${studentMembership.churchYearName || churchYear}).`
+                              : `Officially enrolled in active church year (${studentMembership.churchYearName || churchYear}).`)
+                          : (lang === 'ar' 
+                              ? 'قم بإدخال كود الفصل المسلم لك من الخادم للانضمام الرسمي لكشف العام الحالي.' 
+                              : 'Enter the class join code provided by your servant to officially enroll for the active church year.')}
                       </p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <button

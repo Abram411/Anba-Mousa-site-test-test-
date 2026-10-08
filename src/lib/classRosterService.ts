@@ -3,6 +3,7 @@ import { ClassRosterStudent, StudentClassAssociation, ClassGroupId } from '../ty
 export type { ClassRosterStudent, StudentClassAssociation, ClassGroupId };
 import { getClassGroupForGrade, CLASS_GROUPS } from './classGroups';
 import { sundaySchoolRoster } from './parentChildService';
+import { getStudentActiveMembership, enrollStudentInClass } from './churchYearService';
 
 // In-memory fallback for demo / guest / offline resilience
 const DEMO_STUDENT_CLASS: StudentClassAssociation = {
@@ -85,27 +86,45 @@ export async function getClassRoster(
 /**
  * 2. getMyStudentClass()
  * Retrieves the authoritative class and grade association for the currently logged-in student.
+ * Phase 3C.2: For online authenticated students, authoritative source is public.class_memberships.
+ * If student has no active membership in the active church year, returns data: null (does not fake demo data).
  */
 export async function getMyStudentClass(): Promise<{ data: StudentClassAssociation | null; error: Error | null }> {
-  const headers = await getAuthHeader();
-  try {
-    const res = await fetch('/api/church/my-class', {
-      method: 'GET',
-      headers
-    });
-
-    const json = await res.json().catch(() => null);
-    if (!res.ok || !json?.success) {
+  const memRes = await getStudentActiveMembership();
+  if (memRes.success) {
+    if (memRes.isEnrolled && memRes.membership && memRes.classGroup) {
       return {
-        data: null,
-        error: new Error(json?.message || json?.error || `HTTP ${res.status}: Failed to fetch student class`)
+        data: {
+          studentId: memRes.membership.studentId,
+          grade: memRes.membership.exactGrade,
+          classGroupId: memRes.classGroup.id,
+          className: memRes.classGroup.nameEn,
+          classNameAr: memRes.classGroup.nameAr,
+          servants: [],
+          churchYear: memRes.activeChurchYear?.name || memRes.membership.churchYearId
+        },
+        error: null
       };
     }
-
-    return { data: json.classInfo, error: null };
-  } catch (err: any) {
-    return { data: DEMO_STUDENT_CLASS, error: null };
+    // Student authoritatively has NO active class membership in the active church year
+    return { data: null, error: null };
   }
+
+  // If query failed for an online authenticated student, preserve error without faking demo data
+  if (supabase) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        return {
+          data: null,
+          error: new Error(memRes.error || 'Failed to fetch student class membership from database')
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Demo / Guest / Offline fallback only
+  return { data: DEMO_STUDENT_CLASS, error: null };
 }
 
 export interface ServantClassInfo {
@@ -168,26 +187,48 @@ export async function getMyClass(): Promise<{ data: MyClassResult | null; error:
 }
 
 /**
- * 3. assignStudentClass(studentId, classGroupId, grade)
- * Updates a student's authoritative class and grade.
- * Strict RBAC: Only authorized teachers and admins can modify class assignments.
- * Students and parents are strictly forbidden.
+ * 3. assignStudentClass(studentId, classGroupId, grade, classInstanceId)
+ * Phase 3C.3: Connects to the approved Phase 3B database RPC:
+ *   public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
+ * Strict RBAC: Only authorized servants and admins can enroll students into their assigned classes.
+ * Preserves demo/guest/offline fallback when unauthenticated.
  */
 export async function assignStudentClass(
   studentId: string,
   classGroupId: ClassGroupId,
-  grade: string
-): Promise<{ success: boolean; error: Error | null }> {
+  grade: string,
+  classInstanceId?: string
+): Promise<{ success: boolean; error: Error | null; membershipId?: string }> {
   if (!studentId || !classGroupId || !grade) {
     return { success: false, error: new Error('studentId, classGroupId, and grade are required') };
   }
 
+  // 1. Online Authenticated Flow via Phase 3B Supabase RPC
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.user) {
+        const enrollRes = await enrollStudentInClass(studentId, classInstanceId, classGroupId, grade);
+        if (enrollRes.success) {
+          return { success: true, error: null, membershipId: enrollRes.membershipId };
+        }
+        return {
+          success: false,
+          error: new Error(enrollRes.error || 'Failed to enroll student into class')
+        };
+      }
+    } catch (err: any) {
+      return { success: false, error: new Error(err?.message || 'Database enrollment error') };
+    }
+  }
+
+  // 2. Demo / Guest / Offline fallback
   const headers = await getAuthHeader();
   try {
     const res = await fetch('/api/church/student/class', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ studentId, classGroupId, grade })
+      body: JSON.stringify({ studentId, classGroupId, grade, classInstanceId })
     });
 
     const json = await res.json().catch(() => null);
