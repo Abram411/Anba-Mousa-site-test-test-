@@ -6,7 +6,7 @@
       "year": "2026–2027",
       "status": "ACTIVE",
       "startDate": "2026-09-01",
-      "createdAt": "2026-10-08T10:40:36.976Z",
+      "createdAt": "2026-10-10T08:22:36.061Z",
       "createdBy": "system"
     }
   },
@@ -23,7 +23,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     "inst_2026-2027_primary_1": {
       "id": "inst_2026-2027_primary_1",
@@ -37,7 +37,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     "inst_2026-2027_primary_2": {
       "id": "inst_2026-2027_primary_2",
@@ -51,7 +51,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     "inst_2026-2027_preparatory": {
       "id": "inst_2026-2027_preparatory",
@@ -65,7 +65,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     "inst_2026-2027_secondary": {
       "id": "inst_2026-2027_secondary",
@@ -79,7 +79,7 @@
         "user_teacher_other_404"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     "inst_2026-2027_university": {
       "id": "inst_2026-2027_university",
@@ -93,7 +93,7 @@
         "user_teacher_mina_101"
       ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     }
   },
   "classMemberships": {
@@ -106,7 +106,7 @@
       "studentName": "Mark Shenouda",
       "exactGrade": "Grade 4",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-08T10:40:36.976Z",
+      "enrolledAt": "2026-10-10T08:22:36.061Z",
       "enrolledBy": "servant"
     },
     "mem_david_2026-2027": {
@@ -118,7 +118,7 @@
       "studentName": "David Emad",
       "exactGrade": "Grade 5",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-08T10:40:36.976Z",
+      "enrolledAt": "2026-10-10T08:22:36.061Z",
       "enrolledBy": "servant"
     },
     "mem_other_2026-2027": {
@@ -130,7 +130,7 @@
       "studentName": "Peter Fadi",
       "exactGrade": "Prep 1",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-08T10:40:36.976Z",
+      "enrolledAt": "2026-10-10T08:22:36.061Z",
       "enrolledBy": "servant"
     }
   },
@@ -210,7 +210,7 @@
       "teacherId": "mina",
       "studentId": "student-david",
       "relationshipType": "teacher_student",
-      "createdAt": "2026-10-08T10:40:36.990Z"
+      "createdAt": "2026-10-10T08:22:36.072Z"
     }
   ],
   "parentChildRelationships": [
@@ -218,31 +218,31 @@
       "parentId": "mary",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     {
       "parentId": "mary",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     },
     {
       "parentId": "other_parent",
       "childId": "other",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-08T10:40:36.976Z"
+      "createdAt": "2026-10-10T08:22:36.061Z"
     }
   ],
   "activationRequests": {
@@ -256,7 +256,7 @@
       "requestedGrade": "Grade 4",
       "notes": "New student joining Sunday school with Servant Mina",
       "status": "PENDING_APPROVAL",
-      "requestedAt": "2026-10-08T09:40:36.976Z"
+      "requestedAt": "2026-10-10T07:22:36.061Z"
     }
   }
 }

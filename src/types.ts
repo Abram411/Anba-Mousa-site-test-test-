@@ -133,6 +133,7 @@ export interface ClassGroup {
 
 export interface ClassRosterStudent {
   id: string;
+  membershipId?: string;
   name: string;
   grade: string;
   classGroupId: ClassGroupId;

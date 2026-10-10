@@ -3,7 +3,9 @@ import { ClassRosterStudent, StudentClassAssociation, ClassGroupId } from '../ty
 export type { ClassRosterStudent, StudentClassAssociation, ClassGroupId };
 import { getClassGroupForGrade, CLASS_GROUPS } from './classGroups';
 import { sundaySchoolRoster } from './parentChildService';
-import { getStudentActiveMembership, enrollStudentInClass } from './churchYearService';
+import { getStudentActiveMembership, enrollStudentInClass, removeStudentFromClass, RemoveStudentResult } from './churchYearService';
+export type { RemoveStudentResult };
+export { removeStudentFromClass };
 
 // In-memory fallback for demo / guest / offline resilience
 const DEMO_STUDENT_CLASS: StudentClassAssociation = {

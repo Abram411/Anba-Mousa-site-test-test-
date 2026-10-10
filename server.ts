@@ -5340,12 +5340,12 @@ app.post("/api/church/classes/:classGroupId/regenerate-code", async (req, res) =
 app.post("/api/church/classes/:classGroupId/remove-student", async (req, res) => {
   try {
     const classGroupId = req.params.classGroupId;
-    const { studentId, reason } = req.body;
-    if (!studentId) {
+    const { studentId, reason, membershipId } = req.body;
+    if (!studentId && !membershipId) {
       return res.status(400).json({
         success: false,
         error: "MISSING_STUDENT_ID",
-        message: "studentId is required"
+        message: "studentId or membershipId is required"
       });
     }
 
@@ -5371,6 +5371,89 @@ app.post("/api/church/classes/:classGroupId/remove-student", async (req, res) =>
       }
     }
 
+    // 1. Authoritative Supabase persistence check for authenticated online users (Phase 3C.4)
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        let targetMembershipId = membershipId;
+
+        // If not supplied directly, resolve student's active membership in the active church year
+        if (!targetMembershipId) {
+          const { data: activeYear, error: yErr } = await client
+            .from('church_years')
+            .select('id')
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (yErr || !activeYear) {
+            return res.status(400).json({
+              success: false,
+              error: "NO_ACTIVE_YEAR",
+              message: "No active church year configured in database."
+            });
+          }
+
+          const { data: memRow, error: memErr } = await client
+            .from('class_memberships')
+            .select('id')
+            .eq('student_id', studentId)
+            .eq('church_year_id', activeYear.id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (memErr || !memRow) {
+            return res.status(404).json({
+              success: false,
+              error: "MEMBERSHIP_NOT_FOUND",
+              message: "Active student membership not found for current church year."
+            });
+          }
+
+          targetMembershipId = memRow.id;
+        }
+
+        // Execute the approved Phase 3B SECURITY DEFINER RPC:
+        // public.remove_student_from_class(p_membership_id TEXT, p_reason TEXT)
+        const { data: rpcData, error: rpcErr } = await client.rpc('remove_student_from_class', {
+          p_membership_id: targetMembershipId,
+          p_reason: (reason || '').trim()
+        });
+
+        if (rpcErr) {
+          return res.status(400).json({
+            success: false,
+            error: rpcErr.message.includes('Unauthorized') ? 'FORBIDDEN' : 'REMOVAL_FAILED',
+            message: rpcErr.message
+          });
+        }
+
+        return res.json({
+          success: true,
+          membershipId: rpcData?.membershipId || targetMembershipId,
+          status: rpcData?.status || 'inactive',
+          leftAt: rpcData?.leftAt,
+          studentId,
+          message: `Student successfully removed from class. Historical records preserved.`
+        });
+      } catch (sbErr: any) {
+        return res.status(500).json({
+          success: false,
+          error: "REMOVAL_ERROR",
+          message: sbErr?.message || "Failed to execute student removal"
+        });
+      }
+    }
+
+    // 2. Mock / In-Memory State Update (Demo / Offline / Synthetic Test Fallback)
     const curYear = serverReviewState.currentChurchYear;
     const memKey = `mem_${studentId}_${curYear.replace(/[^a-zA-Z0-9]/g, '-')}`;
     if (serverReviewState.classMemberships[memKey]) {
@@ -5684,6 +5767,214 @@ app.post("/api/church/admin/assign-servant", async (req, res) => {
       });
     }
 
+    // 1. Authoritative Supabase persistence check for authenticated online admins (Phase 3C.5.1)
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (supabaseUrl && supabaseAnonKey && token && !token.startsWith("test_jwt_")) {
+      try {
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        // 1a. Query active church year
+        const { data: activeYear, error: yErr } = await client
+          .from('church_years')
+          .select('id, name')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (yErr || !activeYear) {
+          return res.status(400).json({
+            success: false,
+            error: "NO_ACTIVE_YEAR",
+            message: "No active church year configured in database."
+          });
+        }
+
+        const curYearId = activeYear.id;
+
+        // 1b. Query target servant profile & validate role
+        const { data: servantProfile, error: sErr } = await client
+          .from('profiles')
+          .select('id, name, role')
+          .eq('id', servantId)
+          .maybeSingle();
+
+        if (sErr) {
+          return res.status(500).json({
+            success: false,
+            error: "DATABASE_ERROR",
+            message: `Failed to query servant profile: ${sErr.message}`
+          });
+        }
+
+        if (!servantProfile) {
+          return res.status(404).json({
+            success: false,
+            error: "SERVANT_NOT_FOUND",
+            message: `Servant with ID "${servantId}" was not found.`
+          });
+        }
+
+        if (!['teacher', 'admin'].includes(servantProfile.role)) {
+          return res.status(400).json({
+            success: false,
+            error: "INVALID_SERVANT_ROLE",
+            message: `Target user does not have a servant/admin role (role: "${servantProfile.role}").`
+          });
+        }
+
+        // 1c. Resolve class instance for target classGroupId in the active church year
+        const { data: classInst, error: ciErr } = await client
+          .from('class_instances')
+          .select('id, class_group_id, name_en')
+          .eq('church_year_id', curYearId)
+          .eq('class_group_id', classGroupId)
+          .maybeSingle();
+
+        if (ciErr || !classInst) {
+          return res.status(404).json({
+            success: false,
+            error: "CLASS_INSTANCE_NOT_FOUND",
+            message: `Class instance for classGroupId "${classGroupId}" not found in active church year ${curYearId}.`
+          });
+        }
+
+        const classInstanceId = classInst.id;
+
+        if (action === 'ASSIGN') {
+          // Check for existing assignment row for this (church_year_id, class_instance_id, servant_id)
+          const { data: existingAsgn, error: exErr } = await client
+            .from('servant_class_assignments')
+            .select('id, is_active')
+            .eq('church_year_id', curYearId)
+            .eq('class_instance_id', classInstanceId)
+            .eq('servant_id', servantProfile.id)
+            .maybeSingle();
+
+          if (exErr) {
+            return res.status(500).json({
+              success: false,
+              error: "DATABASE_ERROR",
+              message: `Failed to check existing assignment: ${exErr.message}`
+            });
+          }
+
+          if (existingAsgn) {
+            // Idempotent: if already active, do nothing; if inactive, reactivate
+            if (!existingAsgn.is_active) {
+              const { error: updErr } = await client
+                .from('servant_class_assignments')
+                .update({
+                  is_active: true,
+                  assigned_by: authContext.userId,
+                  assigned_at: new Date().toISOString()
+                })
+                .eq('id', existingAsgn.id);
+
+              if (updErr) {
+                return res.status(400).json({
+                  success: false,
+                  error: updErr.message.includes('permission') ? 'FORBIDDEN' : 'ASSIGNMENT_FAILED',
+                  message: updErr.message
+                });
+              }
+            }
+          } else {
+            // Insert new assignment
+            const assignmentId = `asgn_${curYearId.replace(/[^a-zA-Z0-9]/g, '_')}_${classInstanceId.replace(/[^a-zA-Z0-9]/g, '_')}_${servantProfile.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const { error: insErr } = await client
+              .from('servant_class_assignments')
+              .insert({
+                id: assignmentId,
+                church_year_id: curYearId,
+                class_instance_id: classInstanceId,
+                servant_id: servantProfile.id,
+                assigned_by: authContext.userId,
+                assigned_at: new Date().toISOString(),
+                is_active: true
+              });
+
+            if (insErr) {
+              return res.status(400).json({
+                success: false,
+                error: insErr.message.includes('permission') ? 'FORBIDDEN' : 'ASSIGNMENT_FAILED',
+                message: insErr.message
+              });
+            }
+          }
+        } else {
+          // REMOVE: Deactivate assignment row (preserve history)
+          const { data: existingAsgn, error: exErr } = await client
+            .from('servant_class_assignments')
+            .select('id, is_active')
+            .eq('church_year_id', curYearId)
+            .eq('class_instance_id', classInstanceId)
+            .eq('servant_id', servantProfile.id)
+            .maybeSingle();
+
+          if (exErr) {
+            return res.status(500).json({
+              success: false,
+              error: "DATABASE_ERROR",
+              message: `Failed to check existing assignment: ${exErr.message}`
+            });
+          }
+
+          if (existingAsgn && existingAsgn.is_active) {
+            const { error: updErr } = await client
+              .from('servant_class_assignments')
+              .update({ is_active: false })
+              .eq('id', existingAsgn.id);
+
+            if (updErr) {
+              return res.status(400).json({
+                success: false,
+                error: updErr.message.includes('permission') ? 'FORBIDDEN' : 'ASSIGNMENT_FAILED',
+                message: updErr.message
+              });
+            }
+          }
+        }
+
+        // Query all currently active assigned classes for this servant from public.servant_class_assignments
+        const { data: activeAssignments } = await client
+          .from('servant_class_assignments')
+          .select('class_instance_id')
+          .eq('church_year_id', curYearId)
+          .eq('servant_id', servantProfile.id)
+          .eq('is_active', true);
+
+        const assignedInstanceIds = (activeAssignments || []).map((a: any) => a.class_instance_id);
+        let assignedClassGroupIds: string[] = [];
+        if (assignedInstanceIds.length > 0) {
+          const { data: instances } = await client
+            .from('class_instances')
+            .select('class_group_id')
+            .in('id', assignedInstanceIds);
+          assignedClassGroupIds = (instances || []).map((i: any) => i.class_group_id);
+        }
+
+        return res.json({
+          success: true,
+          servantId: servantProfile.id,
+          assignedClasses: assignedClassGroupIds,
+          message: `Servant ${servantProfile.name || servantProfile.id} ${action === 'ASSIGN' ? 'assigned to' : 'unassigned from'} ${classGroupId}.`
+        });
+      } catch (sbErr: any) {
+        return res.status(500).json({
+          success: false,
+          error: "ASSIGNMENT_ERROR",
+          message: sbErr?.message || "Failed to update servant assignment in database"
+        });
+      }
+    }
+
+    // 2. Mock / In-Memory State Update (Demo / Offline / Synthetic Test Fallback)
     if (!serverReviewState.teacherAssignments[servantId]) {
       serverReviewState.teacherAssignments[servantId] = [];
     }

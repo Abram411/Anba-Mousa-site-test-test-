@@ -181,7 +181,12 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
     if (!studentToRemove || !classInfo?.classGroupId) return;
     setIsRemovingStudent(true);
     try {
-      const res = await removeStudentFromClass(classInfo.classGroupId, studentToRemove.id, removalReason);
+      const res = await removeStudentFromClass(
+        classInfo.classGroupId, 
+        studentToRemove.id, 
+        removalReason,
+        studentToRemove.membershipId
+      );
       if (res.success) {
         setRequestActionSuccess(isAr ? `تم إخراج الطالب "${studentToRemove.name}" من كشف هذا العام. السجلات التاريخية محفوظة.` : `Student "${studentToRemove.name}" removed from this year's roster. History preserved.`);
         setStudentToRemove(null);

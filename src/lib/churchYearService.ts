@@ -540,24 +540,129 @@ export async function regenerateClassCode(
   }
 }
 
+export interface RemoveStudentResult {
+  success: boolean;
+  membershipId?: string;
+  status?: string;
+  leftAt?: string;
+  message?: string;
+  error?: string;
+}
+
 /**
  * 5. Remove Student from Current Church-Year Class (Servant & Admin)
+ * Phase 3C.4: Connects to the approved Phase 3B SECURITY DEFINER RPC:
+ *   public.remove_student_from_class(p_membership_id TEXT, p_reason TEXT)
+ *
+ * For online authenticated users: executes with caller JWT auth.uid().
+ * The database RPC is the sole authority that marks class_memberships status = 'inactive'.
+ * The membership row is preserved in the database (never DELETED).
+ * For offline/guest mode: falls back to the server endpoint.
  */
 export async function removeStudentFromClass(
   classGroupId: string,
   studentId: string,
-  reason?: string
-): Promise<{
-  success: boolean;
-  message?: string;
-  error?: string;
-}> {
+  reason?: string,
+  membershipId?: string
+): Promise<RemoveStudentResult> {
+  const trimmedReason = (reason || '').trim();
+
+  // 1. Online Authenticated Flow via Phase 3B Supabase RPC
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+
+      if (user) {
+        let targetMembershipId = membershipId;
+
+        // If membershipId is not provided directly, query the student's active membership
+        // in the active church year from public.class_memberships
+        if (!targetMembershipId) {
+          const { data: activeYear, error: yErr } = await supabase
+            .from('church_years')
+            .select('id')
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (yErr || !activeYear) {
+            return {
+              success: false,
+              error: 'NO_ACTIVE_YEAR: No active church year configured in database.'
+            };
+          }
+
+          const { data: memRow, error: memErr } = await supabase
+            .from('class_memberships')
+            .select('id')
+            .eq('student_id', studentId)
+            .eq('church_year_id', activeYear.id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (memErr || !memRow) {
+            return {
+              success: false,
+              error: 'MEMBERSHIP_NOT_FOUND: Active student membership not found for current church year.'
+            };
+          }
+
+          targetMembershipId = memRow.id;
+        }
+
+        // Call the approved SECURITY DEFINER RPC:
+        // public.remove_student_from_class(p_membership_id TEXT, p_reason TEXT)
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('remove_student_from_class', {
+          p_membership_id: targetMembershipId,
+          p_reason: trimmedReason
+        });
+
+        if (rpcErr) {
+          const rawMsg = rpcErr.message || '';
+          let errorTag = rawMsg;
+          if (rawMsg.includes('Unauthenticated')) {
+            errorTag = 'UNAUTHENTICATED: ' + rawMsg;
+          } else if (rawMsg.includes('Only an assigned servant or administrator')) {
+            errorTag = 'FORBIDDEN: ' + rawMsg;
+          } else if (rawMsg.includes('Servant is not assigned to this class instance')) {
+            errorTag = 'FORBIDDEN: ' + rawMsg;
+          } else if (rawMsg.includes('Membership not found')) {
+            errorTag = 'NOT_FOUND: ' + rawMsg;
+          } else if (rawMsg.includes('Historical or archived memberships cannot be modified')) {
+            errorTag = 'INVALID_OPERATION: ' + rawMsg;
+          } else if (rawMsg.includes('already inactive')) {
+            errorTag = 'ALREADY_INACTIVE: ' + rawMsg;
+          }
+          return {
+            success: false,
+            error: errorTag
+          };
+        }
+
+        return {
+          success: true,
+          membershipId: rpcData?.membershipId || targetMembershipId,
+          status: rpcData?.status || 'inactive',
+          leftAt: rpcData?.leftAt,
+          message: 'Student membership successfully deactivated. Historical records preserved.'
+        };
+      }
+    } catch (sbErr: any) {
+      console.warn('Supabase remove_student_from_class error:', sbErr);
+      return {
+        success: false,
+        error: sbErr?.message || 'Error executing student removal'
+      };
+    }
+  }
+
+  // 2. Offline / Demo / Test Fallback via server endpoint
   const headers = await getAuthHeader();
   try {
     const res = await fetch(`/api/church/classes/${encodeURIComponent(classGroupId)}/remove-student`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ studentId, reason })
+      body: JSON.stringify({ studentId, reason: trimmedReason, membershipId })
     });
     const json = await res.json().catch(() => null);
     if (!res.ok || !json?.success) {
