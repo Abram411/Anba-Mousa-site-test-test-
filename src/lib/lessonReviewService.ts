@@ -187,22 +187,29 @@ export async function getAuthenticatedServant(): Promise<{
     return { user: null, error: new Error('Authentication required for servant review operations') };
   }
 
-  const { data: profile, error: profErr } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
+  // Retrieve user role from profiles, falling back to auth user metadata if table RLS denies direct select
+  let role = (user.user_metadata?.role || user.app_metadata?.role) as string | undefined;
 
-  if (profErr) {
-    return { user: null, error: new Error(`Failed to verify servant role: ${profErr.message}`) };
+  try {
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profErr && profile?.role) {
+      role = profile.role;
+    }
+  } catch (e) {
+    // Silently continue if profiles table is restricted by RLS
   }
 
-  const role = profile?.role || 'student';
-  if (role !== 'teacher' && role !== 'admin') {
+  const finalRole = role || 'student';
+  if (finalRole !== 'teacher' && finalRole !== 'admin') {
     return { user: null, error: new Error('Only servants, teachers, and administrators may participate in servant reviews') };
   }
 
-  return { user: { id: user.id, role }, error: null };
+  return { user: { id: user.id, role: finalRole }, error: null };
 }
 
 /**

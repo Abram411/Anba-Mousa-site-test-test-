@@ -1,13 +1,22 @@
 {
-  "currentChurchYear": "2026–2027",
+  "currentChurchYear": "2027–2028",
   "churchYears": {
     "2026–2027": {
       "id": "year-2026-2027",
       "year": "2026–2027",
-      "status": "ACTIVE",
+      "status": "ARCHIVED",
       "startDate": "2026-09-01",
-      "createdAt": "2026-10-10T08:22:36.061Z",
-      "createdBy": "system"
+      "createdAt": "2026-10-10T11:34:58.345Z",
+      "createdBy": "system",
+      "endDate": "2026-10-10"
+    },
+    "2027–2028": {
+      "id": "year-2027-2028",
+      "year": "2027–2028",
+      "status": "ACTIVE",
+      "startDate": "2026-10-10",
+      "createdAt": "2026-10-10T11:34:58.649Z",
+      "createdBy": "admin_bishop"
     }
   },
   "classInstances": {
@@ -22,8 +31,8 @@
         "other",
         "user_teacher_other_404"
       ],
-      "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     "inst_2026-2027_primary_1": {
       "id": "inst_2026-2027_primary_1",
@@ -36,8 +45,8 @@
         "mina",
         "user_teacher_mina_101"
       ],
-      "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     "inst_2026-2027_primary_2": {
       "id": "inst_2026-2027_primary_2",
@@ -45,13 +54,15 @@
       "classGroupId": "primary_2",
       "nameEn": "Primary 4–6",
       "nameAr": "فصل ابتدائي 4–6",
-      "code": "MUSA-P46B",
+      "code": "MUSA-6EXN",
       "servantIds": [
         "mina",
-        "user_teacher_mina_101"
+        "user_teacher_mina_101",
+        "other"
       ],
-      "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z",
+      "updatedAt": "2026-10-10T11:34:58.616Z"
     },
     "inst_2026-2027_preparatory": {
       "id": "inst_2026-2027_preparatory",
@@ -64,8 +75,8 @@
         "other",
         "user_teacher_other_404"
       ],
-      "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     "inst_2026-2027_secondary": {
       "id": "inst_2026-2027_secondary",
@@ -78,8 +89,8 @@
         "other",
         "user_teacher_other_404"
       ],
-      "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     "inst_2026-2027_university": {
       "id": "inst_2026-2027_university",
@@ -92,8 +103,93 @@
         "mina",
         "user_teacher_mina_101"
       ],
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-10T11:34:58.345Z"
+    },
+    "inst_2027-2028_angels": {
+      "id": "inst_2027-2028_angels",
+      "churchYear": "2027–2028",
+      "classGroupId": "angels",
+      "nameEn": "Angels",
+      "nameAr": "فصل الملايكة",
+      "code": "MUSA-JGRU",
+      "servantIds": [
+        "other",
+        "user_teacher_other_404"
+      ],
       "status": "ACTIVE",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.649Z"
+    },
+    "inst_2027-2028_primary_1": {
+      "id": "inst_2027-2028_primary_1",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_1",
+      "nameEn": "Primary 1–3",
+      "nameAr": "فصل ابتدائي 1–3",
+      "code": "MUSA-FPNN",
+      "servantIds": [
+        "mina",
+        "user_teacher_mina_101"
+      ],
+      "status": "ACTIVE",
+      "createdAt": "2026-10-10T11:34:58.649Z"
+    },
+    "inst_2027-2028_primary_2": {
+      "id": "inst_2027-2028_primary_2",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "nameEn": "Primary 4–6",
+      "nameAr": "فصل ابتدائي 4–6",
+      "code": "MUSA-SLE2",
+      "servantIds": [
+        "mina",
+        "user_teacher_mina_101",
+        "other"
+      ],
+      "status": "ACTIVE",
+      "createdAt": "2026-10-10T11:34:58.649Z"
+    },
+    "inst_2027-2028_preparatory": {
+      "id": "inst_2027-2028_preparatory",
+      "churchYear": "2027–2028",
+      "classGroupId": "preparatory",
+      "nameEn": "Preparatory",
+      "nameAr": "فصل إعدادي",
+      "code": "MUSA-CUQ3",
+      "servantIds": [
+        "other",
+        "user_teacher_other_404"
+      ],
+      "status": "ACTIVE",
+      "createdAt": "2026-10-10T11:34:58.649Z"
+    },
+    "inst_2027-2028_secondary": {
+      "id": "inst_2027-2028_secondary",
+      "churchYear": "2027–2028",
+      "classGroupId": "secondary",
+      "nameEn": "Secondary",
+      "nameAr": "فصل ثانوي",
+      "code": "MUSA-GWDS",
+      "servantIds": [
+        "other",
+        "user_teacher_other_404"
+      ],
+      "status": "ACTIVE",
+      "createdAt": "2026-10-10T11:34:58.649Z"
+    },
+    "inst_2027-2028_university": {
+      "id": "inst_2027-2028_university",
+      "churchYear": "2027–2028",
+      "classGroupId": "university",
+      "nameEn": "University",
+      "nameAr": "فصل جامعة",
+      "code": "MUSA-L7RF",
+      "servantIds": [
+        "mina",
+        "user_teacher_mina_101"
+      ],
+      "status": "ACTIVE",
+      "createdAt": "2026-10-10T11:34:58.649Z"
     }
   },
   "classMemberships": {
@@ -106,8 +202,8 @@
       "studentName": "Mark Shenouda",
       "exactGrade": "Grade 4",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-10T08:22:36.061Z",
-      "enrolledBy": "servant"
+      "enrolledAt": "2026-10-10T11:34:58.611Z",
+      "enrolledBy": "join_code"
     },
     "mem_david_2026-2027": {
       "id": "mem_david_2026-2027",
@@ -118,7 +214,7 @@
       "studentName": "David Emad",
       "exactGrade": "Grade 5",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-10T08:22:36.061Z",
+      "enrolledAt": "2026-10-10T11:34:58.345Z",
       "enrolledBy": "servant"
     },
     "mem_other_2026-2027": {
@@ -130,8 +226,203 @@
       "studentName": "Peter Fadi",
       "exactGrade": "Prep 1",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-10T08:22:36.061Z",
+      "enrolledAt": "2026-10-10T11:34:58.345Z",
       "enrolledBy": "servant"
+    },
+    "mem_student_late_joiner_2026-2027": {
+      "id": "mem_student_late_joiner_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2026-2027_primary_2",
+      "studentId": "student_late_joiner",
+      "studentName": "student_late_joiner",
+      "exactGrade": "Grade 4",
+      "status": "REMOVED",
+      "enrolledAt": "2026-10-10T11:34:58.619Z",
+      "enrolledBy": "join_code",
+      "removedAt": "2026-10-10T11:34:58.628Z",
+      "removedBy": "mina",
+      "removalReason": "Transferred to another congregation"
+    },
+    "mem_student_kg1_test_2026-2027": {
+      "id": "mem_student_kg1_test_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "angels",
+      "classInstanceId": "inst_2026-2027_angels",
+      "studentId": "student_kg1_test",
+      "studentName": "student_kg1_test",
+      "exactGrade": "KG1",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.638Z",
+      "enrolledBy": "admin_bishop"
+    },
+    "mem_student_p3_test_2026-2027": {
+      "id": "mem_student_p3_test_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_1",
+      "classInstanceId": "inst_2026-2027_primary_1",
+      "studentId": "student_p3_test",
+      "studentName": "student_p3_test",
+      "exactGrade": "Primary 3",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.640Z",
+      "enrolledBy": "admin_bishop"
+    },
+    "mem_student_prep3_test_2026-2027": {
+      "id": "mem_student_prep3_test_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "preparatory",
+      "classInstanceId": "inst_2026-2027_preparatory",
+      "studentId": "student_prep3_test",
+      "studentName": "student_prep3_test",
+      "exactGrade": "Prep 3",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.641Z",
+      "enrolledBy": "admin_bishop"
+    },
+    "mem_student_sec3_test_2026-2027": {
+      "id": "mem_student_sec3_test_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "secondary",
+      "classInstanceId": "inst_2026-2027_secondary",
+      "studentId": "student_sec3_test",
+      "studentName": "student_sec3_test",
+      "exactGrade": "Secondary 3",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.643Z",
+      "enrolledBy": "admin_bishop"
+    },
+    "mem_student_repeat_test_2026-2027": {
+      "id": "mem_student_repeat_test_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2026-2027_primary_2",
+      "studentId": "student_repeat_test",
+      "studentName": "student_repeat_test",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.645Z",
+      "enrolledBy": "admin_bishop"
+    },
+    "mem_mark_2027-2028": {
+      "id": "mem_mark_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "mark",
+      "studentName": "Mark Shenouda",
+      "exactGrade": "Grade 5",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_user_student_mark_101_2027-2028": {
+      "id": "mem_user_student_mark_101_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "user_student_mark_101",
+      "studentName": "Mark Shenouda",
+      "exactGrade": "Grade 5",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student-david_2027-2028": {
+      "id": "mem_student-david_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "student-david",
+      "studentName": "David Emad",
+      "exactGrade": "Grade 6",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_c1_2027-2028": {
+      "id": "mem_c1_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "c1",
+      "studentName": "Mina Emad",
+      "exactGrade": "Grade 5",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_other_2027-2028": {
+      "id": "mem_other_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "preparatory",
+      "classInstanceId": "inst_2027-2028_preparatory",
+      "studentId": "other",
+      "studentName": "Peter Fadi",
+      "exactGrade": "Prep 2",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student_kg1_test_2027-2028": {
+      "id": "mem_student_kg1_test_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "angels",
+      "classInstanceId": "inst_2027-2028_angels",
+      "studentId": "student_kg1_test",
+      "studentName": "student_kg1_test",
+      "exactGrade": "KG2",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student_p3_test_2027-2028": {
+      "id": "mem_student_p3_test_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "student_p3_test",
+      "studentName": "student_p3_test",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student_prep3_test_2027-2028": {
+      "id": "mem_student_prep3_test_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "secondary",
+      "classInstanceId": "inst_2027-2028_secondary",
+      "studentId": "student_prep3_test",
+      "studentName": "student_prep3_test",
+      "exactGrade": "Secondary 1",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student_sec3_test_2027-2028": {
+      "id": "mem_student_sec3_test_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "university",
+      "classInstanceId": "inst_2027-2028_university",
+      "studentId": "student_sec3_test",
+      "studentName": "student_sec3_test",
+      "exactGrade": "University",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
+    },
+    "mem_student_repeat_test_2027-2028": {
+      "id": "mem_student_repeat_test_2027-2028",
+      "churchYear": "2027–2028",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2027-2028_primary_2",
+      "studentId": "student_repeat_test",
+      "studentName": "student_repeat_test",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-10T11:34:58.649Z",
+      "enrolledBy": "promotion_engine"
     }
   },
   "teacherAssignments": {
@@ -143,7 +434,8 @@
     ],
     "other": [
       "preparatory",
-      "angels"
+      "angels",
+      "primary_2"
     ],
     "user_teacher_other_404": [
       "preparatory",
@@ -168,81 +460,115 @@
     "mark": {
       "studentId": "mark",
       "fullName": "Mark Shenouda",
-      "grade": "Grade 4",
+      "grade": "Grade 5",
       "classGroupId": "primary_2",
-      "churchYear": "2026–2027",
+      "churchYear": "2027–2028",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda"
     },
     "user_student_mark_101": {
       "studentId": "user_student_mark_101",
       "fullName": "Mark Shenouda",
-      "grade": "Grade 4",
+      "grade": "Grade 5",
       "classGroupId": "primary_2",
-      "churchYear": "2026–2027",
+      "churchYear": "2027–2028",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=MarkShenouda"
     },
     "student-david": {
       "studentId": "student-david",
       "fullName": "David Emad",
-      "grade": "Grade 5",
+      "grade": "Grade 6",
       "classGroupId": "primary_2",
+      "churchYear": "2027–2028",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=David"
     },
     "c1": {
       "studentId": "c1",
       "fullName": "Mina Emad",
-      "grade": "Grade 4",
+      "grade": "Grade 5",
       "classGroupId": "primary_2",
-      "churchYear": "2026–2027",
+      "churchYear": "2027–2028",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=MinaEmad"
     },
     "other": {
       "studentId": "other",
       "fullName": "Peter Fadi",
-      "grade": "Prep 1",
+      "grade": "Prep 2",
       "classGroupId": "preparatory",
-      "churchYear": "2026–2027",
+      "churchYear": "2027–2028",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Peter"
+    },
+    "student_kg1_test": {
+      "studentId": "student_kg1_test",
+      "fullName": "student_kg1_test",
+      "grade": "KG2",
+      "classGroupId": "angels",
+      "churchYear": "2027–2028",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_kg1_test"
+    },
+    "student_p3_test": {
+      "studentId": "student_p3_test",
+      "fullName": "student_p3_test",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "churchYear": "2027–2028",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_p3_test"
+    },
+    "student_prep3_test": {
+      "studentId": "student_prep3_test",
+      "fullName": "student_prep3_test",
+      "grade": "Secondary 1",
+      "classGroupId": "secondary",
+      "churchYear": "2027–2028",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_prep3_test"
+    },
+    "student_sec3_test": {
+      "studentId": "student_sec3_test",
+      "fullName": "student_sec3_test",
+      "grade": "University",
+      "classGroupId": "university",
+      "churchYear": "2027–2028",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_sec3_test"
+    },
+    "student_repeat_test": {
+      "studentId": "student_repeat_test",
+      "fullName": "student_repeat_test",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "churchYear": "2027–2028",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_repeat_test"
     }
   },
-  "teacherStudentRelationships": [
-    {
-      "teacherId": "mina",
-      "studentId": "student-david",
-      "relationshipType": "teacher_student",
-      "createdAt": "2026-10-10T08:22:36.072Z"
-    }
-  ],
+  "teacherStudentRelationships": [],
   "parentChildRelationships": [
     {
       "parentId": "mary",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     {
       "parentId": "mary",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "mark",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     {
       "parentId": "user_parent_mary_301",
       "childId": "student-david",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.345Z"
     },
     {
       "parentId": "other_parent",
       "childId": "other",
       "relationshipType": "parent_child",
-      "createdAt": "2026-10-10T08:22:36.061Z"
+      "createdAt": "2026-10-10T11:34:58.345Z"
     }
   ],
   "activationRequests": {
@@ -256,7 +582,7 @@
       "requestedGrade": "Grade 4",
       "notes": "New student joining Sunday school with Servant Mina",
       "status": "PENDING_APPROVAL",
-      "requestedAt": "2026-10-10T07:22:36.061Z"
+      "requestedAt": "2026-10-10T10:34:58.345Z"
     }
   }
 }
