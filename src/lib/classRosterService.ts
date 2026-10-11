@@ -214,10 +214,19 @@ export async function assignStudentClass(
         if (enrollRes.success) {
           return { success: true, error: null, membershipId: enrollRes.membershipId };
         }
-        return {
-          success: false,
-          error: new Error(enrollRes.error || 'Failed to enroll student into class')
-        };
+        // If student is not in Supabase profiles (e.g. demo/mock code, local state), fall through to server endpoint
+        if (
+          enrollRes.error?.includes('STUDENT_NOT_FOUND') ||
+          enrollRes.error?.includes('syntax for type uuid') ||
+          enrollRes.error?.includes('not found')
+        ) {
+          // fall through to server endpoint
+        } else {
+          return {
+            success: false,
+            error: new Error(enrollRes.error || 'Failed to enroll student into class')
+          };
+        }
       }
     } catch (err: any) {
       return { success: false, error: new Error(err?.message || 'Database enrollment error') };

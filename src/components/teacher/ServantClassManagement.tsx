@@ -97,7 +97,10 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
     try {
       const res = await getPendingActivationRequests(groupId);
       if (res.success) {
-        setPendingRequests(res.requests || []);
+        const pending = (res.requests || []).filter(
+          r => !r.status || r.status === 'PENDING_APPROVAL'
+        );
+        setPendingRequests(pending);
       }
     } catch (_) {
     } finally {
@@ -251,6 +254,9 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
     setRequestActionSuccess(null);
     setAssignmentError(null);
 
+    // Optimistically remove request from list immediately
+    setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+
     try {
       const res = await reviewActivationRequest({
         requestId,
@@ -261,19 +267,22 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
 
       if (!res.success) {
         setAssignmentError(res.error || (isAr ? 'فشل معالجة الطلب' : 'Failed to process request'));
+        // Rollback request list on failure
+        await loadRequests(classInfo?.classGroupId);
         return;
       }
 
       setRequestActionSuccess(
         action === 'APPROVE'
           ? (isAr ? 'تمت الموافقة على الطالب وتسكينه في كشف الفصل بنجاح!' : 'Student approved and enrolled into official roster successfully!')
-          : (isAr ? 'تم رفض الطلب' : 'Request rejected')
+          : (isAr ? 'تم رفض الطلب بنجاح وتمت إزالته من القائمة' : 'Request rejected and removed from pending list')
       );
 
       // Refresh both pending requests and authoritative roster
       await loadClassData();
     } catch (err: any) {
       setAssignmentError(err?.message || 'Error processing request');
+      await loadRequests(classInfo?.classGroupId);
     } finally {
       setProcessingRequestId(null);
     }
