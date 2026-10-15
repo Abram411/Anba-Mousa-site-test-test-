@@ -303,7 +303,7 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}_${baseClean}${cleanExt}`);
   }
 });
-const upload = multer({ 
+const upload: any = multer({ 
   storage,
   limits: { fileSize: 150 * 1024 * 1024 } // 150 MB max per file
 });
@@ -8789,7 +8789,7 @@ app.post("/api/upload-media", upload.single("media"), async (req, res) => {
 
     // Server Persistence (/uploads/...)
     // File already safely stored on disk in uploadsDir by multer
-    const authContext = await verifyServerRequestAuth(req);
+    const authContext = await verifyServerRequestAuth(req as any);
     const uploaderId = authContext.userId || (typeof req.body.userId === "string" ? req.body.userId : null);
     const uploadType = req.body.type || (req.body.isFeed ? "feed" : "source");
     const lessonId = typeof req.body.lessonId === "string" ? req.body.lessonId : null;
