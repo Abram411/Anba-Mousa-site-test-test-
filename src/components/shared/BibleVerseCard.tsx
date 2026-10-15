@@ -60,7 +60,7 @@ export function BibleVerseCard({ lang }: { lang: Language }) {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-linear-to-br from-amber-400 via-amber-500 to-amber-600 text-amber-950 dark:text-slate-900 p-5 rounded-3xl shadow-sm relative overflow-hidden min-h-[140px]"
+        className="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-amber-950 p-5 rounded-3xl shadow-sm relative overflow-hidden min-h-[140px]"
       >
         <div className="absolute -right-4 -top-4 opacity-15 pointer-events-none">
           <BookOpen size={110} />

@@ -12,9 +12,6 @@ import { ParentDashboard } from './components/parent/ParentDashboard';
 import { CopticCalendarTab } from './components/coptic/CopticCalendarTab';
 import { HymnsSchoolTab } from './components/hymns/HymnsSchoolTab';
 import { AgpeyaPrayerTab } from './components/agpeya/AgpeyaPrayerTab';
-import { DesignSystemPage } from './components/design-system/DesignSystemPage';
-import { BrandGuidelinesPage } from './components/design-system/BrandGuidelinesPage';
-import { TranslationQADashboard } from './components/design-system/TranslationQADashboard';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { StudentOnboardingModal } from './components/auth/StudentOnboardingModal';
 import { OfflineIndicator } from './components/layout/OfflineIndicator';
@@ -30,7 +27,7 @@ function AppContent() {
       const saved = localStorage.getItem('church_app_lang');
       if (saved === 'ar' || saved === 'en' || saved === 'cop' || saved === 'copt') return saved;
     }
-    return 'en';
+    return 'ar';
   });
 
   const setLang = (newLang: Language) => {
@@ -189,12 +186,6 @@ function AppContent() {
             lang={lang}
           />
         );
-      case 'designSystem':
-        return <DesignSystemPage lang={lang} setLang={setLang} />;
-      case 'brandGuidelines':
-        return <BrandGuidelinesPage lang={lang} />;
-      case 'localizationQa':
-        return <TranslationQADashboard lang={lang} />;
       default:
         return (
           <HomeTab

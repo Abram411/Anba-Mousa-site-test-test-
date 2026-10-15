@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface CopticBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'burgundy' | 'gold' | 'blue' | 'success' | 'warning' | 'danger' | 'neutral';
+  variant?: 'burgundy' | 'gold' | 'blue' | 'success' | 'warning' | 'danger' | 'neutral' | 'mousa-gold' | 'mousa-teal' | 'mousa-coral' | 'mousa-sand';
   size?: 'sm' | 'md';
   dot?: boolean;
   icon?: React.ReactNode;
@@ -30,7 +30,15 @@ export const CopticBadge: React.FC<CopticBadgeProps> = ({
     danger:
       'bg-[var(--color-danger)]/15 text-[var(--color-danger)] dark:text-[#E87E75] border-[var(--color-danger)]/30',
     neutral:
-      'bg-[var(--color-neutral)]/15 text-[var(--text-ink)] border-[var(--border-stone)]'
+      'bg-[var(--color-neutral)]/15 text-[var(--text-ink)] border-[var(--border-stone)]',
+    'mousa-gold':
+      'bg-[var(--mousa-gold)]/15 text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] border-[var(--mousa-gold)]/40 font-bold',
+    'mousa-teal':
+      'bg-[var(--mousa-teal)]/15 text-[var(--mousa-teal)] dark:text-[var(--mousa-teal-glow)] border-[var(--mousa-teal)]/40 font-bold',
+    'mousa-coral':
+      'bg-[var(--mousa-coral)]/15 text-[var(--mousa-coral)] dark:text-[var(--mousa-coral-glow)] border-[var(--mousa-coral)]/40 font-bold',
+    'mousa-sand':
+      'bg-[var(--mousa-sand-200)] text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-500)] border-[var(--mousa-border-sand)] font-medium'
   };
 
   const dotColors = {
@@ -40,7 +48,11 @@ export const CopticBadge: React.FC<CopticBadgeProps> = ({
     success: 'bg-[var(--color-success)]',
     warning: 'bg-[var(--color-warning)]',
     danger: 'bg-[var(--color-danger)]',
-    neutral: 'bg-[var(--color-neutral)]'
+    neutral: 'bg-[var(--color-neutral)]',
+    'mousa-gold': 'bg-[var(--mousa-gold)]',
+    'mousa-teal': 'bg-[var(--mousa-teal)]',
+    'mousa-coral': 'bg-[var(--mousa-coral)]',
+    'mousa-sand': 'bg-[var(--mousa-sand-400)]'
   };
 
   const sizeStyles = {

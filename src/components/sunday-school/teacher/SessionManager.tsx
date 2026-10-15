@@ -19,6 +19,7 @@ interface SessionManagerProps {
   onSelectSession: (id: string) => void;
   onCreateSession: (data: Partial<ClassSession>) => void;
   onUpdateSession: (id: string, updates: Partial<ClassSession>) => void;
+  onOpenPublishLesson?: () => void;
 }
 
 export const SessionManager: React.FC<SessionManagerProps> = ({
@@ -27,6 +28,7 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
   onSelectSession,
   onCreateSession,
   onUpdateSession,
+  onOpenPublishLesson,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
@@ -74,12 +76,24 @@ export const SessionManager: React.FC<SessionManagerProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> New Class Session
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenPublishLesson && (
+            <button
+              onClick={onOpenPublishLesson}
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>+ Publish Lesson (نشر درس)</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> New Class Session
+          </button>
+        </div>
       </div>
 
       {/* Session Selection Grid / Strip */}

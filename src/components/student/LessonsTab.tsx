@@ -5,6 +5,7 @@ import { useLessons } from '../../context/LessonsContext';
 import { useAuth } from '../../context/AuthContext';
 import { Lesson, Language } from '../../types';
 import { LessonEditModal } from '../teacher/LessonEditModal';
+import { ExpressLessonPublishModal } from '../teacher/ExpressLessonPublishModal';
 import { formatStudentClassDisplay } from '../../lib/classGroups';
 import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
 
@@ -21,6 +22,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
   const [filterMode, setFilterMode] = useState<'all' | 'published' | 'drafts'>('all');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [showClassModal, setShowClassModal] = useState<boolean>(false);
+  const [showExpressPublishModal, setShowExpressPublishModal] = useState<boolean>(false);
 
   const isTeacher = userData?.role === 'teacher';
 
@@ -61,29 +63,37 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-[var(--color-church-blue)] p-2.5 md:p-3 rounded-2xl text-white shadow-sm">
+          <div className="bg-[var(--mousa-teal)] p-2.5 md:p-3 rounded-2xl text-[var(--mousa-gold-glow)] shadow-xs">
             <BookOpen size={24} className="md:w-8 md:h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[var(--color-church-blue)] md:text-3xl">
-              {lang === 'copt' ? 'Ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ' : lang === 'ar' ? 'دروس مدارس الأحد' : 'Sunday School Lessons'}
+            <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-3xl">
+              {lang === 'copt' ? 'Ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ' : lang === 'ar' ? 'محطات دروس مدارس الأحد' : 'Sunday School Milestones'}
             </h1>
-            <p className="text-xs md:text-sm text-gray-500">
-              {lang === 'copt' ? 'Ϩⲁⲛⲥⲃⲱ ⲙ̀ⲡⲛⲉⲩⲙⲁⲧⲓⲕⲟⲛ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'محتوى روحي، قصص كتابية، واختبارات تفاعلية' : 'Spiritual curriculum, Bible stories & interactive quizzes'}
+            <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+              {lang === 'copt' ? 'Ϩⲁⲛⲥⲃⲱ ⲙ̀ⲡⲛⲉⲩⲙⲁⲧⲓⲕⲟⲛ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'مسيرة الأنبا موسى الروحية، قصص كتابية واختبارات تفاعلية' : 'Journey of Moses spiritual trail, Bible stories & interactive quizzes'}
             </p>
           </div>
         </div>
 
-        {/* Teacher Action Controls */}
+        {/* Teacher Action Controls: Primary Publish Lesson Funnel */}
         {isTeacher && (
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowExpressPublishModal(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-105 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus size={16} className="stroke-[3]" />
+              <span>{lang === 'copt' ? '+ Ϩⲓⲱⲓϣ ⲛ̀ϯⲥⲃⲱ' : lang === 'ar' ? '+ نشر درس جديد' : '+ Publish Lesson'}</span>
+            </button>
+
             {onOpenTeacherStudio && (
               <button
                 onClick={onOpenTeacherStudio}
-                className="px-4 py-2.5 rounded-xl bg-[var(--color-church-gold)] hover:bg-[var(--color-church-gold-light)] text-[var(--color-church-blue)] font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                className="px-3.5 py-2.5 rounded-xl bg-[var(--mousa-cream-surface)] hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] font-bold text-xs sm:text-sm flex items-center gap-1.5 border border-[var(--mousa-border-sand)] transition-all cursor-pointer shadow-2xs"
               >
-                <Sparkles size={16} />
-                <span>{lang === 'copt' ? '+ Ⲑⲁⲙⲓⲟ ⲛ̀ϯⲥⲃⲱ (AI)' : lang === 'ar' ? '+ إعداد درس بالذكاء الاصطناعي' : '+ Create Lesson with AI'}</span>
+                <span>⛪</span>
+                <span>{lang === 'ar' ? 'استوديو الخادم' : 'Teacher Studio'}</span>
               </button>
             )}
           </div>
@@ -93,7 +103,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
         {!isTeacher && (
           <button
             onClick={() => setShowClassModal(true)}
-            className="px-3.5 py-2 rounded-2xl bg-white border border-[var(--color-church-cream-dark)] text-xs font-bold text-gray-700 hover:border-amber-400 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-2 rounded-2xl bg-[var(--mousa-cream-surface)] border border-[var(--mousa-border-sand)] text-xs font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] hover:border-[var(--mousa-gold)] transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title={lang === 'ar' ? 'تعديل أو مراجعة فصلك الدراسي' : 'Change or review your Sunday School class'}
           >
             <span>⛪</span>
@@ -104,7 +114,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                     : (lang === 'ar' ? `فصلي: ${userData.grade}` : `Class: ${userData.grade}`))
                 : (lang === 'ar' ? 'تحديد فصل مدارس الأحد' : 'Select Class')}
             </span>
-            <span className="text-[10px] text-amber-600 underline">
+            <span className="text-[10px] text-[var(--mousa-coral)] font-bold underline">
               {lang === 'ar' ? 'تعديل' : 'Change'}
             </span>
           </button>
@@ -115,12 +125,12 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <div className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3' : 'left-0 pl-3'} flex items-center pointer-events-none`}>
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-[var(--mousa-sand-500)]" />
           </div>
           <input
             type="text"
-            placeholder={lang === 'copt' ? 'Ⲕⲱϯ ⲛ̀ⲥⲁ ⲟⲩⲥⲃⲱ...' : lang === 'ar' ? 'ابحث عن درس أو قصة كتابية...' : 'Search lessons or Bible stories...'}
-            className={`block w-full rounded-xl border border-gray-200 bg-white py-2.5 ${lang === 'ar' ? 'pr-9 pl-4' : 'pl-9 pr-4'} text-xs sm:text-sm placeholder-gray-400 focus:border-[var(--color-church-gold)] focus:outline-none focus:ring-1 focus:ring-[var(--color-church-gold)] transition-colors shadow-2xs`}
+            placeholder={lang === 'copt' ? 'Ⲕⲱϯ ⲛ̀ⲥⲁ ⲟⲩⲥⲃⲱ...' : lang === 'ar' ? 'ابحث عن محطة أو درس في البرية...' : 'Search desert milestones or Bible stories...'}
+            className={`block w-full rounded-2xl border border-[var(--mousa-border-sand)] bg-[var(--mousa-cream-surface)] py-2.5 ${lang === 'ar' ? 'pr-9 pl-4' : 'pl-9 pr-4'} text-xs sm:text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] placeholder-[var(--mousa-sand-500)] focus:border-[var(--mousa-gold)] focus:outline-none focus:ring-1 focus:ring-[var(--mousa-gold)] transition-colors shadow-2xs`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -128,22 +138,22 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
 
         {/* Teacher status filter tabs */}
         {isTeacher && (
-          <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold text-gray-600 self-start sm:self-auto">
+          <div className="flex bg-[var(--mousa-sand-100)] dark:bg-stone-900 p-1 rounded-2xl text-xs font-bold text-[var(--mousa-sand-600)] self-start sm:self-auto border border-[var(--mousa-border-sand)]">
             <button
               onClick={() => setFilterMode('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${filterMode === 'all' ? 'bg-white text-[var(--color-church-blue)] shadow-2xs' : 'hover:text-gray-900'}`}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${filterMode === 'all' ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-2xs' : 'hover:text-[var(--mousa-teal-deep)]'}`}
             >
               {lang === 'copt' ? 'Ⲡⲧⲏⲣϥ' : lang === 'ar' ? 'الكل' : 'All'}
             </button>
             <button
               onClick={() => setFilterMode('published')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${filterMode === 'published' ? 'bg-white text-emerald-700 shadow-2xs' : 'hover:text-gray-900'}`}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${filterMode === 'published' ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-2xs' : 'hover:text-[var(--mousa-teal-deep)]'}`}
             >
               {lang === 'copt' ? 'Ⲉⲧϩⲓⲱⲓϣ' : lang === 'ar' ? 'المنشورة' : 'Published'}
             </button>
             <button
               onClick={() => setFilterMode('drafts')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${filterMode === 'drafts' ? 'bg-white text-amber-700 shadow-2xs' : 'hover:text-gray-900'}`}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${filterMode === 'drafts' ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-2xs' : 'hover:text-[var(--mousa-teal-deep)]'}`}
             >
               {lang === 'copt' ? 'Ϩⲁⲛⲥϧⲁⲓ' : lang === 'ar' ? 'المسودات' : 'Drafts'}
             </button>
@@ -163,15 +173,17 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.25, delay: index * 0.04 }}
-                className={`bg-white rounded-3xl p-5 md:p-6 shadow-sm border flex flex-col transition-all hover:shadow-md ${
-                  lesson.isCompleted ? 'border-green-200' : 'border-[var(--color-church-cream-dark)]'
+                className={`rounded-3xl p-5 md:p-6 shadow-xs border-2 flex flex-col justify-between transition-all hover:shadow-md ${
+                  lesson.isCompleted 
+                    ? 'bg-[#FDFBF7] dark:bg-[#1E1914] border-[var(--mousa-gold)]/60' 
+                    : 'bg-[var(--mousa-cream-surface)] dark:bg-[#221B15] border-[var(--mousa-border-sand)] hover:border-[var(--mousa-gold)]'
                 }`}
               >
                 {/* Card Header with Title & Badges */}
                 <div className="flex justify-between items-start mb-2 gap-2">
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-base md:text-lg text-[var(--color-church-blue)] leading-snug">
+                      <h3 className="font-extrabold text-base md:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] leading-snug">
                         {lang === 'ar' 
                           ? (lesson.titleAr || lesson.title) 
                           : lang === 'copt' || lang === 'cop'
@@ -179,10 +191,10 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                             : lesson.title}
                       </h3>
                       {isTeacher && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                           lesson.status === 'published'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300'
                         }`}>
                           {lesson.status === 'published' 
                             ? (lang === 'copt' || lang === 'cop' ? 'Ⲉⲧϩⲓⲱⲓϣ ✅' : lang === 'ar' ? 'منشور ✅' : 'Published') 
@@ -190,7 +202,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                         </span>
                       )}
                       {lesson.grade && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-900 border border-amber-200/80 flex items-center gap-1">
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[var(--mousa-sand-100)] text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] border border-[var(--mousa-border-sand)] flex items-center gap-1">
                           <span>{formatStudentClassDisplay(lesson.grade, lang).icon}</span>
                           <span>{formatStudentClassDisplay(lesson.grade, lang).fullDisplay}</span>
                         </span>
@@ -199,16 +211,16 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                   </div>
 
                   {lesson.isCompleted ? (
-                    <CheckCircle className="text-green-500 shrink-0" size={22} fill="currentColor" stroke="white" />
+                    <CheckCircle className="text-emerald-600 shrink-0" size={22} fill="currentColor" stroke="white" />
                   ) : (
-                    <div className="bg-[var(--color-church-cream)] text-[var(--color-church-gold)] text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-2xs">
-                      {lesson.pointsAvailable || 150} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'}
+                    <div className="bg-[var(--mousa-gold-soft)] text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] border border-[var(--mousa-gold)]/30 text-xs font-black px-2.5 py-1 rounded-full whitespace-nowrap shadow-2xs">
+                      +{lesson.pointsAvailable || 150} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'}
                     </div>
                   )}
                 </div>
                 
                 {/* Summary */}
-                <p className="text-gray-600 text-xs md:text-sm mb-5 flex-1 leading-relaxed line-clamp-3" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                <p className="text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] text-xs md:text-sm mb-5 flex-1 leading-relaxed line-clamp-3" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                   {lang === 'ar' 
                     ? (lesson.summaryAr || lesson.summary) 
                     : lang === 'copt' || lang === 'cop'
@@ -217,8 +229,8 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                 </p>
                 
                 {/* Footer Actions */}
-                <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100 gap-2">
-                  <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-[var(--mousa-border-sand)]/60 gap-2">
+                  <span className="text-[11px] text-[var(--mousa-sand-500)] font-medium flex items-center gap-1">
                     <Clock size={13} /> 
                     <span>{lesson.date}</span>
                   </span>
@@ -228,7 +240,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                     {isTeacher && (
                       <button
                         onClick={() => setEditingLesson(lesson)}
-                        className="px-3 py-1.5 rounded-xl bg-blue-50 text-[var(--color-church-blue)] hover:bg-blue-100 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--mousa-sand-100)] text-[var(--mousa-teal)] hover:bg-[var(--mousa-sand-200)] text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer border border-[var(--mousa-border-sand)]"
                         title={lang === 'copt' ? 'Ϣⲉⲃⲓⲱ' : lang === 'ar' ? 'تعديل هذا الدرس' : 'Edit lesson'}
                       >
                         <Edit3 size={13} />
@@ -239,10 +251,10 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                     {/* Start / Review Button */}
                     <button 
                       onClick={() => onStartLesson(lesson.id)}
-                      className={`px-4 py-1.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1 ${
+                      className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
                         lesson.isCompleted 
-                          ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' 
-                          : 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] hover:bg-[var(--color-church-gold-light)] shadow-xs'
+                          ? 'bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] hover:bg-[var(--mousa-sand-200)]' 
+                          : 'bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] text-white hover:brightness-105 active:scale-95'
                       }`}
                     >
                       {isTeacher && <Eye size={14} />}
@@ -251,7 +263,7 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
                           ? (lang === 'copt' ? 'Ⲟⲩⲁϩⲙⲉϥ' : lang === 'ar' ? 'مراجعة' : 'Review') 
                           : (isTeacher 
                               ? (lang === 'copt' ? 'Ⲛⲁⲩ' : lang === 'ar' ? 'معاينة' : 'Preview') 
-                              : (lang === 'copt' ? 'Ⲁⲣⲓϩⲏⲧⲥ' : lang === 'ar' ? 'ابدأ' : 'Start'))}
+                              : (lang === 'copt' ? 'Ⲁⲣⲓϩⲏⲧⲥ' : lang === 'ar' ? 'ابدأ المحطة' : 'Begin Milestone'))}
                       </span>
                     </button>
                   </div>
@@ -263,13 +275,13 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="text-center py-12 bg-white rounded-3xl border border-gray-100 shadow-sm col-span-full space-y-2"
+              className="text-center py-12 bg-[var(--mousa-cream-surface)] rounded-3xl border-2 border-[var(--mousa-border-sand)] shadow-xs col-span-full space-y-2"
             >
-              <Search className="mx-auto h-10 w-10 text-gray-300 mb-1" />
-              <h3 className="text-base font-bold text-gray-800">
-                {lang === 'copt' ? 'Ⲙ̀ⲙⲟⲛ ϩⲁⲛⲥⲃⲱ ⲉⲩϣⲱⲡ' : lang === 'ar' ? 'لا توجد دروس مطابقة' : 'No lessons found'}
+              <div className="text-3xl mb-2">🏜️</div>
+              <h3 className="text-base font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                {lang === 'copt' ? 'Ⲙ̀ⲙⲟⲛ ϩⲁⲛⲥⲃⲱ ⲉⲩϣⲱⲡ' : lang === 'ar' ? 'لا توجد دروس أو محطات مطابقة' : 'No milestones found'}
               </h3>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--mousa-sand-500)]">
                 {lang === 'copt' ? 'Ⲕⲱϯ ϧⲉⲛ ϩⲁⲛⲥⲁϫⲓ ⲕⲉⲭⲱⲟⲩⲛⲓ.' : lang === 'ar' ? 'جرب البحث بكلمات أخرى أو تغيير الفلتر.' : 'Try adjusting your search terms or filter mode.'}
               </p>
             </motion.div>
@@ -304,6 +316,19 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
           }}
         />
       )}
+
+      {/* Express Lesson Publishing Modal (AI-Free Servant Funnel) */}
+      <ExpressLessonPublishModal
+        isOpen={showExpressPublishModal}
+        onClose={() => setShowExpressPublishModal(false)}
+        lang={lang === 'ar' ? 'ar' : 'en'}
+        defaultGrade={userData?.grade || '4th Grade'}
+        onLessonCreated={async () => {
+          if (refreshCurriculum) {
+            await refreshCurriculum();
+          }
+        }}
+      />
     </motion.div>
   );
 }

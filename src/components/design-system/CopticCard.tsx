@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface CopticCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'interactive' | 'sacred' | 'media' | 'status';
+  variant?: 'default' | 'interactive' | 'sacred' | 'media' | 'status' | 'mousa-sand' | 'mousa-quest';
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
@@ -29,7 +29,11 @@ export const CopticCard: React.FC<CopticCardProps> = ({
     media:
       'bg-[var(--surface-card)] border border-[var(--border-stone)] shadow-xs rounded-2xl overflow-hidden',
     status:
-      'bg-[var(--surface-elevated)] border border-[var(--border-stone)] rounded-xl'
+      'bg-[var(--surface-elevated)] border border-[var(--border-stone)] rounded-xl',
+    'mousa-sand':
+      'bg-[var(--mousa-cream-surface)] border border-[var(--mousa-border-sand)] shadow-xs rounded-2xl transition-all duration-200',
+    'mousa-quest':
+      'bg-[var(--mousa-cream-surface)] border-2 border-[var(--mousa-border-sand)] hover:border-[var(--mousa-gold)] shadow-md rounded-3xl relative overflow-hidden transition-all duration-200'
   };
 
   return (

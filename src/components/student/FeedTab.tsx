@@ -140,7 +140,6 @@ export function FeedTab({ lang }: { lang: Language }) {
     unlimited: boolean;
     notes: string;
   } | null>(null);
-  const [showStorageModal, setShowStorageModal] = useState(false);
 
   // Check cloud storage status on mount
   useEffect(() => {
@@ -452,32 +451,21 @@ export function FeedTab({ lang }: { lang: Language }) {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-church-blue)] md:text-3xl">
-            {lang === 'ar' ? 'مجتمع كنيسة القديس موسى' : 'Church Community Feed'}
+          <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-3xl">
+            {lang === 'ar' ? 'واحة مجتمع كنيسة القديس الأنبا موسى' : 'St. Moses Community Oasis'}
           </h1>
-          <p className="text-xs md:text-sm text-gray-500">
-            {lang === 'ar' ? 'مشاركات روحية، تأملات، وتواصل عائلة مدارس الأحد' : 'Spiritual reflections, verses & Sunday school fellowship'}
+          <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+            {lang === 'ar' ? 'مشاركات روحية، تأملات البرية، وتواصل عائلة مدارس الأحد' : 'Spiritual reflections, desert verses & Sunday School fellowship'}
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <button
-            onClick={() => setShowStorageModal(true)}
-            className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            title={lang === 'ar' ? 'سحابة الوسائط الكنسية' : 'Church Media Storage'}
-          >
-            <Database size={13} className="text-emerald-600" />
-            <span>
-              {lang === 'ar' ? 'مستودع الوسائط الكنسية' : 'Church Media Storage'}
-            </span>
-          </button>
-
           {isTeacher && (
-            <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold shadow-2xs flex items-center gap-1">
+            <span className="bg-[var(--mousa-coral-soft)] text-[var(--mousa-coral-dark)] border border-[var(--mousa-coral)]/30 px-3 py-1 rounded-full text-xs font-black shadow-2xs flex items-center gap-1">
               <ShieldCheck size={14} />
-              <span>{lang === 'ar' ? 'صلاحية إشراف' : 'Moderator'}</span>
+              <span>{lang === 'ar' ? 'إشراف الخادم' : 'Moderator'}</span>
             </span>
           )}
-          <div className="bg-blue-100 text-[var(--color-church-blue)] px-3 py-1 rounded-full text-xs font-bold shadow-2xs">
+          <div className="bg-[var(--mousa-gold-soft)] text-[var(--mousa-gold-dark)] border border-[var(--mousa-gold)]/30 px-3 py-1 rounded-full text-xs font-black shadow-2xs">
             {lang === 'ar' ? 'مراقب كنسياً' : 'Moderated'}
           </div>
         </div>
@@ -488,42 +476,42 @@ export function FeedTab({ lang }: { lang: Language }) {
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
         onClick={() => setIsComposeModalOpen(true)}
-        className="bg-[var(--color-church-blue)] text-white p-4 md:p-5 rounded-3xl flex items-center gap-3.5 shadow-md cursor-pointer"
+        className="bg-gradient-to-r from-[var(--mousa-teal-deep)] via-[#144E5B] to-[#103D46] border-2 border-[var(--mousa-gold)]/40 text-white p-4 md:p-5 rounded-3xl flex items-center gap-3.5 shadow-sm cursor-pointer"
       >
-        <div className="bg-white/20 p-2.5 rounded-2xl shrink-0">
-          <Share2 size={24} className="text-[var(--color-church-gold)]" />
+        <div className="bg-white/10 p-2.5 rounded-2xl shrink-0 border border-white/10">
+          <Share2 size={24} className="text-[var(--mousa-gold-glow)]" />
         </div>
         <div className="flex-1">
-          <p className="font-bold text-sm md:text-base">
+          <p className="font-black text-sm md:text-base text-white">
             {isTeacher 
               ? (isCop ? 'Ϩⲓⲟⲩⲓ̀ ⲛ̀ⲟⲩⲧⲁⲙⲟ ⲛ̀ⲧⲉ ϯⲇⲓⲁⲕⲟⲛⲓⲁ ⲓⲉ ⲟⲩⲙⲉⲩⲓ' : lang === 'ar' ? 'نشر إعلان خدمة أو تأمل روحي' : 'Post Servant Announcement or Reflection') 
               : (isCop ? 'Ϣⲱⲡ ⲛ̀ⲟⲩⲣⲏϯ ⲓⲉ ⲟⲩⲙⲉⲩⲓ ⲛⲉⲙ ⲧⲉⲕⲉⲕⲕⲗⲏⲥⲓⲁ!' : lang === 'ar' ? 'شارك آية أو تأمل مع كنيستك!' : 'Share a verse or reflection with church!')}
           </p>
-          <p className="text-xs text-blue-200 mt-0.5">
+          <p className="text-xs text-stone-200 mt-0.5">
             {isTeacher 
               ? (isCop ? 'Ⲙ̀ⲫⲣⲏϯ ⲛ̀ⲟⲩⲇⲓⲁⲕⲟⲛ, ⲟⲩⲟⲛ ϣϫⲟⲙ ⲉ̀ⲧⲁϫⲣⲟ ⲛⲓⲧⲁⲙⲟ' : lang === 'ar' ? 'بصفتك خادماً، يمكنك تثبيت الإعلان وتوجيه الأبناء' : 'As a servant, you can pin announcements for students') 
               : (isCop ? 'Ⲛⲓϩⲓⲟⲩⲓ̀ ⲥⲉⲁⲣⲉϩ ⲉ̀ⲣⲱⲟⲩ ⲛⲉⲙ ϯⲡⲁⲧⲣⲓⲁ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ' : lang === 'ar' ? 'المنشورات يتم حفظها ومشاركتها مع أسرة الكنيسة' : 'Posts are saved and shared with your church family')}
           </p>
         </div>
-        <button className="bg-[var(--color-church-gold)] hover:bg-[var(--color-church-gold-light)] text-[var(--color-church-blue)] px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition-colors shadow-2xs pointer-events-none">
+        <button className="bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] text-white px-4 py-2 rounded-xl font-black text-xs md:text-sm transition-all shadow-xs pointer-events-none">
           {isCop ? 'Ϩⲓⲟⲩⲓ̀' : lang === 'ar' ? 'نشر' : 'Post'}
         </button>
       </motion.div>
 
       {/* Sort By Section */}
-      <div className="bg-white p-3 rounded-2xl border border-[var(--color-church-cream-dark)] shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-          <ArrowUpDown size={15} className="text-[var(--color-church-gold)]" />
+      <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] p-3 rounded-2xl border-2 border-[var(--mousa-border-sand)] shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-black text-[var(--mousa-sand-500)]">
+          <ArrowUpDown size={15} className="text-[var(--mousa-gold)]" />
           <span>{isCop ? 'Ⲧⲁⲝⲓⲥ ⲛ̀ⲛⲓϩⲓⲟⲩⲓ̀ ⲕⲁⲧⲁ:' : lang === 'ar' ? 'ترتيب المنشورات حسب:' : 'Sort Posts by:'}</span>
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => setSortBy('latest')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
               sortBy === 'latest'
-                ? 'bg-[var(--color-church-blue)] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[var(--mousa-teal)] text-white shadow-xs'
+                : 'bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:bg-[var(--mousa-sand-200)]'
             }`}
           >
             <Clock size={13} />
@@ -532,22 +520,22 @@ export function FeedTab({ lang }: { lang: Language }) {
 
           <button
             onClick={() => setSortBy('popular')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
               sortBy === 'popular'
-                ? 'bg-[var(--color-church-blue)] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[var(--mousa-teal)] text-white shadow-xs'
+                : 'bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:bg-[var(--mousa-sand-200)]'
             }`}
           >
-            <Flame size={13} className="text-amber-400" />
+            <Flame size={13} className="text-[var(--mousa-coral)]" />
             <span>{isCop ? 'Ⲡⲓϩⲟⲩⲟ̀ ⲛ̀ⲑⲣⲟⲩ' : lang === 'ar' ? 'الأكثر تفاعلاً' : 'Most Popular'}</span>
           </button>
 
           <button
             onClick={() => setSortBy('discussed')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
               sortBy === 'discussed'
-                ? 'bg-[var(--color-church-blue)] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[var(--mousa-teal)] text-white shadow-xs'
+                : 'bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:bg-[var(--mousa-sand-200)]'
             }`}
           >
             <MessageCircle size={13} />
@@ -603,10 +591,10 @@ export function FeedTab({ lang }: { lang: Language }) {
 
               <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center font-bold">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[var(--mousa-teal-deep)] flex items-center justify-center font-bold">
                     ✍️
                   </div>
-                  <h2 className="text-lg font-bold text-[var(--color-church-blue)] dark:text-white">
+                  <h2 className="text-lg font-bold text-[var(--mousa-teal-deep)] dark:text-white">
                     {isCop ? 'Ⲟⲩϩⲓⲟⲩⲓ̀ ⲙ̀ⲃⲉⲣⲓ ϧⲉⲛ ϯⲕⲟⲓⲛⲱⲛⲓⲁ' : lang === 'ar' ? 'منشور جديد في المجتمع' : 'New Community Post'}
                   </h2>
                 </div>
@@ -625,30 +613,8 @@ export function FeedTab({ lang }: { lang: Language }) {
                 value={newPostText}
                 onChange={e => setNewPostText(e.target.value)}
                 placeholder={isCop ? 'Ⲟⲩ ⲡⲉⲧⲉⲣϧⲟⲧⲡ ⲛ̀ϩⲏⲧⲕ; Ϣⲱⲡ ⲛ̀ⲟⲩⲣⲏϯ, ⲟⲩⲉⲩⲭⲏ, ⲟⲩⲙⲉⲩⲓ...' : lang === 'ar' ? 'بم تفكر؟ شارك آية، صلاة، تأمل، أو سؤالاً لمدارس الأحد...' : 'What is on your heart? Share a verse, reflection, or prayer...'}
-                className="w-full h-28 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 resize-none outline-none focus:border-[var(--color-church-blue)] transition-colors text-sm text-gray-800 dark:text-white"
+                className="w-full h-28 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 resize-none outline-none focus:border-[var(--mousa-teal-deep)] transition-colors text-sm text-gray-800 dark:text-white"
               />
-
-              {/* Church Media Storage Banner */}
-              <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-emerald-50/70 border border-blue-100 dark:border-slate-700 dark:from-slate-800 dark:to-slate-850 rounded-2xl text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold flex items-center gap-1.5 text-[var(--color-church-blue)] dark:text-blue-300">
-                    <Database size={15} className="text-blue-600" />
-                    {lang === 'ar' ? 'نظام تخزين الوسائط الكنسية:' : 'Church Media Storage System:'}
-                  </span>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowStorageModal(true)}
-                    className="text-[11px] text-blue-700 dark:text-blue-300 underline font-bold hover:text-blue-900 cursor-pointer"
-                  >
-                    {lang === 'ar' ? 'تفاصيل مستودع الوسائط' : 'Storage Details'}
-                  </button>
-                </div>
-                <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-[11px]">
-                  {lang === 'ar'
-                    ? 'نظام تخزين الوسائط الكنسية يدعم الصور عالية الدقة، مقاطع الفيديو، والتسجيلات الصوتية مع الحفاظ على خصوصية الخدمة وسلامتها.'
-                    : 'Church media storage supports high-res photos, video recordings, and hymns with ecclesiastical safety and moderation.'}
-                </p>
-              </div>
 
               {/* Media Selection Actions */}
               <div>
@@ -670,7 +636,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                     type="button"
                     onClick={() => videoInputRef.current?.click()}
                     disabled={isUploadingMedia}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-[var(--color-church-blue)] border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-[var(--mousa-teal-deep)] border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Video size={15} />
                     <span>{lang === 'ar' ? 'رفع فيديو مباشر' : 'Upload Video'}</span>
@@ -692,7 +658,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                     disabled={isUploadingMedia}
                     className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       showLinkInput
-                        ? 'bg-[var(--color-church-blue)] text-white border-[var(--color-church-blue)]'
+                        ? 'bg-[var(--mousa-teal-deep)] text-white border-[var(--mousa-teal-deep)]'
                         : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                     }`}
                   >
@@ -719,7 +685,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                     <button
                       type="button"
                       onClick={handleApplyLink}
-                      className="px-4 py-2 bg-[var(--color-church-blue)] text-white text-xs font-bold rounded-xl hover:bg-blue-900 transition-colors cursor-pointer"
+                      className="px-4 py-2 bg-[var(--mousa-teal-deep)] text-white text-xs font-bold rounded-xl hover:bg-blue-900 transition-colors cursor-pointer"
                     >
                       {lang === 'ar' ? 'تضمين' : 'Attach'}
                     </button>
@@ -730,7 +696,7 @@ export function FeedTab({ lang }: { lang: Language }) {
               {/* Uploading progress indicator */}
               {isUploadingMedia && (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center gap-3">
-                  <Loader2 className="animate-spin text-[var(--color-church-blue)]" size={20} />
+                  <Loader2 className="animate-spin text-[var(--mousa-teal-deep)]" size={20} />
                   <p className="text-xs font-bold text-blue-900">{uploadStatusText}</p>
                 </div>
               )}
@@ -825,7 +791,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                     type="checkbox"
                     checked={isOfficialAnnouncement}
                     onChange={(e) => setIsOfficialAnnouncement(e.target.checked)}
-                    className="accent-[var(--color-church-gold)] w-4 h-4 rounded cursor-pointer"
+                    className="accent-[var(--mousa-gold)] w-4 h-4 rounded cursor-pointer"
                   />
                   <span>{isCop ? '📌 Ⲟⲩⲧⲁⲙⲟ ⲛ̀ⲇⲓⲁⲕⲟⲛ ⲉⲧⲧⲁϫⲣⲏⲟⲩⲧ' : lang === 'ar' ? '📌 إعلان خادم رسمي وتثبيت في الأعلى' : '📌 Official Servant Announcement (Pin to top)'}</span>
                 </label>
@@ -836,7 +802,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                 disabled={(!newPostText.trim() && !selectedMediaUrl) || isUploadingMedia}
                 className={`w-full font-bold py-3.5 rounded-xl transition-colors shadow-md text-sm cursor-pointer flex items-center justify-center gap-2 ${
                   (newPostText.trim() || selectedMediaUrl) && !isUploadingMedia
-                    ? 'bg-[var(--color-church-blue)] text-[var(--color-church-gold)] hover:bg-blue-900'
+                    ? 'bg-[var(--mousa-teal-deep)] text-[var(--mousa-gold)] hover:bg-blue-900'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -859,15 +825,15 @@ export function FeedTab({ lang }: { lang: Language }) {
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25, delay: idx * 0.03 }}
               key={post.id} 
-              className={`bg-white rounded-3xl p-5 shadow-2xs border break-inside-avoid mb-6 relative transition-all hover:shadow-sm ${
+              className={`bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-5 shadow-xs border-2 break-inside-avoid mb-6 relative transition-all hover:shadow-sm ${
                 post.isPinned 
-                  ? 'border-[var(--color-church-gold)] bg-amber-50/20' 
-                  : 'border-[var(--color-church-cream-dark)]'
+                  ? 'border-[var(--mousa-gold)] bg-amber-50/20' 
+                  : 'border-[var(--mousa-border-sand)]'
               }`}
             >
               {/* Pinned Announcement Flag */}
               {post.isPinned && (
-                <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-[var(--color-church-gold)] bg-amber-50 px-3 py-1 rounded-full w-fit">
+                <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-[var(--mousa-gold)] bg-amber-50 px-3 py-1 rounded-full w-fit">
                   <Pin size={13} className="rotate-45" />
                   <span>{lang === 'ar' ? 'إعلان كنسي مثبت' : 'Pinned Church Announcement'}</span>
                 </div>
@@ -883,7 +849,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                   />
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <p className="font-bold text-sm text-[var(--color-church-blue)]">{post.authorName}</p>
+                      <p className="font-bold text-sm text-[var(--mousa-teal-deep)]">{post.authorName}</p>
                       {post.isAnnouncement && (
                         <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">
                           {lang === 'ar' ? 'خادم' : 'Servant'}
@@ -902,7 +868,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                     <button
                       onClick={() => handleTogglePin(post.id)}
                       className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                        post.isPinned ? 'text-[var(--color-church-gold)] bg-amber-50' : 'text-gray-400 hover:text-gray-600'
+                        post.isPinned ? 'text-[var(--mousa-gold)] bg-amber-50' : 'text-gray-400 hover:text-gray-600'
                       }`}
                       title={post.isPinned ? (lang === 'ar' ? 'إلغاء التثبيت' : 'Unpin') : (lang === 'ar' ? 'تثبيت في الأعلى' : 'Pin to top')}
                     >
@@ -948,7 +914,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                   ) : post.mediaType === 'audio' ? (
                     <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-amber-50/80 dark:from-slate-800 dark:to-slate-850 p-4 rounded-2xl border border-blue-100 dark:border-slate-700 shadow-2xs">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-2xl bg-[var(--color-church-blue)] text-white flex items-center justify-center font-bold shadow-xs">
+                        <div className="w-10 h-10 rounded-2xl bg-[var(--mousa-teal-deep)] text-white flex items-center justify-center font-bold shadow-xs">
                           <Volume2 size={20} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1016,7 +982,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                 <motion.button 
                   whileTap={{ scale: 0.85 }} 
                   onClick={() => handleReactPost(post.id, 'candle')} 
-                  className="flex items-center gap-1 bg-yellow-50 hover:bg-yellow-100 text-[var(--color-church-gold)] px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 bg-yellow-50 hover:bg-yellow-100 text-[var(--mousa-gold)] px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
                 >
                   <span className="text-sm leading-none">🕯️</span>
                   <span>{post.reactions.candle}</span>
@@ -1025,7 +991,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                 <motion.button 
                   whileTap={{ scale: 0.85 }} 
                   onClick={() => handleReactPost(post.id, 'cross')} 
-                  className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-[var(--color-church-blue)] px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                  className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-[var(--mousa-teal-deep)] px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
                 >
                   <span className="text-sm leading-none">✝️</span>
                   <span>{post.reactions.cross}</span>
@@ -1035,7 +1001,7 @@ export function FeedTab({ lang }: { lang: Language }) {
                 
                 <button 
                   onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
-                  className="flex items-center gap-1 text-gray-500 hover:text-[var(--color-church-blue)] font-bold text-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1 text-gray-500 hover:text-[var(--mousa-teal-deep)] font-bold text-xs transition-colors cursor-pointer"
                 >
                   <MessageCircle size={15} />
                   <span>
@@ -1059,12 +1025,12 @@ export function FeedTab({ lang }: { lang: Language }) {
                           {/* Main Comment */}
                           <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 space-y-1.5">
                             <div className="flex justify-between items-start">
-                              <p className="font-bold text-xs text-[var(--color-church-blue)]">{comment.authorName}</p>
+                              <p className="font-bold text-xs text-[var(--mousa-teal-deep)]">{comment.authorName}</p>
                               <button 
                                 onClick={() => {
                                   setReplyTarget({ commentId: comment.id, replyToAuthor: comment.authorName });
                                 }} 
-                                className="text-[11px] font-bold text-gray-500 hover:text-[var(--color-church-blue)] flex items-center gap-1 transition-colors cursor-pointer"
+                                className="text-[11px] font-bold text-gray-500 hover:text-[var(--mousa-teal-deep)] flex items-center gap-1 transition-colors cursor-pointer"
                               >
                                 <CornerDownRight size={12} />
                                 <span>{lang === 'ar' ? 'رد' : 'Reply'}</span>
@@ -1101,16 +1067,16 @@ export function FeedTab({ lang }: { lang: Language }) {
                           
                           {/* Nested Replies to this comment */}
                           {comment.replies && comment.replies.length > 0 && (
-                            <div className="space-y-1.5 ps-4 border-s-2 border-[var(--color-church-gold)]/40">
+                            <div className="space-y-1.5 ps-4 border-s-2 border-[var(--mousa-gold)]/40">
                               {comment.replies.map(reply => (
-                                <div key={reply.id} className="bg-[var(--color-church-cream)]/50 p-2.5 rounded-xl border border-[var(--color-church-gold)]/20 space-y-1">
+                                <div key={reply.id} className="bg-[var(--color-church-cream)]/50 p-2.5 rounded-xl border border-[var(--mousa-gold)]/20 space-y-1">
                                   <div className="flex justify-between items-start">
-                                    <p className="font-bold text-[11px] text-[var(--color-church-blue)]">{reply.authorName}</p>
+                                    <p className="font-bold text-[11px] text-[var(--mousa-teal-deep)]">{reply.authorName}</p>
                                     <button 
                                       onClick={() => {
                                         setReplyTarget({ commentId: comment.id, replyToAuthor: reply.authorName });
                                       }} 
-                                      className="text-[10px] font-bold text-gray-500 hover:text-[var(--color-church-blue)] flex items-center gap-0.5 transition-colors cursor-pointer"
+                                      className="text-[10px] font-bold text-gray-500 hover:text-[var(--mousa-teal-deep)] flex items-center gap-0.5 transition-colors cursor-pointer"
                                     >
                                       <CornerDownRight size={11} />
                                       <span>{lang === 'ar' ? 'رد' : 'Reply'}</span>
@@ -1237,139 +1203,6 @@ export function FeedTab({ lang }: { lang: Language }) {
         )}
       </AnimatePresence>
 
-      {/* Long-Term Cloud Storage Architecture Modal */}
-      <AnimatePresence>
-        {showStorageModal && (
-          <div 
-            onClick={() => setShowStorageModal(false)}
-            className="fixed inset-0 z-[85] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 sm:p-7 shadow-2xl relative space-y-5 my-8 text-gray-800 dark:text-gray-100"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold">
-                    <Database size={22} />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-[var(--color-church-blue)] dark:text-white">
-                      {lang === 'ar' ? 'مستودع الوسائط الكنسية' : 'Church Media Storage System'}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {lang === 'ar' ? 'تخزين الصور، التسجيلات الصوتية، والمقاطع الخاصة بخدمة مدارس الأحد' : 'Storage for photos, audio recordings, and media for Sunday School'}
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowStorageModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Current Active Backend Status */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 dark:from-slate-800 dark:to-slate-850 border border-emerald-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <Server size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200 flex items-center gap-1.5">
-                      <span>{lang === 'ar' ? 'محرك التخزين النشط حالياً:' : 'Active Storage Backend:'}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-100 font-mono text-[11px]">
-                        {lang === 'ar' ? 'خادم التطبيق الداخلي (مستودع الوسائط الكنسية)' : 'App Server (/uploads)'}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
-                      {lang === 'ar' ? 'خادم التطبيق يستقبل الملفات المباشرة حتى 150MB مع التوافق الكامل مع وسائط Supabase' : 'App server handles direct uploads up to 150MB with full Supabase media compatibility'}
-                    </p>
-                  </div>
-                </div>
-                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold border border-emerald-200 dark:border-slate-700 self-start sm:self-center">
-                  {lang === 'ar' ? 'جاهز للرفع ⚡' : 'Uploads Ready ⚡'}
-                </span>
-              </div>
-
-              {/* Features of Church Media Architecture */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {lang === 'ar' ? 'خصائص نظام وسائط مدارس الأحد:' : 'Sunday School Media System Features:'}
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Pillar 1 */}
-                  <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-slate-800/80 border border-blue-100 dark:border-slate-700 space-y-2">
-                    <div className="flex items-center gap-2 text-[var(--color-church-blue)] dark:text-blue-300 font-bold text-xs">
-                      <CloudLightning size={16} />
-                      <span>{lang === 'ar' ? '1. سلامة وخصوصية المحتوى' : '1. Church Data Privacy'}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {lang === 'ar'
-                        ? 'حفظ وسائط الدروس، الترانيم، وأوراق العمل بصورة آمنة تحت إشراف الخدام مع مراعاة خصوصية الأطفال.'
-                        : 'Secure storage of lesson materials, hymns, and worksheets under servant supervision with child privacy safeguards.'}
-                    </p>
-                  </div>
-
-                  {/* Pillar 2 */}
-                  <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/80 border border-amber-200 dark:border-slate-700 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-bold text-xs">
-                      <Server size={16} />
-                      <span>{lang === 'ar' ? '2. دعم مباشر لمختلف الوسائط' : '2. Multi-Format Media Support'}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {lang === 'ar'
-                        ? 'تشغيل سريع وموثوق للصور التوضيحية، تسجيلات الترانيم الصوتية، والملفات التعليمية.'
-                        : 'Fast, reliable playback of illustrations, audio hymns, and Sunday school learning files.'}
-                    </p>
-                  </div>
-
-                  {/* Pillar 3 */}
-                  <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/80 border border-emerald-100 dark:border-slate-700 space-y-2">
-                    <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
-                      <CheckCircle2 size={16} />
-                      <span>{lang === 'ar' ? '3. تكامل مع قاعدة البيانات' : '3. Relational Media Catalog'}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {lang === 'ar'
-                        ? 'فهرسة كل أصل مرئي أو صوتي في جدول media_assets وربطه بالأدلة والدروس الكنسية.'
-                        : 'Every visual or audio asset is indexed in media_assets and linked relationally to lessons and evidence.'}
-                    </p>
-                  </div>
-
-                  {/* Pillar 4 */}
-                  <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/80 border border-amber-100 dark:border-slate-700 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
-                      <Database size={16} />
-                      <span>{lang === 'ar' ? '4. محرك رفع متكامل (صور، فيديو، صوت)' : '4. Multi-Format Pipeline'}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {lang === 'ar'
-                        ? 'محرك رفع متكامل يدعم ملفات بحجم حتى 150MB للملف الواحد مع تصنيف نوع الملف ومعالجته.'
-                        : 'Integrated pipeline supporting files up to 150MB with automatic MIME classification.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowStorageModal(false)}
-                  className="px-5 py-2.5 bg-[var(--color-church-blue)] text-white text-xs font-bold rounded-xl hover:bg-blue-900 transition-colors cursor-pointer"
-                >
-                  {lang === 'ar' ? 'إغلاق ومتابعة النشر' : 'Close & Continue'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

@@ -4,7 +4,7 @@ import { Language } from '../../types';
 import { getFontFamilyClass } from '../../localization/i18n';
 
 export interface CopticButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'gold' | 'ghost' | 'danger' | 'outline';
+  variant?: 'primary' | 'secondary' | 'gold' | 'ghost' | 'danger' | 'outline' | 'mousa-quest' | 'mousa-teal';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
@@ -41,7 +41,11 @@ export const CopticButton: React.FC<CopticButtonProps> = ({
     danger:
       'bg-[var(--color-danger)] text-white hover:brightness-110 active:brightness-95 border border-red-900 shadow-xs focus-visible:ring-2 focus-visible:ring-red-400',
     outline:
-      'bg-transparent text-[var(--brand-burgundy)] dark:text-[var(--brand-gold)] border border-[var(--brand-burgundy)] dark:border-[var(--brand-gold)] hover:bg-[var(--brand-burgundy)]/10 active:bg-[var(--brand-burgundy)]/20 focus-visible:ring-2 focus-visible:ring-[var(--brand-gold)]'
+      'bg-transparent text-[var(--brand-burgundy)] dark:text-[var(--brand-gold)] border border-[var(--brand-burgundy)] dark:border-[var(--brand-gold)] hover:bg-[var(--brand-burgundy)]/10 active:bg-[var(--brand-burgundy)]/20 focus-visible:ring-2 focus-visible:ring-[var(--brand-gold)]',
+    'mousa-quest':
+      'bg-gradient-to-r from-[var(--mousa-teal)] to-[var(--mousa-teal-deep)] text-white font-extrabold border border-[var(--mousa-teal-light)] shadow-md hover:brightness-110 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-[var(--mousa-gold)]',
+    'mousa-teal':
+      'bg-[var(--mousa-teal-soft)] text-[var(--mousa-teal)] dark:text-[var(--mousa-teal-glow)] hover:bg-[var(--mousa-teal)]/20 border border-[var(--mousa-teal)]/30 font-bold focus-visible:ring-2 focus-visible:ring-[var(--mousa-teal)]'
   };
 
   // Size styling - meeting 44px min touch target rule on mobile

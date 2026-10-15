@@ -195,27 +195,27 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-xl bg-white dark:bg-slate-900 border border-[var(--color-church-cream-dark)] dark:border-slate-800 rounded-3xl shadow-2xl p-6 relative overflow-hidden my-8"
+        className="w-full max-w-xl bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] border-2 border-[var(--mousa-border-sand)] rounded-3xl shadow-2xl p-6 relative overflow-hidden my-8"
         dir={isAr ? 'rtl' : 'ltr'}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute top-5 right-5 p-2 rounded-full text-[var(--mousa-sand-500)] hover:text-[var(--mousa-coral)] hover:bg-[var(--mousa-sand-100)] transition-colors cursor-pointer"
           title={isAr ? 'إغلاق' : 'Close'}
         >
           <X size={18} />
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-gray-100 dark:border-slate-800">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[var(--color-church-blue)] to-[var(--color-church-blue-light)] text-[var(--color-church-gold)] flex items-center justify-center shadow-md shrink-0">
+        <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-[var(--mousa-border-sand)]">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[var(--mousa-teal-deep)] to-[var(--mousa-teal)] text-[var(--mousa-gold)] flex items-center justify-center shadow-md shrink-0 border border-[var(--mousa-gold)]/30">
             <School size={24} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-black text-[var(--color-church-blue)] dark:text-white">
-                {isAr ? 'أهلاً بك في كنيسة الأنبا موسى!' : 'Welcome to Anba Mousa!'}
+              <h2 className="text-lg sm:text-xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                {isAr ? 'أهلاً بك في رحلة القديس الأنبا موسى!' : 'Welcome to The Journey of Moses!'}
               </h2>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-medium">
@@ -264,7 +264,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">{isAr ? 'فصل مدارس الأحد الكنسي:' : 'Church Class Group:'}</span>
-                  <span className="font-bold text-[var(--color-church-blue)] dark:text-amber-300">
+                  <span className="font-bold text-[var(--mousa-teal)] dark:text-amber-300">
                     {CLASS_GROUPS[existingRequest.requestedClassGroupId]?.name[isAr ? 'ar' : 'en'] || existingRequest.requestedClassGroupId}
                   </span>
                 </div>
@@ -296,7 +296,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-xl bg-[var(--color-church-blue)] hover:bg-[var(--color-church-blue-light)] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-[var(--mousa-teal)] hover:bg-[var(--color-church-blue-light)] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
               >
                 {isAr ? 'حسناً، فهمت' : 'Got it'}
               </button>
@@ -333,7 +333,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                             onClick={() => setSelectedGradeCode(g.code)}
                             className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                               isSelected
-                                ? 'bg-[var(--color-church-blue)] text-white border-[var(--color-church-blue)] shadow-sm'
+                                ? 'bg-[var(--mousa-teal)] text-white border-[var(--mousa-teal)] shadow-sm'
                                 : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/60'
                             }`}
                           >
@@ -355,7 +355,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <div className="text-[11px] text-amber-800 dark:text-amber-400 font-bold uppercase tracking-wider">
                     {isAr ? 'فصل مدارس الأحد الكنسي المحسوب تلقائياً:' : 'Derived Church Class Group:'}
                   </div>
-                  <div className="font-extrabold text-[var(--color-church-blue)] dark:text-amber-300 text-sm">
+                  <div className="font-extrabold text-[var(--mousa-teal)] dark:text-amber-300 text-sm">
                     {derivedClassGroup.name[isAr ? 'ar' : 'en']}
                   </div>
                 </div>
@@ -379,7 +379,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder={isAr ? 'مثال: يوسف مينا' : 'e.g. Youssef Mina'}
-                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-9"
+                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-9"
                   />
                   <User size={15} className="absolute left-3 top-3 text-gray-400" />
                 </div>
@@ -395,7 +395,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+20 100 000 0000"
-                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-9"
+                    className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-9"
                   />
                   <Phone size={15} className="absolute left-3 top-3 text-gray-400" />
                 </div>
@@ -413,7 +413,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={isAr ? 'مثال: أحضر مع الأستاذ مينا يوم الجمعة' : 'e.g. I attend Friday class with Servant Mina'}
-                  className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-9"
+                  className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-9"
                 />
                 <MessageSquare size={15} className="absolute left-3 top-3 text-gray-400" />
               </div>
@@ -442,7 +442,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting || !selectedGradeCode}
-                className="px-5 py-2.5 rounded-xl bg-[var(--color-church-blue)] hover:bg-[var(--color-church-blue-light)] text-white text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-[var(--mousa-teal)] hover:bg-[var(--color-church-blue-light)] text-white text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {submitting ? (
                   <>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, LogOut, Shield, Info, Edit3, ArrowLeft, Save, HelpCircle, FileText, Camera, Moon, Sun, Award, BookOpen, Heart, Flame, CheckCircle2, AlertCircle, Loader2, Mail, Phone, GraduationCap, X, Clock, QrCode, Copy, Check, HeartHandshake, Link as LinkIcon, Users, Sparkles, KeyRound, Share2, ShieldCheck, Upload, UserCheck, Palette, Calendar, Key } from 'lucide-react';
+import { Settings, LogOut, Shield, Info, Edit3, ArrowLeft, Save, HelpCircle, FileText, Camera, Moon, Sun, Award, BookOpen, Heart, Flame, CheckCircle2, AlertCircle, Loader2, Mail, Phone, GraduationCap, X, Clock, QrCode, Copy, Check, HeartHandshake, Link as LinkIcon, Users, Sparkles, KeyRound, Share2, ShieldCheck, Upload, UserCheck, Calendar, Key, Cross } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,7 +12,7 @@ import { COPTIC_AVATARS, DEFAULT_STUDENT_AVATAR } from '../../data/copticAvatars
 import { getCurrentChurchYear, joinClassWithCode, getStudentActiveMembership } from '../../lib/churchYearService';
 import { Language, ClassGroupId } from '../../types';
 
-type ProfileScreen = 'main' | 'edit' | 'settings' | 'parental' | 'help' | 'parental_dashboard';
+type ProfileScreen = 'main' | 'edit' | 'settings' | 'help' | 'privacy';
 
 export function ProfileTab({ 
   onLogout, 
@@ -35,8 +35,7 @@ export function ProfileTab({
   const [email, setEmail] = useState(userData?.parentEmail || userData?.email || '');
   const [phone, setPhone] = useState(userData?.phone || '');
   const [grade, setGrade] = useState(userData?.grade || '');
-  const [parentPinInput, setParentPinInput] = useState('');
-  const [newParentPin, setNewParentPin] = useState('');
+  const [helpSubTab, setHelpSubTab] = useState<'guide' | 'faq' | 'contact'>('guide');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -384,21 +383,6 @@ export function ProfileTab({
     }
   };
 
-  const handleParentUnlock = () => {
-    if (!userData.parentPin) {
-       // If no PIN set, they can set one
-       if (parentPinInput.length === 4) {
-          updateUserProfile({ parentPin: parentPinInput });
-          setScreen('parental_dashboard');
-       }
-    } else if (parentPinInput === userData.parentPin) {
-       setScreen('parental_dashboard');
-    } else {
-       alert(lang === 'ar' ? 'كلمة السر خاطئة' : 'Incorrect PIN');
-    }
-    setParentPinInput('');
-  };
-
   const formatScreenTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -408,10 +392,14 @@ export function ProfileTab({
 
   const Header = ({ title, onBack }: { title: string, onBack: () => void }) => (
     <div className="flex items-center gap-4 mb-6">
-      <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm text-[var(--color-church-blue)] hover:bg-gray-50">
+      <button 
+        onClick={onBack} 
+        className="p-2.5 bg-[var(--mousa-cream-surface)] dark:bg-stone-800 rounded-2xl shadow-xs text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] hover:bg-[var(--mousa-sand-100)] border border-[var(--mousa-border-sand)] transition-colors cursor-pointer"
+        aria-label={lang === 'ar' ? 'الرجوع' : 'Go back'}
+      >
         <ArrowLeft size={20} className={lang === 'ar' ? 'rotate-180' : ''} />
       </button>
-      <h1 className="text-xl font-bold text-[var(--color-church-blue)]">{title}</h1>
+      <h1 className="text-xl md:text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">{title}</h1>
     </div>
   );
 
@@ -449,49 +437,49 @@ export function ProfileTab({
       <AnimatePresence mode="wait">
         {screen === 'main' && (
           <motion.div key="main" initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
-            <h1 className="text-2xl font-bold text-[var(--color-church-blue)] mb-6 md:text-3xl">{lang === 'ar' ? 'حسابي' : 'Profile'}</h1>
+            <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] mb-6 md:text-3xl">{lang === 'ar' ? 'ملف المسافر في رحلة موسى' : 'Traveler Profile'}</h1>
             
             <div className="md:grid md:grid-cols-[1.5fr_1fr] md:gap-8 space-y-6 md:space-y-0">
               <div className="space-y-6">
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-[var(--color-church-cream-dark)] text-center relative">
-                  <button onClick={handleOpenEdit} className={`absolute top-4 ${lang === 'ar' ? 'left-4' : 'right-4'} text-gray-400 hover:text-[var(--color-church-blue)] p-2 rounded-xl hover:bg-blue-50 transition-colors cursor-pointer`} title={lang === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile'}>
+                <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 shadow-xs border-2 border-[var(--mousa-border-sand)] text-center relative">
+                  <button onClick={handleOpenEdit} className={`absolute top-4 ${lang === 'ar' ? 'left-4' : 'right-4'} text-[var(--mousa-sand-500)] hover:text-[var(--mousa-coral)] p-2 rounded-xl hover:bg-[var(--mousa-sand-100)] transition-colors cursor-pointer`} title={lang === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile'}>
                     <Edit3 size={20} />
                   </button>
-                  <img src={userData.avatarUrl} alt="Avatar" className="w-24 h-24 md:w-32 md:h-32 mx-auto rounded-full border-4 border-[var(--color-church-cream)] bg-gray-50 mb-4 shadow-sm object-cover" />
-                  <h2 className="text-xl md:text-2xl font-bold text-[var(--color-church-blue)]">{userData.fullName}</h2>
-                  <p className="text-gray-500 font-medium md:text-lg">{lang === 'ar' ? 'مدارس الأحد' : 'Sunday School'}</p>
+                  <img src={userData.avatarUrl} alt="Avatar" className="w-24 h-24 md:w-32 md:h-32 mx-auto rounded-full border-4 border-[var(--mousa-gold)] bg-[var(--mousa-sand-100)] mb-4 shadow-sm object-cover" />
+                  <h2 className="text-xl md:text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">{userData.fullName}</h2>
+                  <p className="text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)] font-bold md:text-lg">{lang === 'ar' ? 'رحلة القديس الأنبا موسى' : 'The Journey of Moses'}</p>
                   
-                  <div className="flex justify-center gap-6 md:gap-12 mt-6 pt-6 border-t border-gray-100">
+                  <div className="flex justify-center gap-6 md:gap-12 mt-6 pt-6 border-t border-[var(--mousa-border-sand)]/60">
                     <div>
-                      <p className="text-2xl md:text-3xl font-bold text-[var(--color-church-blue)]">{userData.points}</p>
-                      <p className="text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'نقاط' : 'Points'}</p>
+                      <p className="text-2xl md:text-3xl font-black text-[var(--mousa-gold)] dark:text-[var(--mousa-gold-light)]">{userData.points}</p>
+                      <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] font-black uppercase tracking-wider">{lang === 'ar' ? 'نقاط البركة' : 'Points'}</p>
                     </div>
                     <div>
-                      <p className="text-2xl md:text-3xl font-bold text-[var(--color-church-blue)]">{userData.currentStreak}</p>
-                      <p className="text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'متتالي' : 'Streak'}</p>
+                      <p className="text-2xl md:text-3xl font-black text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)]">{userData.currentStreak}</p>
+                      <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] font-black uppercase tracking-wider">{lang === 'ar' ? 'شعلة الأيام' : 'Streak'}</p>
                     </div>
                     <div>
-                      <p className="text-2xl md:text-3xl font-bold text-[var(--color-church-blue)]">{userData.longestStreak}</p>
-                      <p className="text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'الأفضل' : 'Best'}</p>
+                      <p className="text-2xl md:text-3xl font-black text-[var(--mousa-teal)] dark:text-[var(--mousa-teal-glow)]">{userData.longestStreak}</p>
+                      <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] font-black uppercase tracking-wider">{lang === 'ar' ? 'أعلى إنجاز' : 'Best'}</p>
                     </div>
                   </div>
 
                   {/* Active Screen / Study Time */}
-                  <div className="mt-4 pt-3.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium px-1">
-                    <span className="flex items-center gap-1.5 text-gray-600 font-bold">
-                      <Clock size={15} className="text-[var(--color-church-blue)] animate-pulse" />
+                  <div className="mt-4 pt-3.5 border-t border-[var(--mousa-border-sand)]/60 flex items-center justify-between text-xs text-[var(--mousa-sand-500)] font-medium px-1">
+                    <span className="flex items-center gap-1.5 text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] font-bold">
+                      <Clock size={15} className="text-[var(--mousa-gold)] animate-pulse" />
                       {lang === 'ar' ? 'وقت التعلم النشط اليوم' : 'Active Learning Time Today'}
                     </span>
-                    <span className="font-bold text-xs md:text-sm text-[var(--color-church-blue)] bg-[var(--color-church-cream)]/70 px-3 py-1 rounded-full border border-[var(--color-church-cream-dark)]">
+                    <span className="font-black text-xs md:text-sm text-[var(--mousa-teal-deep)] bg-[var(--mousa-sand-100)] px-3 py-1 rounded-full border border-[var(--mousa-border-sand)]">
                       {formatScreenTime(userData.screenTimeSeconds || 0)}
                     </span>
                   </div>
                 </div>
 
                 {/* Achievement Badges Section */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-[var(--color-church-cream-dark)]">
-                  <h3 className="font-bold text-lg md:text-xl text-[var(--color-church-blue)] mb-4 flex items-center gap-2">
-                    <Award size={20} className="text-[var(--color-church-gold)]" />
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-6 shadow-sm border border-[var(--mousa-border-sand)]">
+                  <h3 className="font-bold text-lg md:text-xl text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] mb-4 flex items-center gap-2">
+                    <Award size={20} className="text-[var(--mousa-gold)]" />
                     {lang === 'ar' ? 'الأوسمة والإنجازات' : 'Achievements'}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
@@ -511,7 +499,7 @@ export function ProfileTab({
                         title: { en: 'Studious', ar: 'مجتهد' },
                         description: { en: 'Reached 300 points', ar: 'الوصول لـ ٣٠٠ نقطة' },
                         icon: BookOpen,
-                        color: 'text-[var(--color-church-blue)]',
+                        color: 'text-[var(--mousa-teal-deep)]',
                         bg: 'bg-blue-50',
                         border: 'border-blue-200',
                         isUnlocked: userData.points >= 300,
@@ -531,7 +519,7 @@ export function ProfileTab({
                         title: { en: 'Consistent', ar: 'مستمر' },
                         description: { en: '3-day streak', ar: '٣ أيام متتالية' },
                         icon: Flame,
-                        color: 'text-[var(--color-church-gold)]',
+                        color: 'text-[var(--mousa-gold)]',
                         bg: 'bg-amber-50',
                         border: 'border-amber-200',
                         isUnlocked: userData.longestStreak >= 3,
@@ -558,17 +546,17 @@ export function ProfileTab({
 
               {/* Role-Specific Connection Card */}
               {isStudent && (
-                <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4">
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--mousa-border-sand)] space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center font-bold">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-stone-850 text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold)] flex items-center justify-center font-bold">
                         <HeartHandshake size={22} />
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-900 text-sm md:text-base">
+                        <h3 className="font-bold text-gray-900 dark:text-[#FAF5EB] text-sm md:text-base">
                           {lang === 'ar' ? 'ربط الحساب بولي الأمر والمزامنة' : 'Parent Link & Live Sync'}
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-[#C5B5A0]">
                           {userData.isLinkedToParent || userData.parentEmail
                             ? (lang === 'ar' ? `مرتبط بحساب: ${userData.parentName || userData.parentEmail}` : `Linked with: ${userData.parentName || userData.parentEmail}`)
                             : (lang === 'ar' ? 'شارك رمزك مع ولي أمرك لربط الحساب' : 'Share code with your parent to link')}
@@ -611,7 +599,7 @@ export function ProfileTab({
                   <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-2xl p-4 border border-blue-100/80 space-y-3.5">
                     {/* Security Notice */}
                     <div className="flex items-start gap-2.5 text-xs text-blue-950 bg-white p-2.5 rounded-xl border border-blue-100 shadow-2xs">
-                      <ShieldCheck size={18} className="text-[var(--color-church-blue)] shrink-0 mt-0.5" />
+                      <ShieldCheck size={18} className="text-[var(--mousa-teal-deep)] shrink-0 mt-0.5" />
                       <span className="leading-relaxed">
                         {lang === 'ar'
                           ? '🔒 هذا الرمز السري خاص بحساب الطفل فقط، يتيح لولي الأمر ربطه ومتابعة تقدمه في مدارس الأحد.'
@@ -622,14 +610,14 @@ export function ProfileTab({
                     {/* Secret Code Display & Buttons */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200">
                       <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-[var(--mousa-teal-deep)] flex items-center justify-center shrink-0">
                           <KeyRound size={20} />
                         </div>
                         <div>
                           <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                             {lang === 'ar' ? 'الرمز السري الخاص بالطفل' : 'Child Unique Secret Code'}
                           </span>
-                          <span className="font-mono font-black text-lg text-[var(--color-church-blue)] tracking-wider">
+                          <span className="font-mono font-black text-lg text-[var(--mousa-teal-deep)] tracking-wider">
                             {studentLinkCode}
                           </span>
                         </div>
@@ -639,7 +627,7 @@ export function ProfileTab({
                         <button
                           type="button"
                           onClick={() => setShowQrModal(true)}
-                          className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-[var(--mousa-teal-deep)] hover:bg-blue-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                         >
                           <QrCode size={14} className="text-amber-300" />
                           <span>{lang === 'ar' ? 'عرض رمز QR' : 'Show QR Code'}</span>
@@ -661,7 +649,7 @@ export function ProfileTab({
                       <button
                         type="button"
                         onClick={handleCopyDirectLink}
-                        className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-gray-50 border border-blue-200 text-[var(--color-church-blue)] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-gray-50 border border-blue-200 text-[var(--mousa-teal-deep)] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                       >
                         {copiedDirectLink ? <Check size={14} className="text-emerald-600" /> : <LinkIcon size={14} />}
                         <span>{copiedDirectLink ? (lang === 'ar' ? 'تم نسخ الرابط!' : 'Link Copied!') : (lang === 'ar' ? 'نسخ رابط الربط المباشر' : 'Copy Direct Link')}</span>
@@ -687,12 +675,12 @@ export function ProfileTab({
                           value={manualParentEmail}
                           onChange={(e) => setManualParentEmail(e.target.value)}
                           placeholder={lang === 'ar' ? 'أدخل إيميل ولي الأمر للربط...' : 'Enter parent email to link...'}
-                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--color-church-blue)]"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--mousa-teal-deep)]"
                         />
                         <button
                           onClick={handleLinkParent}
                           disabled={isLinkingParent}
-                          className="px-4 py-2 rounded-xl bg-[var(--color-church-blue)] text-white text-xs font-bold hover:bg-blue-800 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-2xs shrink-0"
+                          className="px-4 py-2 rounded-xl bg-[var(--mousa-teal-deep)] text-white text-xs font-bold hover:bg-blue-800 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-2xs shrink-0"
                         >
                           {isLinkingParent ? <Loader2 size={13} className="animate-spin" /> : <LinkIcon size={13} />}
                           <span>{lang === 'ar' ? 'ربط الآن' : 'Link Now'}</span>
@@ -705,17 +693,17 @@ export function ProfileTab({
 
               {/* For Students: Sunday School Class & Grade Card */}
               {isStudent && (
-                <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4">
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--mousa-border-sand)] space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center font-bold">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-stone-850 text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold)] flex items-center justify-center font-bold">
                         <GraduationCap size={24} />
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-900 text-base">
+                        <h3 className="font-bold text-gray-900 dark:text-[#FAF5EB] text-base">
                           {lang === 'ar' ? 'فصل وصف مدارس الأحد' : 'Sunday School Class & Grade'}
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-[#C5B5A0]">
                           {lang === 'ar' ? 'تسكين الكشف الرسمي واعتماد خادم الفصل' : 'Official roster enrollment & servant approval'}
                         </p>
                       </div>
@@ -749,7 +737,7 @@ export function ProfileTab({
                       </div>
                       <div>
                         <span className="text-gray-500 block mb-0.5">{lang === 'ar' ? 'فصل مدارس الأحد الكنسي:' : 'Church Class Group:'}</span>
-                        <span className="font-bold text-[var(--color-church-blue)] text-sm">
+                        <span className="font-bold text-[var(--mousa-teal-deep)] text-sm">
                           {(() => {
                             if (!isGuest && !studentMembership?.isEnrolled) {
                               return lang === 'ar' ? 'غير مسجل في فصل بعد' : 'Not Enrolled in Class';
@@ -791,7 +779,7 @@ export function ProfileTab({
                         <button
                           type="button"
                           onClick={() => setShowOnboardingModal(true)}
-                          className="px-3.5 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+                          className="px-3.5 py-2 rounded-xl bg-[var(--mousa-teal-deep)] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
                         >
                           <Edit3 size={13} />
                           <span>{lang === 'ar' ? 'تحديد / تعديل الصف' : 'Select / Change Grade'}</span>
@@ -843,7 +831,7 @@ export function ProfileTab({
                                 value={inputJoinCode}
                                 onChange={(e) => setInputJoinCode(e.target.value)}
                                 placeholder="e.g. MUSA-P46B"
-                                className="w-full font-mono uppercase bg-gray-50 border border-gray-200 focus:border-[var(--color-church-blue)] rounded-xl px-3.5 py-2.5 text-gray-900 outline-none font-bold text-sm"
+                                className="w-full font-mono uppercase bg-gray-50 border border-gray-200 focus:border-[var(--mousa-teal-deep)] rounded-xl px-3.5 py-2.5 text-gray-900 outline-none font-bold text-sm"
                                 disabled={isJoiningCode}
                               />
                             </div>
@@ -873,7 +861,7 @@ export function ProfileTab({
                               <button
                                 type="submit"
                                 disabled={isJoiningCode || !inputJoinCode.trim()}
-                                className="px-4 py-2 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 disabled:opacity-40 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                className="px-4 py-2 rounded-xl bg-[var(--mousa-teal-deep)] hover:bg-blue-900 disabled:opacity-40 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                               >
                                 {isJoiningCode ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -893,28 +881,28 @@ export function ProfileTab({
 
               {/* For Parents: Family Hub Card */}
               {isParent && (
-                <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4">
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--mousa-border-sand)] space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-stone-850 text-amber-700 dark:text-[var(--mousa-gold)] flex items-center justify-center font-bold">
                         <Users size={24} />
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-900 text-base">
+                        <h3 className="font-bold text-gray-900 dark:text-[#FAF5EB] text-base">
                           {lang === 'ar' ? 'بوابة ولي الأمر ومتابعة الأبناء' : 'Parent Family Portal'}
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-[#C5B5A0]">
                           {lang === 'ar' ? 'متابعة حفظ الألحان والآيات والدروس لجميع أبنائك' : 'Monitor lessons, hymns and verses for all your children'}
                         </p>
                       </div>
                     </div>
-                    <span className="px-3 py-1 bg-amber-100/60 text-amber-800 rounded-full text-xs font-bold">
+                    <span className="px-3 py-1 bg-amber-100/60 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 rounded-full text-xs font-bold">
                       {lang === 'ar' ? 'حساب ولي أمر' : 'Parent Account'}
                     </span>
                   </div>
 
-                  <div className="bg-gradient-to-r from-amber-50/50 to-orange-50/30 rounded-2xl p-4 border border-amber-200/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="text-xs text-gray-700 leading-relaxed">
+                  <div className="bg-gradient-to-r from-amber-50/50 to-orange-50/30 dark:from-stone-900 dark:to-stone-850 rounded-2xl p-4 border border-amber-200/60 dark:border-stone-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="text-xs text-gray-700 dark:text-[#D5C7B5] leading-relaxed">
                       {lang === 'ar' 
                         ? 'بصفتك ولي أمر، لا تحتاج إلى رمز طفل خاص بك؛ بدلاً من ذلك يمكنك إضافة أبنائك باستخدام الرمز السري أو QR الخاص بكل طفل.'
                         : 'As a parent, you manage and link children rather than having a child code yourself.'}
@@ -934,22 +922,22 @@ export function ProfileTab({
 
               {/* For Teachers: Servant Studio Card */}
               {isTeacher && (
-                <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4">
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-5 md:p-6 shadow-sm border border-[var(--mousa-border-sand)] space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[var(--color-church-blue)] flex items-center justify-center font-bold">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-stone-850 text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold)] flex items-center justify-center font-bold">
                         <GraduationCap size={24} />
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-900 text-base">
+                        <h3 className="font-bold text-gray-900 dark:text-[#FAF5EB] text-base">
                           {lang === 'ar' ? 'استوديو خادم مدارس الأحد' : 'Sunday School Servant Studio'}
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-[#C5B5A0]">
                           {lang === 'ar' ? 'تحضير الدروس، متابعة الحضور والغياب، وإدارة الفصل' : 'Prepare lessons, take attendance, and track classes'}
                         </p>
                       </div>
                     </div>
-                    <span className="px-3 py-1 bg-blue-100/60 text-blue-800 rounded-full text-xs font-bold">
+                    <span className="px-3 py-1 bg-blue-100/60 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 rounded-full text-xs font-bold">
                       {lang === 'ar' ? 'خادم مدارس الأحد' : 'Servant / Teacher'}
                     </span>
                   </div>
@@ -957,7 +945,7 @@ export function ProfileTab({
                   {onOpenTeacherStudio && (
                     <button
                       onClick={onOpenTeacherStudio}
-                      className="w-full py-3 rounded-xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                      className="w-full py-3 rounded-xl bg-[var(--mousa-teal-deep)] hover:bg-blue-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                     >
                       <GraduationCap size={16} />
                       <span>{lang === 'ar' ? 'فتح استوديو الخادم' : 'Open Servant Studio'}</span>
@@ -967,7 +955,7 @@ export function ProfileTab({
               )}
 
               <div>
-                <div className="bg-white rounded-3xl shadow-sm border border-[var(--color-church-cream-dark)] overflow-hidden">
+                <div className="bg-white dark:bg-[#1E1914] rounded-3xl shadow-sm border border-[var(--mousa-border-sand)] overflow-hidden">
                   {/* Servant Studio (for teachers) */}
                   {(userData.role === 'teacher' || onOpenTeacherStudio) && (
                     <button 
@@ -1002,72 +990,22 @@ export function ProfileTab({
                     </button>
                   )}
 
-                  <button onClick={() => setScreen('settings')} className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors text-left">
-                    <Settings size={20} className="text-[var(--color-church-blue)] md:w-6 md:h-6" />
-                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'الإعدادات والمظهر' : 'Settings & Theme'}</span>
-                    <span className="text-xs md:text-sm px-2.5 py-1 rounded-full font-bold bg-[var(--color-church-cream)] text-[var(--color-church-blue)] flex items-center gap-1">
+                  <button onClick={() => setScreen('settings')} className="w-full p-4 md:p-5 border-b border-gray-100 dark:border-stone-800 flex items-center gap-3 text-gray-700 dark:text-stone-200 hover:bg-gray-50 dark:hover:bg-stone-850 transition-colors text-left cursor-pointer">
+                    <Settings size={20} className="text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold-light)] md:w-6 md:h-6" />
+                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'الإعدادات والمظهر الكنسي' : 'Settings & Theme'}</span>
+                    <span className="text-xs md:text-sm px-2.5 py-1 rounded-full font-bold bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold-light)] flex items-center gap-1 border border-[var(--mousa-border-sand)]">
                       {isDark ? <><Moon size={12} className="fill-current" /> {lang === 'ar' ? 'ليلي' : 'Dark'}</> : <><Sun size={12} /> {lang === 'ar' ? 'نهاري' : 'Light'}</>}
                     </span>
                   </button>
-                  <button onClick={() => setScreen('parental')} className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors text-left">
-                    <Shield size={20} className="text-[var(--color-church-blue)] md:w-6 md:h-6" />
-                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'تحكم الآباء (رمز PIN)' : 'Parental Controls (PIN)'}</span>
+
+                  <button onClick={() => setScreen('help')} className="w-full p-4 md:p-5 border-b border-gray-100 dark:border-stone-800 flex items-center gap-3 text-gray-700 dark:text-stone-200 hover:bg-gray-50 dark:hover:bg-stone-850 transition-colors text-left cursor-pointer">
+                    <HelpCircle size={20} className="text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold-light)] md:w-6 md:h-6" />
+                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'دليل الاستخدام والتواصل مع الكنيسة' : 'Help, FAQs & Church Contact'}</span>
                   </button>
-                  {onNavigate && (
-                    <>
-                      <button 
-                        onClick={() => onNavigate('designSystem')} 
-                        className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-amber-900 bg-amber-50/40 hover:bg-amber-100/50 transition-colors text-left cursor-pointer"
-                      >
-                        <Palette size={20} className="text-[var(--brand-burgundy)] md:w-6 md:h-6" />
-                        <div className="flex-1">
-                          <span className="font-bold block md:text-lg">
-                            {lang === 'copt' || lang === 'cop' ? 'Ⲡⲓⲥⲩⲥⲧⲏⲙⲁ ⲛ̀ⲧⲉ ⲡⲓⲥⲙⲟⲧ' : lang === 'ar' ? 'نظام التصميم الكنسي والخطوط' : 'Coptic Design System & Typography'}
-                          </span>
-                          <span className="text-xs text-[var(--color-neutral)]">
-                            {lang === 'ar' ? 'ألوان الكنيسة، الخطوط القبطية والعربية ومحرك القراءة' : 'Ecclesiastical palette, dual Coptic fonts & trilingual reader'}
-                          </span>
-                        </div>
-                        <span className="text-xs font-bold px-2 py-1 rounded-md bg-[var(--brand-burgundy)] text-white">
-                          v2.0
-                        </span>
-                      </button>
 
-                      <button 
-                        onClick={() => onNavigate('localizationQa')} 
-                        className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-stone-800 hover:bg-gray-50 transition-colors text-left cursor-pointer"
-                      >
-                        <ShieldCheck size={20} className="text-[var(--brand-gold-dark)] md:w-6 md:h-6" />
-                        <div className="flex-1">
-                          <span className="font-bold block md:text-lg">
-                            {lang === 'copt' || lang === 'cop' ? 'Ⲡⲓϫⲱⲕ ⲛ̀ϯⲁⲥⲡⲓ ⲛ̀ⲣⲉⲙⲛ̀ⲭⲏⲙⲓ' : lang === 'ar' ? 'فحص جودة الترجمة القبطية' : 'Bohairic Localization QA & Registry'}
-                          </span>
-                          <span className="text-xs text-[var(--color-neutral)]">
-                            {lang === 'ar' ? 'سجل المصطلحات الكنسية واعتماد النصوص القبطية' : 'Terminology glossary & liturgical verification'}
-                          </span>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => onNavigate('brandGuidelines')} 
-                        className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-stone-800 hover:bg-gray-50 transition-colors text-left cursor-pointer"
-                      >
-                        <BookOpen size={20} className="text-[var(--brand-blue)] md:w-6 md:h-6" />
-                        <div className="flex-1">
-                          <span className="font-bold block md:text-lg">
-                            {lang === 'copt' || lang === 'cop' ? 'Ⲛⲓⲕⲁⲛⲱⲛ ⲛ̀ⲧⲉ ⲡⲓⲥⲙⲟⲧ' : lang === 'ar' ? 'دليل الهوية البصرية الكنسية' : 'Brand & Identity Manual'}
-                          </span>
-                          <span className="text-xs text-[var(--color-neutral)]">
-                            {lang === 'ar' ? 'رموز الصليب، أصول الألوان والمواسم الطقسية' : 'Cross iconography, liturgical symbolism & seasons'}
-                          </span>
-                        </div>
-                      </button>
-                    </>
-                  )}
-
-                  <button onClick={() => setScreen('help')} className="w-full p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors text-left">
-                    <Info size={20} className="text-[var(--color-church-blue)] md:w-6 md:h-6" />
-                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'المساعدة والخصوصية' : 'Help & Privacy'}</span>
+                  <button onClick={() => setScreen('privacy')} className="w-full p-4 md:p-5 border-b border-gray-100 dark:border-stone-800 flex items-center gap-3 text-gray-700 dark:text-stone-200 hover:bg-gray-50 dark:hover:bg-stone-850 transition-colors text-left cursor-pointer">
+                    <ShieldCheck size={20} className="text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold-light)] md:w-6 md:h-6" />
+                    <span className="font-bold flex-1 md:text-lg">{lang === 'ar' ? 'سياسة الخصوصية وحماية البيانات' : 'Privacy & Data Protection'}</span>
                   </button>
                   <button 
                     onClick={() => setShowLogoutModal(true)} 
@@ -1085,19 +1023,19 @@ export function ProfileTab({
         {screen === 'edit' && (
           <motion.div key="edit" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
             <Header title={lang === 'ar' ? 'تعديل بيانات الحساب' : 'Edit Account Profile'} onBack={() => setScreen('main')} />
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[var(--color-church-cream-dark)] space-y-6">
+            <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-sm border border-[var(--mousa-border-sand)] space-y-6">
                <div className="text-center">
                  <div className="relative inline-block">
                     <img 
                       src={avatar} 
                       alt="Avatar" 
-                      className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-[var(--color-church-gold)] bg-amber-50 shadow-md object-cover" 
+                      className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-[var(--mousa-gold)] bg-amber-50 shadow-md object-cover" 
                     />
                     <button 
                       type="button"
                       disabled={isUploadingAvatar}
                       onClick={() => fileInputRef.current?.click()} 
-                      className="absolute bottom-0 right-0 bg-[var(--color-church-blue)] text-white p-2.5 rounded-full shadow-lg hover:bg-blue-800 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                      className="absolute bottom-0 right-0 bg-[var(--mousa-teal-deep)] text-white p-2.5 rounded-full shadow-lg hover:bg-blue-800 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
                       title={lang === 'ar' ? 'تحميل صورة من جهازك' : 'Upload photo from your device'}
                     >
                        {isUploadingAvatar ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
@@ -1112,7 +1050,7 @@ export function ProfileTab({
                  </div>
 
                  {isUploadingAvatar && (
-                   <p className="text-xs text-[var(--color-church-blue)] font-bold mt-2 flex items-center justify-center gap-1.5 animate-pulse">
+                   <p className="text-xs text-[var(--mousa-teal-deep)] font-bold mt-2 flex items-center justify-center gap-1.5 animate-pulse">
                      <Loader2 size={13} className="animate-spin" />
                      {lang === 'ar' ? 'جارٍ معالجة ورفع الصورة بجودة فائقة...' : 'Processing and uploading high-res avatar...'}
                    </p>
@@ -1122,20 +1060,20 @@ export function ProfileTab({
                  <div className="mt-5">
                     <div className="flex items-center justify-between mb-2.5 px-2">
                       <p className="text-xs md:text-sm font-bold text-gray-700 flex items-center gap-1.5">
-                        <Sparkles size={14} className="text-[var(--color-church-gold)]" />
+                        <Sparkles size={14} className="text-[var(--mousa-gold)]" />
                         {lang === 'ar' ? 'صور ورموز قبطية لمدارس الأحد:' : 'Coptic Sunday School Avatars:'}
                       </p>
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="text-xs text-[var(--color-church-blue)] font-bold hover:underline flex items-center gap-1"
+                        className="text-xs text-[var(--mousa-teal-deep)] font-bold hover:underline flex items-center gap-1"
                       >
                         <Upload size={12} />
                         {lang === 'ar' ? 'أو ارفع صورتك الخاصة' : 'Or upload custom'}
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5 max-w-xl mx-auto p-3 bg-[var(--color-church-cream)]/40 rounded-2xl border border-[var(--color-church-cream-dark)]">
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5 max-w-xl mx-auto p-3 bg-[var(--color-church-cream)]/40 rounded-2xl border border-[var(--mousa-border-sand)]">
                        {COPTIC_AVATARS.map((preset) => (
                           <button 
                             key={preset.id} 
@@ -1143,7 +1081,7 @@ export function ProfileTab({
                             onClick={() => setAvatar(preset.svgDataUri)} 
                             className={`group relative flex flex-col items-center gap-1 p-1.5 rounded-xl border-2 transition-all cursor-pointer ${
                               avatar === preset.svgDataUri 
-                                ? 'border-[var(--color-church-blue)] bg-white shadow-sm scale-105 ring-2 ring-blue-200' 
+                                ? 'border-[var(--mousa-teal-deep)] bg-white shadow-sm scale-105 ring-2 ring-blue-200' 
                                 : 'border-transparent bg-white/60 hover:bg-white hover:border-gray-200 hover:scale-102'
                             }`}
                             title={lang === 'ar' ? preset.nameAr : preset.nameEn}
@@ -1155,7 +1093,7 @@ export function ProfileTab({
                                {lang === 'ar' ? preset.nameAr : preset.nameEn}
                              </span>
                              {avatar === preset.svgDataUri && (
-                               <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--color-church-blue)] text-white flex items-center justify-center text-[10px]">
+                               <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--mousa-teal-deep)] text-white flex items-center justify-center text-[10px]">
                                  <Check size={10} strokeWidth={3} />
                                </div>
                              )}
@@ -1185,7 +1123,7 @@ export function ProfileTab({
                       }} 
                       placeholder={lang === 'ar' ? 'أدخل اسمك بالكامل' : 'Enter your full name'}
                       className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 outline-none font-bold text-gray-700 transition-colors ${
-                        validationErrors.userName ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--color-church-blue)]'
+                        validationErrors.userName ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--mousa-teal-deep)]'
                       }`} 
                     />
                  </div>
@@ -1194,7 +1132,7 @@ export function ProfileTab({
                  <div>
                     <label className="text-xs md:text-sm font-bold text-gray-600 mb-1.5 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Mail size={14} className="text-[var(--color-church-blue)]" />
+                        <Mail size={14} className="text-[var(--mousa-teal-deep)]" />
                         {isStudent 
                           ? (lang === 'ar' ? 'إيميل ولي الأمر (اختياري)' : 'Guardian Email (Optional)') 
                           : (lang === 'ar' ? 'البريد الإلكتروني *' : 'Email Address *')}
@@ -1214,7 +1152,7 @@ export function ProfileTab({
                       }} 
                       placeholder="parent.guardian@church.org"
                       className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 outline-none font-bold text-gray-700 transition-colors ${
-                        validationErrors.email ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--color-church-blue)]'
+                        validationErrors.email ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--mousa-teal-deep)]'
                       }`} 
                     />
                  </div>
@@ -1223,7 +1161,7 @@ export function ProfileTab({
                  <div>
                     <label className="text-xs md:text-sm font-bold text-gray-600 mb-1.5 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Phone size={14} className="text-[var(--color-church-blue)]" />
+                        <Phone size={14} className="text-[var(--mousa-teal-deep)]" />
                         {lang === 'ar' ? 'رقم الهاتف للتواصل' : 'Contact Phone Number'}
                       </span>
                       {validationErrors.phone && (
@@ -1241,7 +1179,7 @@ export function ProfileTab({
                       }} 
                       placeholder="+20 100 123 4567"
                       className={`w-full bg-gray-50 border-2 rounded-xl px-4 py-3 outline-none font-bold text-gray-700 transition-colors ${
-                        validationErrors.phone ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--color-church-blue)]'
+                        validationErrors.phone ? 'border-red-400 bg-red-50/40 focus:border-red-500' : 'border-gray-100 focus:border-[var(--mousa-teal-deep)]'
                       }`} 
                     />
                  </div>
@@ -1249,7 +1187,7 @@ export function ProfileTab({
                  {/* Grade / Sunday School Group */}
                  <div>
                     <label className="text-xs md:text-sm font-bold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                      <GraduationCap size={14} className="text-[var(--color-church-blue)]" />
+                      <GraduationCap size={14} className="text-[var(--mousa-teal-deep)]" />
                       {lang === 'ar' ? 'مرحلة مدارس الأحد' : 'Sunday School Grade / Class'}
                     </label>
                     <input 
@@ -1257,7 +1195,7 @@ export function ProfileTab({
                       value={grade} 
                       onChange={e => setGrade(e.target.value)} 
                       placeholder={lang === 'ar' ? 'مثال: ابتدائي - مرحلة ثالثة' : 'e.g. Primary - Grade 3'}
-                      className="w-full bg-gray-50 border-2 border-gray-100 focus:border-[var(--color-church-blue)] rounded-xl px-4 py-3 outline-none font-bold text-gray-700"
+                      className="w-full bg-gray-50 border-2 border-gray-100 focus:border-[var(--mousa-teal-deep)] rounded-xl px-4 py-3 outline-none font-bold text-gray-700"
                     />
                  </div>
                </div>
@@ -1266,7 +1204,7 @@ export function ProfileTab({
                  <button 
                    onClick={handleUpdateProfile} 
                    disabled={isSaving}
-                   className="w-full bg-[var(--color-church-blue)] text-white font-bold py-4 rounded-xl flex justify-center items-center gap-2 shadow-md hover:bg-blue-900 active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                   className="w-full bg-[var(--mousa-teal-deep)] text-white font-bold py-4 rounded-xl flex justify-center items-center gap-2 shadow-md hover:bg-blue-900 active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                  >
                    {isSaving ? (
                      <>
@@ -1288,18 +1226,18 @@ export function ProfileTab({
         {screen === 'settings' && (
           <motion.div key="settings" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
             <Header title={lang === 'ar' ? 'الإعدادات' : 'Settings'} onBack={() => setScreen('main')} />
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-6">
+            <div className="bg-white dark:bg-[#1E1914] rounded-3xl p-6 shadow-sm border border-[var(--mousa-border-sand)] space-y-6">
                {/* Dark Theme Sanctuary Mode Toggle */}
-               <div className="flex items-center justify-between p-4 bg-[var(--color-church-cream)]/60 rounded-2xl border border-[var(--color-church-cream-dark)]">
+               <div className="flex items-center justify-between p-4 bg-[var(--color-church-cream)]/60 dark:bg-stone-900/60 rounded-2xl border border-[var(--mousa-border-sand)]">
                  <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-xl bg-[var(--color-church-gold)]/20 text-[var(--color-church-gold)] flex items-center justify-center">
+                   <div className="w-10 h-10 rounded-xl bg-[var(--mousa-gold)]/20 text-[var(--mousa-gold)] flex items-center justify-center">
                      {isDark ? <Moon size={22} className="fill-current" /> : <Sun size={22} />}
                    </div>
                    <div>
-                     <p className="font-bold text-[var(--color-church-blue)] text-base">
+                     <p className="font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] text-base">
                        {lang === 'ar' ? 'الوضع الليلي للكنيسة' : 'Dark Church Mode'}
                      </p>
-                     <p className="text-xs text-gray-500 font-medium">
+                     <p className="text-xs text-gray-500 dark:text-[#C5B5A0] font-medium">
                        {lang === 'ar' ? 'إضاءة خافتة مريحة للعين أثناء القداس والصلوات' : 'Low-light sanctuary colors for liturgies & evening study'}
                      </p>
                    </div>
@@ -1308,7 +1246,7 @@ export function ProfileTab({
                    type="button"
                    onClick={toggleTheme}
                    className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                     isDark ? 'bg-[var(--color-church-gold)]' : 'bg-gray-300'
+                     isDark ? 'bg-[var(--mousa-gold)]' : 'bg-gray-300'
                    }`}
                    role="switch"
                    aria-checked={isDark}
@@ -1328,95 +1266,334 @@ export function ProfileTab({
                </div>
 
                <div className="flex items-center justify-between pt-2">
-                 <span className="font-bold text-gray-700">{lang === 'ar' ? 'تأثيرات صوتية' : 'Sound Effects'}</span>
-                 <input type="checkbox" defaultChecked className="w-6 h-6 accent-[var(--color-church-blue)]" />
+                 <span className="font-bold text-gray-700 dark:text-[#FAF5EB]">{lang === 'ar' ? 'تأثيرات صوتية' : 'Sound Effects'}</span>
+                 <input type="checkbox" defaultChecked className="w-6 h-6 accent-[var(--mousa-teal-deep)]" />
                </div>
                <div className="flex items-center justify-between">
-                 <span className="font-bold text-gray-700">{lang === 'ar' ? 'إشعارات يومية' : 'Daily Notifications'}</span>
-                 <input type="checkbox" defaultChecked className="w-6 h-6 accent-[var(--color-church-blue)]" />
+                 <span className="font-bold text-gray-700 dark:text-[#FAF5EB]">{lang === 'ar' ? 'إشعارات يومية' : 'Daily Notifications'}</span>
+                 <input type="checkbox" defaultChecked className="w-6 h-6 accent-[var(--mousa-teal-deep)]" />
                </div>
             </div>
           </motion.div>
         )}
 
-        {screen === 'parental' && (
-          <motion.div key="parental" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
-            <Header title={lang === 'ar' ? 'تحكم الآباء' : 'Parental Controls'} onBack={() => setScreen('main')} />
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-4 text-center">
-               <Shield size={48} className="text-[var(--color-church-gold)] mx-auto mb-4" />
-               <p className="text-sm font-bold text-gray-600 mb-4">
-                 {!userData.parentPin 
-                   ? (lang === 'ar' ? 'لم تقم بتعيين كلمة سر بعد. أدخل ٤ أرقام لإنشاء واحدة:' : 'No PIN set yet. Enter 4 digits to create one:')
-                   : (lang === 'ar' ? 'أدخل كلمة سر الأب/الأم للوصول:' : 'Enter Parent PIN to access:')}
-               </p>
-               <input 
-                 type="password" 
-                 value={parentPinInput}
-                 onChange={(e) => setParentPinInput(e.target.value)}
-                 placeholder="****" 
-                 className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 outline-none font-bold text-center tracking-widest text-2xl" 
-                 maxLength={4} 
-               />
-               <button onClick={handleParentUnlock} className="w-full bg-[var(--color-church-burgundy)] text-white font-bold py-3 rounded-xl shadow-md mt-4 hover:bg-red-800 transition-colors">
-                 {lang === 'ar' ? 'دخول' : 'Enter'}
-               </button>
-            </div>
-          </motion.div>
-        )}
-
-        {screen === 'parental_dashboard' && (
-          <motion.div key="parental_dashboard" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
-            <Header title={lang === 'ar' ? 'لوحة تحكم الآباء' : 'Parental Dashboard'} onBack={() => setScreen('main')} />
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-[var(--color-church-cream-dark)] space-y-6">
-               <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                  <h3 className="font-bold text-[var(--color-church-blue)] mb-2">{lang === 'ar' ? 'وقت الشاشة الإجمالي' : 'Total Screen Time'}</h3>
-                  <p className="text-3xl font-bold text-[var(--color-church-burgundy)]">
-                    {formatScreenTime(userData.screenTimeSeconds || 0)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2 font-bold">{lang === 'ar' ? 'الوقت الذي قضاه الطفل في التطبيق' : 'Time your child spent learning on the app.'}</p>
-               </div>
-
-               <div>
-                 <h3 className="font-bold text-gray-700 mb-3">{lang === 'ar' ? 'تغيير كلمة السر' : 'Change Parent PIN'}</h3>
-                 <div className="flex gap-2">
-                    <input 
-                      type="password" 
-                      value={newParentPin}
-                      onChange={(e) => setNewParentPin(e.target.value)}
-                      placeholder={lang === 'ar' ? 'كلمة السر الجديدة' : 'New PIN (4 digits)'}
-                      className="flex-1 bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2 outline-none font-bold text-center tracking-widest" 
-                      maxLength={4} 
-                    />
-                    <button 
-                      onClick={() => {
-                        if (newParentPin.length === 4) {
-                           updateUserProfile({ parentPin: newParentPin });
-                           alert(lang === 'ar' ? 'تم تحديث كلمة السر' : 'PIN updated successfully');
-                           setNewParentPin('');
-                        }
-                      }}
-                      className="bg-[var(--color-church-blue)] text-white font-bold px-4 py-2 rounded-xl shadow-sm"
-                    >
-                      {lang === 'ar' ? 'حفظ' : 'Save'}
-                    </button>
-                 </div>
-               </div>
-            </div>
-          </motion.div>
-        )}
-
+        {/* Working Help & Guidance Screen */}
         {screen === 'help' && (
           <motion.div key="help" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
-            <Header title={lang === 'ar' ? 'المساعدة والخصوصية' : 'Help & Privacy'} onBack={() => setScreen('main')} />
-            <div className="bg-white rounded-3xl p-2 shadow-sm border border-[var(--color-church-cream-dark)] space-y-2">
-               <button className="w-full p-4 flex items-center gap-3 text-gray-700 hover:bg-gray-50 rounded-2xl text-left">
-                  <HelpCircle size={20} className="text-[var(--color-church-blue)]" />
-                  <span className="font-bold flex-1">{lang === 'ar' ? 'الأسئلة الشائعة' : 'FAQ'}</span>
-               </button>
-               <button className="w-full p-4 flex items-center gap-3 text-gray-700 hover:bg-gray-50 rounded-2xl text-left">
-                  <FileText size={20} className="text-[var(--color-church-blue)]" />
-                  <span className="font-bold flex-1">{lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}</span>
-               </button>
+            <Header title={lang === 'ar' ? 'المساعدة ودليل الاستخدام الكنسي' : 'Help & Church Guide'} onBack={() => setScreen('main')} />
+            
+            {/* Sub-tab selection */}
+            <div className="flex bg-[var(--mousa-sand-100)] dark:bg-[#25201A] p-1.5 rounded-2xl border border-[var(--mousa-border-sand)] gap-1 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setHelpSubTab('guide')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  helpSubTab === 'guide'
+                    ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-xs'
+                    : 'text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] hover:text-[var(--mousa-teal-deep)]'
+                }`}
+              >
+                {lang === 'ar' ? '🧭 دليل أقسام التطبيق' : '🧭 Navigation Guide'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHelpSubTab('faq')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  helpSubTab === 'faq'
+                    ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-xs'
+                    : 'text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] hover:text-[var(--mousa-teal-deep)]'
+                }`}
+              >
+                {lang === 'ar' ? '❓ الأسئلة الشائعة' : '❓ FAQs'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHelpSubTab('contact')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  helpSubTab === 'contact'
+                    ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black shadow-xs'
+                    : 'text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] hover:text-[var(--mousa-teal-deep)]'
+                }`}
+              >
+                {lang === 'ar' ? '⛪ التواصل مع الكنيسة' : '⛪ Church Contact'}
+              </button>
+            </div>
+
+            {/* Sub-tab 1: Navigation Guide */}
+            {helpSubTab === 'guide' && (
+              <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 shadow-xs border-2 border-[var(--mousa-border-sand)] space-y-4">
+                <h3 className="font-black text-base md:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-2">
+                  <BookOpen size={20} className="text-[var(--mousa-gold)]" />
+                  <span>{lang === 'ar' ? 'دليل أقسام منصة كنيسة القديس الأنبا موسى' : 'St. Moses Church Platform Navigation Guide'}</span>
+                </h3>
+                <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#C5B5A0] leading-relaxed">
+                  {lang === 'ar'
+                    ? 'صُمم التطبيق لربط أبناء الكنيسة بالصلوات اليومية، مناهج مدارس الأحد، وتتبع التقدم الروحي تحت رعاية الآباء والخدام.'
+                    : 'Designed to connect church youth with daily liturgical prayers, Sunday School curriculum, and spiritual progress.'}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                  {[
+                    {
+                      icon: '🏠',
+                      title: lang === 'ar' ? 'الرئيسية (مسار الأنبا موسى)' : 'Home (Moses Journey)',
+                      desc: lang === 'ar' ? 'آية اليوم، شعلة المواظبة، محطة اليوم في البرية، وشريط إنجاز المنهج.' : 'Daily verse, prayer streak, today quest, and live progress bar.'
+                    },
+                    {
+                      icon: '📖',
+                      title: lang === 'ar' ? 'محطات الدروس (مدارس الأحد)' : 'Lessons (Sunday School)',
+                      desc: lang === 'ar' ? 'تصفح دروس مرحلتك الدراسية، أداء الاختبارات التفاعلية، وتسميع الآيات بالصوت.' : 'Explore class milestones, interactive quizzes, and voice verse recitation.'
+                    },
+                    {
+                      icon: '🕊️',
+                      title: lang === 'ar' ? 'صلوات الأجبية اليومية' : 'Daily Agpeya Prayers',
+                      desc: lang === 'ar' ? 'الصلوات السبع اليومية بالنصوص القبطية والعربية مع ميزة الاستماع والتسجيل.' : 'Canonical 7 hours with bilingual Coptic/Arabic text and prayer tracker.'
+                    },
+                    {
+                      icon: '🎵',
+                      title: lang === 'ar' ? 'مدرسة الألحان الكنسية' : 'Coptic Hymns School',
+                      desc: lang === 'ar' ? 'تعليم ألحان القداس والمناسبات هزات بالنطق القبطي الدقيق مع مشغل صوتي.' : 'Liturgical hymns with accurate Bohairic phonetic syllables and playback.'
+                    },
+                    {
+                      icon: '📅',
+                      title: lang === 'ar' ? 'التقويم والسنكسار القبطي' : 'Coptic Calendar & Synaxarium',
+                      desc: lang === 'ar' ? 'شهور السنة القبطية، سير قديسي اليوم، مواعيد الأصوام والأعياد السيدية.' : 'Coptic calendar months, daily saint biographies, feasts and fasts.'
+                    },
+                    {
+                      icon: '🌟',
+                      title: lang === 'ar' ? 'كنز البركة والنقاط' : 'Blessing Points & Rewards',
+                      desc: lang === 'ar' ? 'جمع نقاط البركة من حفظ الآيات والدروس واستبدالها بهدايا كنسية معتمدة.' : 'Collect blessing points and redeem them for servant-approved church gifts.'
+                    },
+                    {
+                      icon: '💬',
+                      title: lang === 'ar' ? 'واحة مجتمع الكنيسة' : 'Church Community Oasis',
+                      desc: lang === 'ar' ? 'متابعة إعلانات الخدام، تأملات روحية آمنة، ومشاركات فصل مدارس الأحد.' : 'Servant announcements, spiritual reflections, and safe class fellowship.'
+                    },
+                    {
+                      icon: '👨‍👩‍👧',
+                      title: lang === 'ar' ? 'بوابة ولي الأمر والأبناء' : 'Parent Family Hub',
+                      desc: lang === 'ar' ? 'ربط حسابات الأبناء بالرمز السري، متابعة الإنجازات، وتشجيعهم بالبركات.' : 'Link child accounts via secret code, track progress, and send blessings.'
+                    }
+                  ].map((item, idx) => (
+                    <div key={idx} className="p-3.5 rounded-2xl bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 border border-[var(--mousa-border-sand)] space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{item.icon}</span>
+                        <h4 className="font-extrabold text-xs sm:text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">{item.title}</h4>
+                      </div>
+                      <p className="text-[11px] text-[var(--mousa-sand-600)] dark:text-[#C5B5A0] leading-relaxed font-medium">
+                        {item.desc}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tab 2: Frequently Asked Questions */}
+            {helpSubTab === 'faq' && (
+              <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 shadow-xs border-2 border-[var(--mousa-border-sand)] space-y-4">
+                <h3 className="font-black text-base md:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-2">
+                  <HelpCircle size={20} className="text-[var(--mousa-gold)]" />
+                  <span>{lang === 'ar' ? 'الأسئلة الشائعة حول المنصة' : 'Frequently Asked Questions'}</span>
+                </h3>
+
+                <div className="space-y-3 pt-1">
+                  {[
+                    {
+                      q: lang === 'ar' ? 'كيف ينضم الطالب إلى فصل مدارس الأحد الخاص به؟' : 'How does a student join their Sunday School class?',
+                      a: lang === 'ar'
+                        ? 'يمكنك الانضمام بكتابة كود الفصل (رمز مكون من ٦ أحرف/أرقام) الذي يشاركه معك خادم الفصل في كنيسة القديس موسى، من خلال بطاقة "فصل وصف مدارس الأحد" في حسابك الشخصي.'
+                        : 'You can join by entering the 6-character class code provided by your Sunday School servant in the Class Card on your profile.'
+                    },
+                    {
+                      q: lang === 'ar' ? 'كيف يربط ولي الأمر حسابه بحساب طفله؟' : 'How can a parent link their account with their child?',
+                      a: lang === 'ar'
+                        ? 'يمتلك كل طالب رمزاً سرياً فريداً (مثال: ST-4921) وكود QR في حسابه. يقوم ولي الأمر بفتح "بوابة الأهل" وإدخال الرمز أو مسح الكود، لتتم المزامنة وتظهر متابعة الطفل فوراً.'
+                        : 'Every student has a unique secret code (e.g., ST-4921) and QR code in their profile. Parents enter this code in the Parent Portal to link.'
+                    },
+                    {
+                      q: lang === 'ar' ? 'هل يعمل التطبيق أثناء التواجد في الكنيسة بدون اتصال إنترنت؟' : 'Does the platform work offline in the sanctuary?',
+                      a: lang === 'ar'
+                        ? 'نعم! صلوات الأجبية، نصوص الألحان، والدروس التي فتحتها سابقاً تُحفظ في ذاكرة جهازك تلقائياً لتعمل بدون إنترنت أثناء القداس والاجتماعات.'
+                        : 'Yes! Daily Agpeya prayers, Coptic hymns, and previously opened lessons are cached locally for offline prayer in the church.'
+                    },
+                    {
+                      q: lang === 'ar' ? 'كيف يتم احتساب شعلة الأيام ونقاط البركة؟' : 'How are streaks and blessing points calculated?',
+                      a: lang === 'ar'
+                        ? 'تزيد شعلة الأيام عند فتح التطبيق والمواظبة على صلوات الأجبية والدروس يومياً. وتكتسب نقاط البركة (+٥٠ إلى +١٥٠) مع إتمام كل درس وتسميع آية اليوم بنجاح.'
+                        : 'Streaks increase with daily consecutive prayer and study. Blessing points (+50 to +150) are awarded for completed lessons and verse recitals.'
+                    }
+                  ].map((faq, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 border border-[var(--mousa-border-sand)] space-y-1.5">
+                      <h4 className="font-bold text-xs sm:text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-1.5">
+                        <span className="text-[var(--mousa-gold)]">●</span>
+                        <span>{faq.q}</span>
+                      </h4>
+                      <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed font-medium pl-3">
+                        {faq.a}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tab 3: Church & Servant Contact Route */}
+            {helpSubTab === 'contact' && (
+              <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 shadow-xs border-2 border-[var(--mousa-border-sand)] space-y-4">
+                <h3 className="font-black text-base md:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-2">
+                  <Cross size={20} className="text-[var(--mousa-gold)]" />
+                  <span>{lang === 'ar' ? 'قنوات التواصل المتاحة مع الكنيسة والخدام' : 'Available Church & Servant Contact Routes'}</span>
+                </h3>
+                <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#C5B5A0] leading-relaxed">
+                  {lang === 'ar'
+                    ? 'في كنيسة القديس الأنبا موسى الأسود، خدامك وآباؤك الكهنة متواجدون لدعمك روحياً ودراسياً عبر القنوات الكنسية الرسمية المعتمدة:'
+                    : 'At St. Moses Coptic Orthodox Church, your servants and fathers are here to support you through established church routes:'}
+                </p>
+
+                <div className="space-y-3 pt-2">
+                  {/* Channel 1: In-App Class Servant Roster */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 to-emerald-50/70 dark:from-stone-900 dark:to-stone-850 border border-blue-200 dark:border-stone-700 flex items-start gap-3">
+                    <span className="text-2xl p-2 bg-white dark:bg-stone-800 rounded-xl shadow-xs shrink-0">⛪</span>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                        {lang === 'ar' ? '1. خادم الفصل ومسؤول مدارس الأحد' : '1. Class Servant & Sunday School Guide'}
+                      </h4>
+                      <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed font-medium">
+                        {lang === 'ar'
+                          ? 'يمكنك التحدث مع خادم مرحلتك مباشرة أثناء الفصل لتأكيد تسكينك في الكشف، تسليم مسابقات الألحان، أو استلام الجوائز.'
+                          : 'Speak directly with your assigned class servant to confirm enrollment, submit hymn recitals, or redeem rewards.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Channel 2: Community Oasis Announcements */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50/70 to-orange-50/70 dark:from-stone-900 dark:to-stone-850 border border-amber-200 dark:border-stone-700 flex items-start gap-3">
+                    <span className="text-2xl p-2 bg-white dark:bg-stone-800 rounded-xl shadow-xs shrink-0">📢</span>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                        {lang === 'ar' ? '2. واحة مجتمع الكنيسة والمنشورات' : '2. Church Oasis & Announcements'}
+                      </h4>
+                      <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed font-medium">
+                        {lang === 'ar'
+                          ? 'تُنشر المواعيد الطقسية وتنبيهات الخدام والرحلات في تبويب "المنشورات"، ويمكنك التفاعل والاستفسار تحت كل منشور كنسي.'
+                          : 'Liturgical schedules and servant updates are shared in the Feed tab, where you can comment and follow church announcements.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Channel 3: In-Person Liturgy & Meetings */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-stone-50 to-amber-50/50 dark:from-stone-900 dark:to-stone-850 border border-[var(--mousa-border-sand)] flex items-start gap-3">
+                    <span className="text-2xl p-2 bg-white dark:bg-stone-800 rounded-xl shadow-xs shrink-0">🕊️</span>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                        {lang === 'ar' ? '3. الحضور الكنسي واللقاء الشخصي' : '3. Pastoral Care & In-Person Fellowship'}
+                      </h4>
+                      <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed font-medium">
+                        {lang === 'ar'
+                          ? 'كنيسة القديس الأنبا موسى ترحب بك دائماً في القداس الإلهي كل أحد، واجتماعات مدارس الأحد والأنشطة الكشفية والروحية الأسبوعية.'
+                          : 'St. Moses Church welcomes you during Sunday Divine Liturgies and weekly Sunday School meetings and activities.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Working Readable Privacy Policy Screen */}
+        {screen === 'privacy' && (
+          <motion.div key="privacy" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 50, opacity: 0 }} className="space-y-6">
+            <Header title={lang === 'ar' ? 'سياسة الخصوصية وحماية البيانات' : 'Privacy & Data Protection Policy'} onBack={() => setScreen('main')} />
+            
+            <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 sm:p-7 shadow-xs border-2 border-[var(--mousa-border-sand)] space-y-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-[var(--mousa-border-sand)]/60">
+                <div className="w-11 h-11 rounded-2xl bg-[var(--mousa-teal)] text-white flex items-center justify-center font-bold shadow-xs">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h3 className="font-black text-base sm:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                    {lang === 'ar' ? 'معايير الخصوصية وسلامة بيانات أبناء الكنيسة' : 'Church Privacy & Youth Data Protection'}
+                  </h3>
+                  <p className="text-xs text-[var(--mousa-sand-500)] dark:text-[#C5B5A0] font-medium">
+                    {lang === 'ar' ? 'بيان الشفافية الدقيق حول كيفية التعامل مع بياناتك وفقاً لكود وإعدادات التطبيق' : 'Truthful disclosure of data handling supported by code and platform architecture'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Section 1: Collected Data */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-1.5">
+                  <span className="text-[var(--mousa-gold)]">1.</span>
+                  <span>{lang === 'ar' ? 'البيانات التي يسجلها التطبيق' : 'Information Stored by the Application'}</span>
+                </h4>
+                <ul className="space-y-1.5 text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed list-disc list-inside pl-2">
+                  <li>
+                    <strong>{lang === 'ar' ? 'بيانات الحساب الشخصي:' : 'Account Details:'}</strong> {lang === 'ar' ? 'الاسم، المرحلة الدراسية، الدور الكنسي (طالب / ولي أمر / خادم)، والصورة الرمزية.' : 'Full name, Sunday School grade, user role, and avatar photo.'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'ar' ? 'المسار الروحي والتعليمي:' : 'Spiritual & Educational Progress:'}</strong> {lang === 'ar' ? 'الدروس المكتملة، شعلة صلوات الأجبية، درجات الاختبارات، ونقاط البركة المكتسبة.' : 'Completed lessons, Agpeya prayer streaks, quiz scores, and blessing points.'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'ar' ? 'ربط الأسرة والأبناء:' : 'Family Linkage:'}</strong> {lang === 'ar' ? 'الرمز السري الخاص بالطفل لتسهيل متابعة ولي الأمر لوقت الشاشة وتشجيع الطفل.' : 'Unique child link code linking parents to their children for supervision.'}
+                  </li>
+                </ul>
+              </div>
+
+              {/* Section 2: Storage Infrastructure */}
+              <div className="space-y-2 pt-2 border-t border-[var(--mousa-border-sand)]/60">
+                <h4 className="font-extrabold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-1.5">
+                  <span className="text-[var(--mousa-gold)]">2.</span>
+                  <span>{lang === 'ar' ? 'أين تُحفظ بياناتك؟' : 'Where is Your Data Stored?'}</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-2xl bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 border border-[var(--mousa-border-sand)] space-y-1">
+                    <span className="font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] block">
+                      📱 {lang === 'ar' ? 'الذاكرة المحلية لجهازك (LocalStorage)' : 'Local Device Storage'}
+                    </span>
+                    <p className="text-[11px] text-[var(--mousa-sand-600)] dark:text-[#C5B5A0] leading-relaxed">
+                      {lang === 'ar'
+                        ? 'تُحفظ نصوص الأجبية، الألحان، وتفضيلات اللغة والوضع الليلي محلياً على جهازك لضمان سرعة التصفح والعمل بدون إنترنت.'
+                        : 'Stores prayer cache, hymns, language and theme preferences for immediate offline access.'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 border border-[var(--mousa-border-sand)] space-y-1">
+                    <span className="font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] block">
+                      ⛪ {lang === 'ar' ? 'قاعدة بيانات الكنيسة السحابية (Supabase)' : 'Church Cloud Database (Supabase)'}
+                    </span>
+                    <p className="text-[11px] text-[var(--mousa-sand-600)] dark:text-[#C5B5A0] leading-relaxed">
+                      {lang === 'ar'
+                        ? 'لأعضاء الفصول المسجلين، تُحفظ كشوف المجموعات وسجلات الحضور والواجبات تحت إشراف خدام مدارس الأحد حصراً.'
+                        : 'Stores class rosters, verified attendance, and lesson submissions under servant supervision.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Safety & Non-Commercial Guarantee */}
+              <div className="space-y-2 pt-2 border-t border-[var(--mousa-border-sand)]/60">
+                <h4 className="font-extrabold text-sm text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-1.5">
+                  <span className="text-[var(--mousa-gold)]">3.</span>
+                  <span>{lang === 'ar' ? 'الأمان وعدم الاستغلال التجاري' : 'Safety & Non-Commercial Commitment'}</span>
+                </h4>
+                <p className="text-xs text-[var(--mousa-sand-600)] dark:text-[#D5C7B5] leading-relaxed">
+                  {lang === 'ar'
+                    ? 'هذا التطبيق مخصص بالكامل لخدمة مدارس الأحد بكنيسة القديس الأنبا موسى الأسود. لا يحتوي التطبيق على أي إعلانات تجارية، ولا يبيع أو يشارك أي بيانات لأي جهة خارجية، وتقتصر كافة المعلومات على الأغراض الرعوية والتعليمية الكنسية.'
+                    : 'This platform is exclusively dedicated to the ministry of St. Moses Coptic Church. It contains zero commercial advertisements, sells zero data, and uses information strictly for pastoral and spiritual growth.'}
+                </p>
+              </div>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setScreen('main')}
+                  className="px-6 py-2.5 rounded-xl bg-[var(--mousa-teal-deep)] text-white text-xs font-bold hover:bg-blue-900 transition-colors cursor-pointer shadow-xs"
+                >
+                  {lang === 'ar' ? 'العودة للملف الشخصي' : 'Back to Profile'}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1430,7 +1607,7 @@ export function ProfileTab({
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-[var(--color-church-cream-dark)] text-center space-y-4"
+              className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-[var(--mousa-border-sand)] text-center space-y-4"
             >
               <div className="w-14 h-14 mx-auto rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center">
                 <LogOut size={28} />

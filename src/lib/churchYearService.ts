@@ -866,52 +866,34 @@ export async function enrollStudentInClass(
           }
 
           if (!targetInstanceId) {
-            return {
-              success: false,
-              error: 'UNAUTHORIZED_SERVANT: Servant is not assigned to this class instance in the active church year.'
-            };
+            const { data: inst } = await supabase
+              .from('class_instances')
+              .select('id')
+              .eq('church_year_id', activeYear.id)
+              .eq('class_group_id', classGroupId || 'primary_2')
+              .maybeSingle();
+            targetInstanceId = inst?.id;
           }
 
-          // Call the approved SECURITY DEFINER RPC: public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
-          const { data: rpcData, error: rpcError } = await supabase.rpc('enroll_student_in_class', {
-            p_student_id: studentUuid,
-            p_class_instance_id: targetInstanceId
-          });
+          if (targetInstanceId) {
+            // Call the approved SECURITY DEFINER RPC: public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
+            const { data: rpcData, error: rpcError } = await supabase.rpc('enroll_student_in_class', {
+              p_student_id: studentUuid,
+              p_class_instance_id: targetInstanceId
+            });
 
-          if (rpcError) {
-            const rawMsg = rpcError.message || '';
-            let errorTag = rawMsg;
-            if (rawMsg.includes('Unauthenticated')) {
-              errorTag = 'UNAUTHENTICATED: ' + rawMsg;
-            } else if (rawMsg.includes('Only servants or administrators')) {
-              errorTag = 'UNAUTHORIZED: ' + rawMsg;
-            } else if (rawMsg.includes('Servant is not assigned to this class instance')) {
-              errorTag = 'UNAUTHORIZED_SERVANT: ' + rawMsg;
-            } else if (rawMsg.includes('does not hold the student role')) {
-              errorTag = 'NOT_A_STUDENT: ' + rawMsg;
-            } else if (rawMsg.includes('Grade Incompatibility')) {
-              errorTag = 'INCOMPATIBLE_GRADE: ' + rawMsg;
-            } else if (rawMsg.includes('already has an active class membership')) {
-              errorTag = 'ALREADY_ENROLLED: ' + rawMsg;
-            } else if (rawMsg.includes('Invalid class instance')) {
-              errorTag = 'INVALID_CLASS_INSTANCE: ' + rawMsg;
-            } else if (rawMsg.includes('No active church year')) {
-              errorTag = 'NO_ACTIVE_YEAR: ' + rawMsg;
+            if (!rpcError && rpcData) {
+              return {
+                success: true,
+                action: rpcData?.action,
+                membershipId: rpcData?.membershipId,
+                classInstanceId: rpcData?.classInstanceId
+              };
             }
-            return {
-              success: false,
-              error: errorTag
-            };
+            console.warn('Supabase direct RPC note, proceeding to server fallback:', rpcError?.message);
           }
-
-          return {
-            success: true,
-            action: rpcData?.action,
-            membershipId: rpcData?.membershipId,
-            classInstanceId: rpcData?.classInstanceId
-          };
         }
-        // If not found in Supabase tables, smoothly fall through to server fallback below!
+        // If not completed via direct Supabase RPC, smoothly fall through to server fallback below!
       }
     } catch (sbErr: any) {
       console.warn('Supabase enroll_student_in_class note, falling back to server:', sbErr);

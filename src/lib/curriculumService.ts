@@ -174,19 +174,52 @@ export function adaptDbLessonToAppLesson(
 
   if (activeVersion?.quizDraft?.questions && activeVersion.quizDraft.questions.length > 0) {
     quizQuestions = activeVersion.quizDraft.questions.map((q: QuizQuestionDraft) => ({
+      id: q.id,
       question: q.questionEn,
       options: q.optionsEn,
       correctIndex: q.correctIndex,
       type: q.type === 'multiple_choice' ? 'multiple_choice' : undefined,
+      difficulty: q.difficulty || 'EASY',
+      points: q.points || (q.difficulty === 'HARD' ? 30 : q.difficulty === 'MEDIUM' ? 20 : 10),
       sourceRef: q.sourceRef ? `${q.sourceRef.sectionTitle} (${q.sourceRef.location})` : undefined
     }));
   } else if (Array.isArray(dbLesson.quiz_questions) && dbLesson.quiz_questions.length > 0) {
-    quizQuestions = dbLesson.quiz_questions as QuizQuestion[];
+    quizQuestions = (dbLesson.quiz_questions as any[]).map((q: any) => ({
+      id: q.id,
+      question: q.question,
+      options: q.options || [],
+      correctIndex: q.correctIndex ?? 0,
+      type: q.type || 'multiple_choice',
+      difficulty: q.difficulty || 'EASY',
+      points: q.points || (q.difficulty === 'HARD' ? 30 : q.difficulty === 'MEDIUM' ? 20 : 10),
+      sourceRef: q.sourceRef
+    }));
   }
 
   const status = (dbLesson.status as any) || 
                  (dbLesson.lesson_status as any) || 
                  (activeVersion?.status === 'PUBLISHED' ? 'published' : 'draft');
+
+  // Video, slides, and audio from sources or fields
+  let videoUrl = (dbLesson as any).video_url || undefined;
+  let slidesUrl = dbLesson.pdf_worksheet_url || undefined;
+  let audioUrl = dbLesson.audio_url || undefined;
+  let teacherNotes = (dbLesson as any).teacher_notes || undefined;
+
+  if (sources && sources.length > 0) {
+    if (!videoUrl) {
+      const vSrc = sources.find(s => s.type === 'YOUTUBE_VIDEO' || s.type === 'TEACHER_VIDEO');
+      if (vSrc) videoUrl = vSrc.fileUrl;
+    }
+    if (!slidesUrl) {
+      const sSrc = sources.find(s => s.type === 'PPTX' || s.type === 'PDF');
+      if (sSrc) slidesUrl = sSrc.fileUrl;
+    }
+    if (!audioUrl) {
+      const aSrc = sources.find(s => s.type === 'TEACHER_VOICE');
+      if (aSrc) audioUrl = aSrc.fileUrl;
+    }
+  }
 
   return {
     id: dbLesson.id,
@@ -208,6 +241,10 @@ export function adaptDbLessonToAppLesson(
     scriptureVerseEn: dbLesson.scripture_verse_en || undefined,
     scriptureVerseAr: dbLesson.scripture_verse_ar || undefined,
     verseReference: dbLesson.verse_reference || undefined,
+    videoUrl,
+    slidesUrl,
+    audioUrl,
+    teacherNotes
   };
 }
 

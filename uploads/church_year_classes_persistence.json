@@ -140,9 +140,33 @@
       "classInstanceId": "inst_2026-2027_primary_2",
       "studentId": "student-david",
       "studentName": "David Shenouda",
-      "exactGrade": "Grade 5",
+      "exactGrade": "Grade 4",
       "status": "ACTIVE",
-      "enrolledAt": "2026-10-11T13:27:32.406Z",
+      "enrolledAt": "2026-10-12T13:11:10.611Z",
+      "enrolledBy": "servant"
+    },
+    "mem_student-new-user-01_2026-2027": {
+      "id": "mem_student-new-user-01_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2026-2027_primary_2",
+      "studentId": "student-new-user-01",
+      "studentName": "Bishoy Raouf",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-11T13:29:02.757Z",
+      "enrolledBy": "26188619-5bf6-412e-b91f-bef4330a8016"
+    },
+    "mem_student_new_youssef_777_2026-2027": {
+      "id": "mem_student_new_youssef_777_2026-2027",
+      "churchYear": "2026–2027",
+      "classGroupId": "primary_2",
+      "classInstanceId": "inst_2026-2027_primary_2",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "exactGrade": "Grade 4",
+      "status": "ACTIVE",
+      "enrolledAt": "2026-10-11T13:45:38.436Z",
       "enrolledBy": "mina"
     }
   },
@@ -160,6 +184,9 @@
     "user_teacher_other_404": [
       "preparatory",
       "angels"
+    ],
+    "servant-kyrollos-church-org": [
+      "primary_2"
     ]
   },
   "userRoles": {
@@ -196,7 +223,7 @@
     "student-david": {
       "studentId": "student-david",
       "fullName": "David Shenouda",
-      "grade": "Grade 5",
+      "grade": "Grade 4",
       "classGroupId": "primary_2",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=David"
     },
@@ -215,6 +242,26 @@
       "classGroupId": "preparatory",
       "churchYear": "2026–2027",
       "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=Peter"
+    },
+    "student-new-user-01": {
+      "studentId": "student-new-user-01",
+      "fullName": "Bishoy Raouf",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "churchYear": "2026–2027",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student-new-user-01",
+      "enrolledAt": "2026-10-11T13:29:02.757Z",
+      "isPending": false
+    },
+    "student_new_youssef_777": {
+      "studentId": "student_new_youssef_777",
+      "fullName": "Youssef Mina",
+      "grade": "Grade 4",
+      "classGroupId": "primary_2",
+      "churchYear": "2026–2027",
+      "avatarUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=student_new_youssef_777",
+      "enrolledAt": "2026-10-11T13:45:38.436Z",
+      "isPending": false
     }
   },
   "teacherStudentRelationships": [
@@ -223,6 +270,18 @@
       "studentId": "student-david",
       "relationshipType": "teacher_student",
       "createdAt": "2026-10-11T13:27:32.406Z"
+    },
+    {
+      "teacherId": "26188619-5bf6-412e-b91f-bef4330a8016",
+      "studentId": "student-new-user-01",
+      "relationshipType": "teacher_student",
+      "createdAt": "2026-10-11T13:29:02.757Z"
+    },
+    {
+      "teacherId": "mina",
+      "studentId": "student_new_youssef_777",
+      "relationshipType": "teacher_student",
+      "createdAt": "2026-10-11T13:45:38.436Z"
     }
   ],
   "parentChildRelationships": [
@@ -267,8 +326,56 @@
       "requestedClassGroupId": "primary_2",
       "requestedGrade": "Grade 4",
       "notes": "New student joining Sunday school with Servant Mina",
-      "status": "PENDING_APPROVAL",
-      "requestedAt": "2026-10-11T12:27:32.397Z"
+      "status": "APPROVED",
+      "requestedAt": "2026-10-11T12:27:32.397Z",
+      "assignedGrade": "Grade 4",
+      "reviewedBy": "26188619-5bf6-412e-b91f-bef4330a8016",
+      "reviewedAt": "2026-10-11T13:29:02.757Z",
+      "reviewNotes": "Approved by class servant"
+    },
+    "req_1791726338418_xoh58": {
+      "id": "req_1791726338418_xoh58",
+      "studentId": "student_new_youssef_777",
+      "studentName": "Youssef Mina",
+      "email": "",
+      "phone": "+20 100 123 4567",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 4",
+      "notes": "New student joining Sunday school Grade 4",
+      "status": "APPROVED",
+      "requestedAt": "2026-10-11T13:45:38.418Z",
+      "assignedGrade": "Grade 4",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-11T13:45:38.436Z",
+      "reviewNotes": "Welcome to Primary 4-6 Sunday School!"
+    },
+    "req_1791726338443_axasi": {
+      "id": "req_1791726338443_axasi",
+      "studentId": "student_reject_test_99",
+      "studentName": "Temp Student",
+      "email": "",
+      "phone": "",
+      "requestedClassGroupId": "primary_2",
+      "requestedGrade": "Grade 5",
+      "notes": "",
+      "status": "REJECTED",
+      "requestedAt": "2026-10-11T13:45:38.443Z",
+      "reviewedBy": "mina",
+      "reviewedAt": "2026-10-11T13:45:38.445Z",
+      "reviewNotes": "Duplicate submission"
     }
+  },
+  "classServants": {
+    "inst_2026-2027_primary_2": [
+      {
+        "id": "servant-kyrollos-church-org",
+        "name": "kyrollos",
+        "nameAr": "kyrollos@church.org",
+        "email": "kyrollos@church.org",
+        "role": "teacher",
+        "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=servant-kyrollos-church-org",
+        "assignedAt": "2026-10-12T13:11:54.800Z"
+      }
+    ]
   }
 }

@@ -8,7 +8,6 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 import { CLASS_GROUPS } from '../../lib/classGroups';
 import { ClassGroupId } from '../../types';
 import { requestAccountActivation } from '../../lib/onboardingService';
-import { SupabaseConnectionTester } from './SupabaseConnectionTester';
 import { PrivacyPolicy } from '../legal/PrivacyPolicy';
 import { FAQ } from '../legal/FAQ';
 import { Language } from '../../types';
@@ -19,7 +18,6 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const [showTester, setShowTester] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'faq' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -155,12 +153,12 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
         </div>
       </div>
 
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-[var(--color-church-cream-dark)] dark:border-slate-800 p-8 space-y-6">
+      <div className="w-full max-w-md bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl shadow-xl border-2 border-[var(--mousa-border-sand)] p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-gradient-to-tr from-[var(--color-church-blue)] to-[var(--color-church-blue-light)] rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-blue-950/20 border border-[var(--color-church-gold)]/30">
-            <span className="text-2xl font-bold tracking-tighter text-[var(--color-church-gold)]">ⲭⲣ</span>
+          <div className="w-16 h-16 bg-gradient-to-tr from-[var(--mousa-teal-deep)] to-[var(--mousa-teal)] rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-[var(--mousa-teal-deep)]/20 border-2 border-[var(--mousa-gold)]/50">
+            <span className="text-2xl font-black tracking-tighter text-[var(--mousa-gold)]">ⲭⲣ</span>
           </div>
-          <h1 className="text-2xl font-black text-[var(--color-church-blue)] dark:text-white tracking-tight">
+          <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] tracking-tight">
             {lang === 'copt' ? 'Ϯⲉⲕⲕⲗⲏⲥⲓⲁ ⲙ̀Ⲫⲁⲅⲓⲟⲥ Ⲙⲱⲩⲥⲏⲥ' : lang === 'ar' ? 'كنيسة القديس الأنبا موسى' : 'St. Moses Church'}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -169,19 +167,6 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
               : (lang === 'copt' ? 'Ϣⲉ ⲉ̀ϧⲟⲩⲛ ⲉ̀ⲛⲓⲥⲃⲱ ⲟⲩⲟϩ ϭⲓ ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'سجل دخولك عشان تتابع دروسك وتجمع نقاط' : 'Sign in to follow lessons & earn points')
             }
           </p>
-          <button
-            type="button"
-            onClick={() => setShowTester(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer shadow-2xs"
-            title={lang === 'ar' ? 'اضغط لاختبار اتصال Supabase وتحديث الإعدادات' : 'Click to test Supabase connection & credentials'}
-          >
-            <Database size={11} className="text-emerald-600 dark:text-emerald-400" />
-            <span>
-              {isSupabaseConfigured 
-                ? (lang === 'ar' ? 'Supabase متصل • اضغط للفحص' : 'Supabase Connected • Click to Test') 
-                : (lang === 'ar' ? 'فحص واختبار اتصال Supabase' : 'Test Supabase Connection')}
-            </span>
-          </button>
         </div>
 
         {error && (
@@ -202,8 +187,8 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 onClick={() => setRole('student')}
                 className={`py-2 px-1 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                   role === 'student'
-                    ? 'bg-[var(--color-church-blue)] text-white border-[var(--color-church-blue)] shadow-sm'
-                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--color-church-cream-dark)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
+                    ? 'bg-[var(--mousa-teal)] text-white border-[var(--mousa-teal)] shadow-sm'
+                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--mousa-border-sand)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
                 }`}
               >
                 {lang === 'copt' ? '👦 Ⲁⲗⲟⲩ' : lang === 'ar' ? '👦 تلميذ' : '👦 Student'}
@@ -213,8 +198,8 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 onClick={() => setRole('teacher')}
                 className={`py-2 px-1 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                   role === 'teacher'
-                    ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] border-[var(--color-church-gold)] shadow-sm font-black'
-                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--color-church-cream-dark)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
+                    ? 'bg-[var(--color-church-gold)] text-[var(--mousa-teal)] border-[var(--color-church-gold)] shadow-sm font-black'
+                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--mousa-border-sand)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
                 }`}
               >
                 {lang === 'copt' ? '⛪ Ⲇⲓⲁⲕⲟⲛ' : lang === 'ar' ? '⛪ خادم' : '⛪ Servant'}
@@ -225,7 +210,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 className={`py-2 px-1 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                   role === 'parent'
                     ? 'bg-[var(--color-church-burgundy)] text-white border-[var(--color-church-burgundy)] shadow-sm'
-                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--color-church-cream-dark)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
+                    : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-[var(--mousa-border-sand)] dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'
                 }`}
               >
                 {lang === 'copt' ? '👨‍👩‍👦 Ⲓⲱⲧ' : lang === 'ar' ? '👨‍👩‍👦 ولي أمر' : '👨‍👩‍👦 Parent'}
@@ -247,7 +232,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder={lang === 'copt' ? 'Ⲙⲱⲩⲥⲏⲥ' : lang === 'ar' ? 'مثال: مينا عماد' : 'e.g., Mina Emad'}
-                  className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--color-church-cream-dark)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-10"
+                  className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--mousa-border-sand)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-10"
                 />
                 <User size={18} className="absolute left-3 top-3.5 text-gray-400" />
               </div>
@@ -278,7 +263,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                         }}
                         className={`py-1.5 px-1 text-[11px] font-bold rounded-xl border transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
                           isSelected
-                            ? 'bg-[var(--color-church-blue)] text-white border-[var(--color-church-blue)] shadow-xs'
+                            ? 'bg-[var(--mousa-teal)] text-white border-[var(--mousa-teal)] shadow-xs'
                             : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:bg-gray-50'
                         }`}
                       >
@@ -297,7 +282,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 <select
                   value={selectedGrade}
                   onChange={(e) => setSelectedGrade(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-800 text-gray-800 dark:text-white border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)]"
+                  className="w-full bg-white dark:bg-slate-800 text-gray-800 dark:text-white border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)]"
                 >
                   {(CLASS_GROUPS[selectedClassGroupId]?.grades || []).map((g) => (
                     <option key={g.id} value={g.code}>
@@ -325,7 +310,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@church.org"
-                className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--color-church-cream-dark)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-10"
+                className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--mousa-border-sand)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-10"
               />
               <Mail size={18} className="absolute left-3 top-3.5 text-gray-400" />
             </div>
@@ -342,7 +327,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--color-church-cream-dark)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-church-blue)] pl-10"
+                className="w-full bg-gray-50 dark:bg-slate-800 dark:text-white border border-[var(--mousa-border-sand)] dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mousa-teal)] pl-10"
               />
               <Lock size={18} className="absolute left-3 top-3.5 text-gray-400" />
             </div>
@@ -355,7 +340,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => handleRememberMeChange(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--color-church-cream-dark)] text-[var(--color-church-blue)] focus:ring-[var(--color-church-blue)] accent-[var(--color-church-blue)] cursor-pointer"
+                className="w-4 h-4 rounded border-[var(--mousa-border-sand)] text-[var(--mousa-teal)] focus:ring-[var(--mousa-teal)] accent-[var(--mousa-teal)] cursor-pointer"
               />
               <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
                 {lang === 'copt' ? 'Ⲁⲣⲓⲡⲁⲙⲉⲩⲓ ϧⲉⲛ ⲡⲁⲓⲥⲕⲉⲩⲟⲥ' : lang === 'ar' ? 'تذكرني على هذا الجهاز' : 'Remember me on this device'}
@@ -366,7 +351,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
           <button 
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-[var(--color-church-blue)] hover:bg-[var(--color-church-blue-light)] text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer border border-[var(--color-church-blue-light)]"
+            className="w-full py-3.5 bg-[var(--mousa-teal)] hover:bg-[var(--color-church-blue-light)] text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer border border-[var(--color-church-blue-light)]"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -385,7 +370,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full py-3 px-4 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl border border-[var(--color-church-cream-dark)] dark:border-slate-700 shadow-xs transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer text-xs"
+            className="w-full py-3 px-4 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl border border-[var(--mousa-border-sand)] dark:border-slate-700 shadow-xs transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer text-xs"
           >
             {googleLoading ? (
               <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
@@ -416,11 +401,11 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
         </form>
 
         <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-[var(--color-church-cream-dark)] dark:border-slate-700"></div>
+          <div className="flex-grow border-t border-[var(--mousa-border-sand)] dark:border-slate-700"></div>
           <span className="flex-shrink mx-4 text-xs font-bold text-gray-400 uppercase">
             {lang === 'copt' ? 'Ⲓⲉ ⲇⲟⲕⲓⲙⲁⲍⲓⲛ' : lang === 'ar' ? 'أو تجربة فورية' : 'or instant demo'}
           </span>
-          <div className="flex-grow border-t border-[var(--color-church-cream-dark)] dark:border-slate-700"></div>
+          <div className="flex-grow border-t border-[var(--mousa-border-sand)] dark:border-slate-700"></div>
         </div>
 
         {/* Quick Demo Access buttons for Sunday School testing */}
@@ -432,7 +417,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
             <button
               type="button"
               onClick={() => loginAsGuest('student', lang === 'copt' ? 'Ⲇⲁⲩⲓⲇ' : 'التلميذ ديفيد')}
-              className="py-2.5 px-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-[var(--color-church-blue)] dark:text-blue-300 text-xs font-bold rounded-xl border border-[var(--color-church-cream-dark)] dark:border-blue-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
+              className="py-2.5 px-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 text-[var(--mousa-teal)] dark:text-blue-300 text-xs font-bold rounded-xl border border-[var(--mousa-border-sand)] dark:border-blue-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
             >
               <span>👦</span>
               <span>{lang === 'copt' ? 'Ⲁⲗⲟⲩ' : lang === 'ar' ? 'تلميذ' : 'Student'}</span>
@@ -440,7 +425,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
             <button
               type="button"
               onClick={() => loginAsGuest('teacher', lang === 'copt' ? 'Ⲙⲏⲛⲁ' : 'الخادم مينا')}
-              className="py-2.5 px-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-[var(--color-church-blue)] dark:text-amber-300 text-xs font-bold rounded-xl border border-[var(--color-church-gold)]/40 dark:border-amber-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
+              className="py-2.5 px-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-[var(--mousa-teal)] dark:text-amber-300 text-xs font-bold rounded-xl border border-[var(--mousa-gold)]/40 dark:border-amber-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
             >
               <span>⛪</span>
               <span>{lang === 'copt' ? 'Ⲇⲓⲁⲕⲟⲛ' : lang === 'ar' ? 'خادم' : 'Servant'}</span>
@@ -448,7 +433,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
             <button
               type="button"
               onClick={() => loginAsGuest('parent', lang === 'copt' ? 'Ⲙⲁⲕⲁⲣⲓⲟⲥ' : 'الأستاذ عماد مكرم')}
-              className="py-2.5 px-2 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 text-[var(--color-church-burgundy)] dark:text-red-300 text-xs font-bold rounded-xl border border-[var(--color-church-burgundy)]/30 dark:border-red-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
+              className="py-2.5 px-2 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 text-[var(--mousa-coral)] dark:text-red-300 text-xs font-bold rounded-xl border border-[var(--mousa-coral)]/30 dark:border-red-900 transition-all flex flex-col items-center gap-1 cursor-pointer"
             >
               <span>👨‍👩‍👦</span>
               <span>{lang === 'copt' ? 'Ⲓⲱⲧ' : lang === 'ar' ? 'ولي أمر' : 'Parent'}</span>
@@ -460,7 +445,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
           <button 
             type="button"
             onClick={() => { setIsRegister(!isRegister); setError(''); }}
-            className="text-xs font-bold text-[var(--color-church-blue)] dark:text-amber-400 hover:underline cursor-pointer"
+            className="text-xs font-bold text-[var(--mousa-teal)] dark:text-[var(--mousa-gold-light)] hover:underline cursor-pointer"
           >
             {isRegister 
               ? (lang === 'copt' ? 'Ⲟⲩⲟⲛ ⲛ̀ⲧⲁⲕ ⲟⲩⲕⲗⲟⲙ? Ϣⲉ ⲉ̀ϧⲟⲩⲛ' : lang === 'ar' ? 'لديك حساب بالفعل؟ سجل دخولك' : 'Already have an account? Sign in')
@@ -470,11 +455,11 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
         </div>
 
         {/* Legal & Compliance footer links */}
-        <div className="pt-2 border-t border-[var(--color-church-cream-dark)] dark:border-slate-800/80 flex items-center justify-center gap-4 text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+        <div className="pt-2 border-t border-[var(--mousa-border-sand)] dark:border-stone-800/80 flex items-center justify-center gap-4 text-[11px] text-gray-400 dark:text-gray-500 font-medium">
           <button
             type="button"
             onClick={() => setShowLegal('privacy')}
-            className="hover:text-[var(--color-church-blue)] dark:hover:text-amber-400 transition-colors cursor-pointer"
+            className="hover:text-[var(--mousa-teal)] dark:hover:text-[var(--mousa-gold)] transition-colors cursor-pointer"
           >
             {lang === 'copt' ? 'Ⲡⲓⲛⲟⲙⲟⲥ ⲛ̀ⲧⲉ ⲡⲓϩⲱⲡ' : lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}
           </button>
@@ -482,7 +467,7 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
           <button
             type="button"
             onClick={() => setShowLegal('faq')}
-            className="hover:text-[var(--color-church-blue)] dark:hover:text-amber-400 transition-colors cursor-pointer"
+            className="hover:text-[var(--mousa-teal)] dark:hover:text-[var(--mousa-gold)] transition-colors cursor-pointer"
           >
             {lang === 'copt' ? 'Ⲛⲓϣⲉⲛϩⲏⲧ' : lang === 'ar' ? 'الأسئلة الشائعة' : 'FAQ'}
           </button>
@@ -491,9 +476,6 @@ export function LoginScreen({ lang, setLang }: { lang: Language, setLang: (l: La
 
       {/* Legal Modals */}
       <AnimatePresence>
-        {showTester && (
-          <SupabaseConnectionTester lang={lang} onClose={() => setShowTester(false)} />
-        )}
         {showLegal === 'privacy' && (
           <PrivacyPolicy lang={lang} onClose={() => setShowLegal(null)} />
         )}

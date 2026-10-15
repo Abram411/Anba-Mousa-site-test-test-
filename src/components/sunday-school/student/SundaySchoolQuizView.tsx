@@ -57,18 +57,28 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
   };
 
   const finishQuiz = () => {
-    let score = 0;
+    let earnedPoints = 0;
+    let totalPossiblePoints = 0;
+    let correctCount = 0;
+
     const recordedAnswers: QuizAnswer[] = questions.map(q => {
+      const qDiff = q.difficulty || 'EASY';
+      const qPts = q.points || (qDiff === 'HARD' ? 30 : qDiff === 'MEDIUM' ? 20 : 10);
+      totalPossiblePoints += qPts;
+
       const selected = selectedAnswers[q.id];
       const isCorrect = selected === q.correctIndex;
-      if (isCorrect) score += 1;
+      if (isCorrect) {
+        correctCount += 1;
+        earnedPoints += qPts;
+      }
 
       return {
         questionId: q.id,
         selectedOptionIndex: selected ?? -1,
         isCorrect,
         feedbackEn: isCorrect 
-          ? (q.explanationEn || 'Correct! Excellent job.') 
+          ? (q.explanationEn || `Correct! +${qPts} points earned.`) 
           : `Review needed: ${q.explanationEn || 'See lesson text.'}`,
         feedbackAr: q.explanationAr,
         recommendedSectionId: q.sourceRef?.sectionId,
@@ -76,14 +86,16 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
       };
     });
 
-    const percentage = Math.round((score / questions.length) * 100);
+    const percentage = totalPossiblePoints > 0 
+      ? Math.round((earnedPoints / totalPossiblePoints) * 100) 
+      : Math.round((correctCount / questions.length) * 100);
 
     onSubmitAttempt({
       studentId,
       lessonId,
       quizId: quiz.id,
-      score,
-      totalScore: questions.length,
+      score: earnedPoints,
+      totalScore: totalPossiblePoints || questions.length,
       percentage,
       passed: percentage >= 70,
       answers: recordedAnswers
@@ -100,11 +112,21 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
   };
 
   // Result Calculation
-  let finalScore = 0;
+  let finalPoints = 0;
+  let finalMaxPoints = 0;
+  let finalCorrectCount = 0;
   questions.forEach(q => {
-    if (selectedAnswers[q.id] === q.correctIndex) finalScore += 1;
+    const qDiff = q.difficulty || 'EASY';
+    const qPts = q.points || (qDiff === 'HARD' ? 30 : qDiff === 'MEDIUM' ? 20 : 10);
+    finalMaxPoints += qPts;
+    if (selectedAnswers[q.id] === q.correctIndex) {
+      finalCorrectCount += 1;
+      finalPoints += qPts;
+    }
   });
-  const finalPercentage = Math.round((finalScore / questions.length) * 100);
+  const finalPercentage = finalMaxPoints > 0 
+    ? Math.round((finalPoints / finalMaxPoints) * 100) 
+    : Math.round((finalCorrectCount / questions.length) * 100);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-16">
@@ -112,45 +134,58 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={onBackToLesson}
-          className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-stone-800 transition-colors"
+          className="px-4 py-2 bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] rounded-2xl text-xs font-black flex items-center gap-2 border-2 border-[var(--mousa-border-sand)] transition-all cursor-pointer shadow-2xs"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Lesson
+          <ArrowLeft className="w-4 h-4" /> <span>Back to Lesson</span>
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-medium">
-            Separate Review Assessment
+          <span className="text-xs px-3.5 py-1 rounded-full bg-[var(--mousa-gold-soft)] text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] border border-[var(--mousa-gold)]/30 font-bold">
+            Journey Milestone Review Quiz
           </span>
         </div>
       </div>
 
       {/* Distinction Banner */}
-      <div className="p-4 bg-stone-900/90 rounded-2xl border border-stone-800 text-xs text-stone-400 space-y-1">
-        <span className="font-semibold text-stone-200 block">
-          Assessment & Practice Distinction:
+      <div className="p-4 bg-[var(--mousa-sand-50)] dark:bg-stone-900 rounded-2xl border border-[var(--mousa-border-sand)] text-xs text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] space-y-1">
+        <span className="font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] block">
+          Assessment & Practice:
         </span>
         <p>
-          This review quiz checks your comprehension of the lesson taught in church. Quiz scores provide helpful practice, but your Sunday School servant personally reviews your lesson mastery.
+          This review quiz checks your comprehension of the lesson taught in church. Earn blessing points and unlock your Journey of Moses milestone badge!
         </p>
       </div>
 
       {!isSubmitted ? (
-        <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-          {/* Question Progress Counter */}
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-amber-500 uppercase tracking-wider">
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </span>
+        <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] border-2 border-[var(--mousa-border-sand)] rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+          {/* Question Progress Counter with Difficulty Badge */}
+          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-black text-[var(--mousa-gold)] uppercase tracking-wider">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border font-mono ${
+                (currentQuestion.difficulty || 'EASY') === 'HARD'
+                  ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40'
+                  : (currentQuestion.difficulty || 'EASY') === 'MEDIUM'
+                  ? 'bg-[var(--mousa-gold-soft)] text-[var(--mousa-gold-dark)] border-[var(--mousa-gold)]/40'
+                  : 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40'
+              }`}>
+                {(currentQuestion.difficulty || 'EASY') === 'HARD' ? '🔴 Hard • 30 pts (3x)' :
+                 (currentQuestion.difficulty || 'EASY') === 'MEDIUM' ? '🟡 Medium • 20 pts (2x)' :
+                 '🟢 Easy • 10 pts (1x)'}
+              </span>
+            </div>
             <div className="flex gap-1.5">
               {questions.map((_, i) => (
                 <span
                   key={i}
                   className={`w-2.5 h-2.5 rounded-full ${
                     i === currentQuestionIndex 
-                      ? 'bg-amber-500' 
+                      ? 'bg-[var(--mousa-gold)]' 
                       : selectedAnswers[questions[i].id] !== undefined 
-                      ? 'bg-purple-600' 
-                      : 'bg-stone-800'
+                      ? 'bg-[var(--mousa-teal)]' 
+                      : 'bg-[var(--mousa-sand-200)] dark:bg-stone-800'
                   }`}
                 />
               ))}
@@ -159,10 +194,10 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
 
           {/* Question Text */}
           <div className="space-y-3">
-            <h2 className="text-lg sm:text-xl font-bold text-white font-serif leading-snug">
+            <h2 className="text-lg sm:text-xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] font-serif leading-snug">
               {currentQuestion.questionEn}
             </h2>
-            <h3 className="text-base text-amber-300/90 font-sans leading-relaxed" dir="rtl">
+            <h3 className="text-base text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] font-sans font-bold leading-relaxed" dir="rtl">
               {currentQuestion.questionAr}
             </h3>
           </div>
@@ -179,14 +214,14 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
                   key={oIdx}
                   onClick={() => handleSelectOption(oIdx)}
                   disabled={hasAnswered}
-                  className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between text-sm ${
+                  className={`w-full p-4 rounded-2xl border-2 text-left transition-all flex items-center justify-between text-sm cursor-pointer ${
                     hasAnswered && isCorrectAnswer
-                      ? 'bg-emerald-950/60 border-emerald-600 text-emerald-100 font-medium'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-600 text-emerald-900 dark:text-emerald-100 font-bold'
                       : hasAnswered && isSelected && !isCorrectAnswer
-                      ? 'bg-red-950/60 border-red-600 text-red-100 font-medium'
+                      ? 'bg-rose-50 dark:bg-rose-950/60 border-[var(--mousa-coral)] text-rose-950 dark:text-rose-100 font-medium'
                       : isSelected
-                      ? 'bg-amber-950/60 border-amber-500 text-amber-100'
-                      : 'bg-stone-950/80 border-stone-800 text-stone-300 hover:border-stone-700 hover:bg-stone-950'
+                      ? 'bg-[var(--mousa-sand-100)] border-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-bold'
+                      : 'bg-[var(--mousa-cream)] dark:bg-stone-900/60 border-[var(--mousa-border-sand)] hover:border-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]'
                   }`}
                 >
                   <div className="space-y-1">
@@ -265,8 +300,11 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
             <div className="text-4xl font-extrabold font-mono text-amber-400">
               {finalPercentage}%
             </div>
-            <p className="text-xs text-stone-300">
-              {finalScore} of {questions.length} Questions Answered Correctly
+            <p className="text-xs font-semibold text-amber-300">
+              {finalPoints} / {finalMaxPoints} Points Earned
+            </p>
+            <p className="text-[11px] text-stone-400">
+              {finalCorrectCount} of {questions.length} Questions Answered Correctly
             </p>
           </div>
 
@@ -295,6 +333,13 @@ export const SundaySchoolQuizView: React.FC<SundaySchoolQuizViewProps> = ({
                         {idx + 1}
                       </span>
                       <span className="font-semibold text-stone-200">{q.questionEn}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono shrink-0 ${
+                        (q.difficulty || 'EASY') === 'HARD' ? 'bg-rose-950/60 text-rose-300 border border-rose-800' :
+                        (q.difficulty || 'EASY') === 'MEDIUM' ? 'bg-amber-950/60 text-amber-300 border border-amber-800' :
+                        'bg-emerald-950/60 text-emerald-300 border border-emerald-800'
+                      }`}>
+                        {q.difficulty || 'EASY'} ({q.points || ((q.difficulty === 'HARD') ? 30 : (q.difficulty === 'MEDIUM') ? 20 : 10)} pts)
+                      </span>
                     </div>
 
                     {!isCorrect && q.explanationEn && (

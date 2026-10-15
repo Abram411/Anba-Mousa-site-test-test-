@@ -357,7 +357,7 @@ export interface SlideItem {
   bulletsAr: string[];
   speakerNotesEn?: string;
   speakerNotesAr?: string;
-  sourceRefs: Array<{ sourceId: string; sourceName: string; location: string }>;
+  sourceRefs?: Array<{ sourceId: string; sourceName: string; location: string }>;
   imageUrl?: string;
 }
 
@@ -373,12 +373,14 @@ export interface QuizQuestionDraft {
   correctIndex: number;
   explanationEn: string;
   explanationAr: string;
-  sourceRef: {
+  sourceRef?: {
     sectionId: string;
     sectionTitle: string;
     sourceId: string;
     location: string;
   };
+  difficulty?: QuestionDifficulty;
+  points?: number;
 }
 
 export interface QuizDraft {
@@ -386,8 +388,8 @@ export interface QuizDraft {
   lessonId: string;
   titleEn: string;
   titleAr: string;
-  instructionsEn: string;
-  instructionsAr: string;
+  instructionsEn?: string;
+  instructionsAr?: string;
   questions: QuizQuestionDraft[];
   status: 'DRAFT' | 'REVIEW_REQUIRED' | 'APPROVED';
 }
@@ -443,16 +445,16 @@ export interface LessonVersion {
   objectivesEn: string[];
   objectivesAr: string[];
   sections: LessonSectionItem[];
-  recapEn: string;
-  recapAr: string;
-  flashcards: FlashcardItem[];
-  slides: SlideItem[];
-  quizDraft: QuizDraft;
-  narrationScriptEn: string;
-  narrationScriptAr: string;
+  recapEn?: string;
+  recapAr?: string;
+  flashcards?: FlashcardItem[];
+  slides?: SlideItem[];
+  quizDraft?: QuizDraft;
+  narrationScriptEn?: string;
+  narrationScriptAr?: string;
   ttsAudioUrlEn?: string;
   ttsAudioUrlAr?: string;
-  ttsStatus: 'NONE' | 'PENDING' | 'GENERATED' | 'STALE';
+  ttsStatus?: 'NONE' | 'PENDING' | 'GENERATED' | 'STALE';
 }
 
 export type CommentType = 
@@ -571,12 +573,17 @@ export interface ClassSession {
   updatedAt: string;
 }
 
+export type QuestionDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
 export interface QuizQuestion {
+  id?: string;
   question: string;
   options: string[];
   correctIndex: number;
   type?: 'multiple_choice' | 'free_write';
   sourceRef?: string;
+  difficulty?: QuestionDifficulty;
+  points?: number; // Easy = 10, Medium = 20, Hard = 30
 }
 
 export interface Lesson {
@@ -599,7 +606,7 @@ export interface Lesson {
   quiz?: QuizQuestion[];
   currentVersionId?: string;
   versionsCount?: number;
-  // Deep Sunday School Links
+  // Deep Sunday School Links & Media
   sourcesCount?: number;
   latestVersion?: LessonVersion;
   evidenceMap?: EvidenceMap;
@@ -609,6 +616,13 @@ export interface Lesson {
   scriptureVerseEn?: string;
   scriptureVerseAr?: string;
   verseReference?: string;
+  videoUrl?: string; // YouTube URL or uploaded MP4 URL
+  slidesUrl?: string; // PPTX or PDF slides URL
+  audioUrl?: string; // Sermon audio recording URL
+  teacherNotes?: string; // Handwritten notes or sermon takeaway
+  writtenExplanation?: string; // Rich written lesson explanation
+  imageUrl?: string; // Primary illustration or picture
+  category?: 'bible' | 'hymns' | 'history' | 'virtues';
 }
 
 export interface Hymn {

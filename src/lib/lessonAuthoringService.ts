@@ -1081,3 +1081,312 @@ export async function getTeacherCurriculumLessons(): Promise<AuthoringResult<Les
     return { data: null, error: new Error(err?.message || 'Unexpected failure fetching teacher lessons') };
   }
 }
+
+export interface PublishExpressLessonInput {
+  titleEn: string;
+  titleAr?: string;
+  category?: 'bible' | 'hymns' | 'history' | 'virtues';
+  gradeLevel?: string;
+  summaryEn?: string;
+  summaryAr?: string;
+  scriptureVerseEn?: string;
+  scriptureVerseAr?: string;
+  verseReference?: string;
+  videoUrl?: string;
+  slidesUrl?: string;
+  audioUrl?: string;
+  teacherNotes?: string;
+  publishDirectly?: boolean;
+  quiz?: Array<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+    points?: number;
+  }>;
+  slides?: Array<{
+    number: number;
+    titleEn: string;
+    titleAr?: string;
+    imageUrl?: string;
+    bulletsEn?: string[];
+  }>;
+}
+
+/**
+ * Publishes or saves an express lesson directly to Supabase without AI dependency.
+ * Creates the root public.lessons, public.lesson_versions, and public.lesson_sources.
+ */
+export async function publishExpressLesson(
+  input: PublishExpressLessonInput
+): Promise<AuthoringResult<{ lesson: Lesson; version: LessonVersion }>> {
+  try {
+    const servantCheck = await getAuthenticatedServant();
+    if (servantCheck.error || !servantCheck.user) {
+      return { data: null, error: servantCheck.error };
+    }
+    const currentUserId = servantCheck.user.id;
+
+    if (!input.titleEn || !input.titleEn.trim()) {
+      return { data: null, error: new Error('Lesson title is required') };
+    }
+
+    const titleEn = input.titleEn.trim();
+    const titleAr = (input.titleAr && input.titleAr.trim()) ? input.titleAr.trim() : titleEn;
+    const category = input.category || 'bible';
+    const gradeLevel = input.gradeLevel || '4th Grade';
+    const nowIso = new Date().toISOString();
+    const lessonId = generateUuid();
+    const versionId = generateUuid();
+    const isPublished = input.publishDirectly !== false;
+
+    // Calculate total points available from quiz difficulty multipliers
+    const formattedQuizQuestions = (input.quiz || []).map((q, idx) => {
+      const diff = q.difficulty || 'EASY';
+      const pts = q.points || (diff === 'HARD' ? 30 : diff === 'MEDIUM' ? 20 : 10);
+      return {
+        id: `q-${idx + 1}`,
+        type: 'multiple_choice' as const,
+        questionEn: q.question,
+        questionAr: q.question,
+        optionsEn: q.options,
+        optionsAr: q.options,
+        correctIndex: q.correctIndex,
+        explanationEn: `Correct answer is option ${q.correctIndex + 1}`,
+        explanationAr: `الإجابة الصحيحة هي الخيار رقم ${q.correctIndex + 1}`,
+        difficulty: diff,
+        points: pts,
+        sourceRef: {
+          sectionId: 'sec-1',
+          sectionTitle: titleEn,
+          sourceId: 'src-teacher',
+          location: 'Teacher Class Lesson'
+        }
+      };
+    });
+
+    const totalQuizPoints = formattedQuizQuestions.reduce((sum, q) => sum + (q.points || 10), 0);
+    const totalLessonPoints = 100 + totalQuizPoints;
+
+    const quizDraft: QuizDraft = {
+      id: `quiz-${versionId}`,
+      lessonId,
+      titleEn: `Quiz: ${titleEn}`,
+      titleAr: `تقييم: ${titleAr}`,
+      instructionsEn: 'Complete this Sunday School quiz to test your comprehension.',
+      instructionsAr: 'أكمل التقييم لاختبار فهمك لمحتوى الدرس ونيل النقاط.',
+      status: isPublished ? 'APPROVED' : 'DRAFT',
+      questions: formattedQuizQuestions
+    };
+
+    // 1. Root lesson record
+    const rootLessonPayload = {
+      id: lessonId,
+      title_en: titleEn,
+      title_ar: titleAr,
+      category,
+      grade_level: gradeLevel,
+      summary_en: input.summaryEn || input.teacherNotes || '',
+      summary_ar: input.summaryAr || input.teacherNotes || '',
+      scripture_verse_en: input.scriptureVerseEn || null,
+      scripture_verse_ar: input.scriptureVerseAr || null,
+      verse_reference: input.verseReference || null,
+      audio_url: input.audioUrl || null,
+      pdf_worksheet_url: input.slidesUrl || null,
+      points_reward: totalLessonPoints,
+      active_version_id: isPublished ? versionId : null,
+      lesson_status: isPublished ? 'published' : 'draft',
+      status: isPublished ? 'published' : 'draft',
+      approved_servant_name: isPublished ? (servantCheck.user.role || 'Servant') : null,
+      approved_at: isPublished ? nowIso : null,
+      created_by: currentUserId,
+      created_at: nowIso
+    };
+
+    const { error: rootErr } = await supabase!
+      .from('lessons')
+      .insert(rootLessonPayload);
+
+    if (rootErr) {
+      return { data: null, error: new Error(`Failed to save lesson: ${rootErr.message}`) };
+    }
+
+    // 2. Version record
+    const formattedSlides = (input.slides || []).map((s, idx) => ({
+      number: s.number || (idx + 1),
+      titleEn: s.titleEn,
+      titleAr: s.titleAr || s.titleEn,
+      bulletsEn: s.bulletsEn || [],
+      bulletsAr: [],
+      sourceRefs: [],
+      imageUrl: s.imageUrl
+    }));
+
+    const versionPayload = {
+      id: versionId,
+      lesson_id: lessonId,
+      version_number: 1,
+      status: isPublished ? 'PUBLISHED' : 'AI_DRAFT',
+      approved_by: isPublished ? (servantCheck.user.role || 'Servant') : null,
+      approved_at: isPublished ? nowIso : null,
+      approval_note: isPublished ? 'Directly authored and approved by Sunday School servant' : null,
+      created_by: currentUserId,
+      created_at: nowIso,
+      summary_en: input.summaryEn || '',
+      summary_ar: input.summaryAr || '',
+      big_idea_en: input.teacherNotes || input.summaryEn || titleEn,
+      big_idea_ar: input.summaryAr || titleAr,
+      objectives_en: [input.summaryEn || 'Understand and apply church teachings'],
+      objectives_ar: [input.summaryAr || 'استيعاب وتطبيق تعاليم الكنيسة في الحياة اليومية'],
+      recap_en: input.summaryEn || '',
+      recap_ar: input.summaryAr || '',
+      quiz_draft: quizDraft,
+      slides: formattedSlides,
+      flashcards: [],
+      tts_status: 'NONE'
+    };
+
+    const { error: verErr } = await supabase!
+      .from('lesson_versions')
+      .insert(versionPayload);
+
+    if (verErr) {
+      await supabase!.from('lessons').delete().eq('id', lessonId);
+      return { data: null, error: new Error(`Failed to save version: ${verErr.message}`) };
+    }
+
+    // 3. Sections record
+    const sectionRow = {
+      id: generateUuid(),
+      lesson_version_id: versionId,
+      order_index: 1,
+      title_en: titleEn,
+      title_ar: titleAr,
+      content_en: input.summaryEn || input.teacherNotes || titleEn,
+      content_ar: input.summaryAr || input.teacherNotes || titleAr,
+      teacher_notes: input.teacherNotes || null,
+      created_at: nowIso
+    };
+
+    await supabase!.from('lesson_sections').insert([sectionRow]);
+
+    // 4. Register media as lesson sources for student viewers
+    const sourcesToInsert: any[] = [];
+    if (input.videoUrl) {
+      const isYoutube = input.videoUrl.includes('youtube.com') || input.videoUrl.includes('youtu.be');
+      sourcesToInsert.push({
+        id: generateUuid(),
+        lesson_id: lessonId,
+        uploaded_by: currentUserId,
+        type: isYoutube ? 'YOUTUBE_VIDEO' : 'TEACHER_VIDEO',
+        original_filename: `${titleEn} - Video`,
+        mime_type: isYoutube ? 'video/youtube' : 'video/mp4',
+        file_url: input.videoUrl,
+        rights_status: 'CHURCH_OWNED',
+        processing_status: 'INDEXED',
+        priority: 'PRIMARY',
+        created_at: nowIso
+      });
+    }
+
+    if (input.slidesUrl) {
+      const isPptx = input.slidesUrl.endsWith('.pptx') || input.slidesUrl.endsWith('.ppt');
+      sourcesToInsert.push({
+        id: generateUuid(),
+        lesson_id: lessonId,
+        uploaded_by: currentUserId,
+        type: isPptx ? 'PPTX' : 'PDF',
+        original_filename: `${titleEn} - Slides`,
+        mime_type: isPptx ? 'application/vnd.ms-powerpoint' : 'application/pdf',
+        file_url: input.slidesUrl,
+        rights_status: 'CHURCH_OWNED',
+        processing_status: 'INDEXED',
+        priority: 'PRIMARY',
+        created_at: nowIso
+      });
+    }
+
+    if (input.audioUrl) {
+      sourcesToInsert.push({
+        id: generateUuid(),
+        lesson_id: lessonId,
+        uploaded_by: currentUserId,
+        type: 'TEACHER_VOICE',
+        original_filename: `${titleEn} - Sermon Audio`,
+        mime_type: 'audio/mp4',
+        file_url: input.audioUrl,
+        rights_status: 'TEACHER_OWNED',
+        processing_status: 'INDEXED',
+        priority: 'PRIMARY',
+        created_at: nowIso
+      });
+    }
+
+    if (sourcesToInsert.length > 0) {
+      await supabase!.from('lesson_sources').insert(sourcesToInsert);
+    }
+
+    const appLesson: Lesson = {
+      id: lessonId,
+      title: titleEn,
+      titleAr: titleAr,
+      summary: input.summaryEn || input.teacherNotes || '',
+      summaryAr: input.summaryAr || '',
+      status: isPublished ? 'published' : 'draft',
+      date: nowIso.split('T')[0],
+      grade: gradeLevel,
+      pointsAvailable: totalLessonPoints,
+      currentVersionId: versionId,
+      videoUrl: input.videoUrl,
+      slidesUrl: input.slidesUrl,
+      audioUrl: input.audioUrl,
+      teacherNotes: input.teacherNotes,
+      quiz: (input.quiz || []).map((q, idx) => ({
+        id: `q-${idx + 1}`,
+        question: q.question,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        difficulty: q.difficulty || 'EASY',
+        points: q.points || (q.difficulty === 'HARD' ? 30 : q.difficulty === 'MEDIUM' ? 20 : 10)
+      }))
+    };
+
+    const appVersion: LessonVersion = {
+      id: versionId,
+      lessonId,
+      versionNumber: 1,
+      status: isPublished ? 'PUBLISHED' : 'AI_DRAFT',
+      createdBy: currentUserId,
+      createdAt: nowIso,
+      approvedBy: isPublished ? 'Servant' : undefined,
+      approvedAt: isPublished ? nowIso : undefined,
+      summaryEn: input.summaryEn || '',
+      summaryAr: input.summaryAr || '',
+      bigIdeaEn: input.teacherNotes || titleEn,
+      bigIdeaAr: titleAr,
+      objectivesEn: [input.summaryEn || 'Understand and apply church teachings'],
+      objectivesAr: [input.summaryAr || 'استيعاب وتطبيق تعاليم الكنيسة في الحياة اليومية'],
+      sections: [{
+        id: sectionRow.id,
+        order: 1,
+        titleEn,
+        titleAr,
+        contentEn: sectionRow.content_en,
+        contentAr: sectionRow.content_ar,
+        sourceRefs: []
+      }],
+      recapEn: input.summaryEn || '',
+      recapAr: input.summaryAr || '',
+      flashcards: [],
+      slides: formattedSlides,
+      quizDraft,
+      narrationScriptEn: '',
+      narrationScriptAr: '',
+      ttsStatus: 'NONE'
+    };
+
+    return { data: { lesson: appLesson, version: appVersion }, error: null };
+  } catch (err: any) {
+    return { data: null, error: new Error(err?.message || 'Failed to publish express lesson') };
+  }
+}

@@ -393,25 +393,25 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[var(--color-church-cream-dark)] mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+        className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-border-sand)] mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
       >
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--color-church-cream)] border border-[var(--color-church-gold)]/20 p-2 flex items-center justify-center text-3xl shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--mousa-gold-soft)] border border-[var(--mousa-gold)]/30 p-2 flex items-center justify-center text-3xl shadow-xs">
             👨‍👩‍👧‍👦
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--color-church-blue)]">
+              <h1 className="text-2xl md:text-3xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
                 {lang === 'ar' ? 'بوابة أولياء الأمور' : 'Parent Portal'}
               </h1>
-              <span className="text-xs bg-blue-50 text-[var(--color-church-blue)] border border-blue-200 font-bold px-2.5 py-0.5 rounded-full">
-                {lang === 'ar' ? 'حساب ولي أمر' : 'Parent Account'}
+              <span className="text-xs bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] border border-[var(--mousa-border-sand)] font-bold px-2.5 py-0.5 rounded-full">
+                {lang === 'ar' ? 'رحلة القديس الأنبا موسى' : 'The Journey of Moses'}
               </span>
             </div>
-            <p className="text-sm text-gray-500 font-medium mt-1">
+            <p className="text-sm text-[var(--mousa-sand-500)] font-bold mt-1">
               {lang === 'ar' 
-                ? `أهلاً بك يا ${userData?.fullName || 'أستاذ عماد'}، متابعة نمو أطفالك في مدارس الأحد والأنشطة الكنسية` 
-                : `Welcome, ${userData?.fullName || 'Emad Makram'} — Track your children's Sunday School growth and liturgical life`}
+                ? `أهلاً بك يا ${userData?.fullName || 'ولي الأمر'}، متابعة نمو أطفالك في مسيرة مدارس الأحد` 
+                : `Welcome, ${userData?.fullName || 'Parent'} — Track your children's Sunday School journey`}
             </p>
           </div>
         </div>
@@ -422,7 +422,7 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
             <button
               type="button"
               onClick={onOpenTeacherStudio}
-              className="px-3 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3.5 py-2 rounded-2xl bg-[var(--mousa-sand-100)] hover:bg-[var(--mousa-sand-200)] text-[var(--mousa-teal-deep)] border border-[var(--mousa-border-sand)] text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <span>⛪</span>
               <span>{lang === 'ar' ? 'استوديو الخادم' : 'Servant Studio'}</span>
@@ -433,7 +433,7 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
             <button
               type="button"
               onClick={onBackToApp}
-              className="px-3 py-2 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-2xl bg-[var(--mousa-cream-surface)] dark:bg-stone-800 hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-sand-600)] text-xs font-bold transition-all cursor-pointer border border-[var(--mousa-border-sand)]"
             >
               {lang === 'ar' ? 'تطبيق الكنيسة' : 'Church App'}
             </button>
@@ -444,14 +444,14 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
             type="button"
             onClick={togglePushNotifications}
             title={lang === 'ar' ? 'تبديل التنبيهات الفورية' : 'Toggle Real-Time Push Alerts'}
-            className={`px-3 py-2 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs ${
+            className={`px-3 py-2 rounded-2xl border-2 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs ${
               pushNotificationsEnabled
-                ? 'bg-blue-50 hover:bg-blue-100 text-[var(--color-church-blue)] border-blue-200'
-                : 'bg-gray-50 hover:bg-gray-100 text-gray-500 border-gray-200'
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                : 'bg-[var(--mousa-cream-surface)] hover:bg-[var(--mousa-sand-100)] text-stone-500 border-[var(--mousa-border-sand)]'
             }`}
           >
             {pushNotificationsEnabled ? (
-              <BellRing size={15} className="text-[var(--color-church-blue)]" />
+              <BellRing size={15} className="text-emerald-700" />
             ) : (
               <BellOff size={15} className="text-gray-400" />
             )}
@@ -470,14 +470,14 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
               setIsAddChildModalOpen(true);
             }}
             title={lang === 'ar' ? 'مسح رمز QR للطفل لربط حسابه فورياً' : 'Scan child QR code to link instantly'}
-            className="px-3.5 py-2 rounded-2xl bg-[var(--color-church-blue)] hover:bg-blue-900 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            className="px-3.5 py-2 rounded-2xl bg-[var(--mousa-teal)] hover:bg-[var(--mousa-teal-deep)] text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
-            <QrCode size={15} className="text-amber-300" />
+            <QrCode size={15} className="text-[var(--mousa-gold)]" />
             <span>{lang === 'ar' ? 'مسح كود QR' : 'Scan Child QR'}</span>
           </button>
 
-          <div className="flex items-center gap-2 bg-gray-50 px-3.5 py-2 rounded-2xl border border-gray-100 text-xs font-semibold text-gray-600">
-            <Users size={16} className="text-[var(--color-church-blue)]" />
+          <div className="flex items-center gap-2 bg-[var(--mousa-sand-100)] dark:bg-stone-800 px-3.5 py-2 rounded-2xl border border-[var(--mousa-border-sand)] text-xs font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+            <Users size={16} className="text-[var(--mousa-gold)]" />
             <span>
               {linkedChildren.length} {lang === 'ar' ? 'أطفال مسجلين' : 'children enrolled'}
             </span>
@@ -490,42 +490,42 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
         {/* Tab 1: Lessons Progress */}
         <button 
           onClick={() => setActiveTab('overview')}
-          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-2xs ${
+          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
             activeTab === 'overview' 
-              ? 'bg-[var(--color-church-blue)] text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-gray-50 border border-[var(--color-church-cream-dark)]'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs' 
+              : 'bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] text-[var(--mousa-sand-600)] hover:bg-[var(--mousa-sand-100)] border-2 border-[var(--mousa-border-sand)]'
           }`}
         >
-          <BookOpen size={18} className={activeTab === 'overview' ? 'text-[var(--color-church-gold)]' : 'text-gray-400'} />
+          <BookOpen size={18} className={activeTab === 'overview' ? 'text-[var(--mousa-gold)]' : 'text-stone-400'} />
           <span>{lang === 'ar' ? 'تقدم الدروس' : 'Lessons & Progress'}</span>
         </button>
 
         {/* Tab 2: Weekly Aggregated Progress */}
         <button 
           onClick={() => setActiveTab('weekly')}
-          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-2xs ${
+          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
             activeTab === 'weekly' 
-              ? 'bg-[var(--color-church-blue)] text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-gray-50 border border-[var(--color-church-cream-dark)]'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs' 
+              : 'bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] text-[var(--mousa-sand-600)] hover:bg-[var(--mousa-sand-100)] border-2 border-[var(--mousa-border-sand)]'
           }`}
         >
-          <TrendingUp size={18} className={activeTab === 'weekly' ? 'text-[var(--color-church-gold)]' : 'text-gray-400'} />
+          <TrendingUp size={18} className={activeTab === 'weekly' ? 'text-[var(--mousa-gold)]' : 'text-stone-400'} />
           <span>{lang === 'ar' ? 'التقرير الأسبوعي' : 'Weekly Progress'}</span>
         </button>
 
         {/* Tab 3: Church Events Feed */}
         <button 
           onClick={() => setActiveTab('events')}
-          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative shadow-2xs ${
+          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 relative shadow-xs cursor-pointer ${
             activeTab === 'events' 
-              ? 'bg-[var(--color-church-blue)] text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-gray-50 border border-[var(--color-church-cream-dark)]'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs' 
+              : 'bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] text-[var(--mousa-sand-600)] hover:bg-[var(--mousa-sand-100)] border-2 border-[var(--mousa-border-sand)]'
           }`}
         >
-          <Calendar size={18} className={activeTab === 'events' ? 'text-[var(--color-church-gold)]' : 'text-gray-400'} />
+          <Calendar size={18} className={activeTab === 'events' ? 'text-[var(--mousa-gold)]' : 'text-stone-400'} />
           <span>{lang === 'ar' ? 'فعاليات الكنيسة' : 'Church Events'}</span>
           {unreadEventsCount > 0 && (
-            <span className="bg-[var(--color-church-burgundy)] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+            <span className="bg-[var(--mousa-coral)] text-white text-[11px] font-black px-2 py-0.5 rounded-full shrink-0">
               {unreadEventsCount}
             </span>
           )}
@@ -534,16 +534,16 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
         {/* Tab 4: Reward Approvals */}
         <button 
           onClick={() => setActiveTab('approvals')}
-          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative shadow-2xs ${
+          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 relative shadow-xs cursor-pointer ${
             activeTab === 'approvals' 
-              ? 'bg-[var(--color-church-blue)] text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-gray-50 border border-[var(--color-church-cream-dark)]'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs' 
+              : 'bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] text-[var(--mousa-sand-600)] hover:bg-[var(--mousa-sand-100)] border-2 border-[var(--mousa-border-sand)]'
           }`}
         >
-          <Shield size={18} className={activeTab === 'approvals' ? 'text-[var(--color-church-gold)]' : 'text-gray-400'} />
+          <Shield size={18} className={activeTab === 'approvals' ? 'text-[var(--mousa-gold)]' : 'text-stone-400'} />
           <span>{lang === 'ar' ? 'موافقات المكافآت' : 'Reward Approvals'}</span>
           {pendingRequests.length > 0 && (
-            <span className="bg-amber-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+            <span className="bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] text-[11px] font-black px-2 py-0.5 rounded-full shrink-0">
               {pendingRequests.length}
             </span>
           )}
@@ -553,13 +553,13 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
         <button 
           id="parent-settings-tab-btn"
           onClick={() => setActiveTab('settings')}
-          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 relative shadow-2xs ${
+          className={`flex-1 min-w-[140px] py-3.5 px-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 relative shadow-xs cursor-pointer ${
             activeTab === 'settings' 
-              ? 'bg-[var(--color-church-blue)] text-white shadow-md' 
-              : 'bg-white text-gray-600 hover:bg-gray-50 border border-[var(--color-church-cream-dark)]'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs' 
+              : 'bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] text-[var(--mousa-sand-600)] hover:bg-[var(--mousa-sand-100)] border-2 border-[var(--mousa-border-sand)]'
           }`}
         >
-          <Settings size={18} className={activeTab === 'settings' ? 'text-[var(--color-church-gold)]' : 'text-gray-400'} />
+          <Settings size={18} className={activeTab === 'settings' ? 'text-[var(--mousa-gold)]' : 'text-stone-400'} />
           <span>{lang === 'ar' ? 'الإعدادات والتنبيهات' : 'Settings & Alerts'}</span>
           {pushNotificationsEnabled && (
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Notifications active"></span>
@@ -646,14 +646,14 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
             className="space-y-6"
           >
             {/* Control & Toggle Banner */}
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[var(--color-church-cream-dark)]">
+            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-[var(--mousa-border-sand)]">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
                     <Shield size={22} />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-xl font-bold text-[var(--color-church-blue)]">
+                    <h2 className="text-lg md:text-xl font-bold text-[var(--mousa-teal-deep)]">
                       {lang === 'ar' ? 'نظام التحكم والموافقة الأبوية' : 'Parental Approval & Reward Safety'}
                     </h2>
                     <p className="text-xs text-gray-500 font-medium">
@@ -677,7 +677,7 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
                       checked={requireApproval}
                       onChange={toggleApproval}
                     />
-                    <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-church-blue)]"></div>
+                    <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--mousa-teal-deep)]"></div>
                   </label>
                 </div>
               </div>
@@ -706,7 +706,7 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-[var(--color-church-blue)] text-base">
+                              <h4 className="font-bold text-[var(--mousa-teal-deep)] text-base">
                                 {lang === 'ar' ? req.rewardTitleAr : req.rewardTitleEn}
                               </h4>
                               <span className="text-xs font-bold text-[var(--color-church-gold-dark)] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
@@ -731,7 +731,7 @@ export function ParentDashboard({ lang, onBackToApp, onOpenTeacherStudio, initia
                           </button>
                           <button 
                             onClick={() => handleRewardAction(req.id, 'approved')}
-                            className="flex-1 sm:flex-initial bg-[var(--color-church-blue)] text-white hover:bg-blue-900 font-bold px-4 py-2 rounded-xl transition-all text-xs flex items-center justify-center gap-1 shadow-2xs"
+                            className="flex-1 sm:flex-initial bg-[var(--mousa-teal-deep)] text-white hover:bg-blue-900 font-bold px-4 py-2 rounded-xl transition-all text-xs flex items-center justify-center gap-1 shadow-2xs"
                           >
                             <CheckCircle size={15} className="text-[var(--color-church-gold)]" />
                             <span>{lang === 'ar' ? 'موافقة وتسليم' : 'Approve & Redeem'}</span>

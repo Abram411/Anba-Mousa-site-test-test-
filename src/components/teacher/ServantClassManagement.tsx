@@ -18,10 +18,27 @@ import {
   UserMinus,
   AlertTriangle,
   Sparkles,
-  UserCheck
+  UserCheck,
+  Search,
+  DoorOpen,
+  Plus,
+  X,
+  Check,
+  Layers,
+  ArrowRight,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getMyClass, assignStudentClass, ClassRosterStudent, ServantClassInfo } from '../../lib/classRosterService';
+import { 
+  getMyClass, 
+  assignStudentClass, 
+  lookupClassByCode,
+  getClassServants,
+  addTeacherToClass,
+  ClassRosterStudent, 
+  ServantClassInfo,
+  ServantMember
+} from '../../lib/classRosterService';
 import { CLASS_GROUPS } from '../../lib/classGroups';
 import { ClassGroupId, OnboardingActivationRequest, ChurchClassInstance } from '../../types';
 import { getPendingActivationRequests, reviewActivationRequest } from '../../lib/onboardingService';
@@ -57,6 +74,24 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
   const [regeneratingCode, setRegeneratingCode] = useState<boolean>(false);
   const [codeSuccessMessage, setCodeSuccessMessage] = useState<string | null>(null);
   const [allClassInstances, setAllClassInstances] = useState<ChurchClassInstance[]>([]);
+
+  // Class Code Quick Switch & Modal state
+  const [classCodeInput, setClassCodeInput] = useState<string>('');
+  const [isSwitchingClass, setIsSwitchingClass] = useState<boolean>(false);
+  const [switchClassError, setSwitchClassError] = useState<string | null>(null);
+  const [showSwitchClassModal, setShowSwitchClassModal] = useState<boolean>(false);
+
+  // Servant Team (Co-Teachers) state
+  const [classServants, setClassServants] = useState<ServantMember[]>([]);
+  const [loadingServants, setLoadingServants] = useState<boolean>(false);
+  const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
+  const [teacherInput, setTeacherInput] = useState<string>('');
+  const [addingTeacher, setAddingTeacher] = useState<boolean>(false);
+  const [addTeacherSuccess, setAddTeacherSuccess] = useState<string | null>(null);
+  const [addTeacherError, setAddTeacherError] = useState<string | null>(null);
+
+  // Studio Sub-Tabs: 'roster' | 'servants' | 'allClasses'
+  const [managementTab, setManagementTab] = useState<'roster' | 'servants' | 'allClasses'>('roster');
 
   // Student Removal state
   const [studentToRemove, setStudentToRemove] = useState<ClassRosterStudent | null>(null);
@@ -108,13 +143,29 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
     }
   };
 
+  // Load servants assigned to this class instance
+  const loadServants = async (instanceId: string) => {
+    if (!instanceId) return;
+    setLoadingServants(true);
+    try {
+      const res = await getClassServants(instanceId);
+      if (res.success && res.servants) {
+        setClassServants(res.servants);
+      }
+    } catch (_) {
+    } finally {
+      setLoadingServants(false);
+    }
+  };
+
   // Load authoritative class and roster
-  const loadClassData = async () => {
+  const loadClassData = async (overrideGroupId?: string, overrideCode?: string) => {
     setLoading(true);
     setLoadError(null);
+    setSwitchClassError(null);
     try {
       const [{ data, error }, churchYearRes] = await Promise.all([
-        getMyClass(),
+        getMyClass(overrideGroupId, overrideCode),
         getCurrentChurchYear().catch(() => null)
       ]);
 
@@ -126,6 +177,10 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
       const info = data.classInfo as ServantClassInfo;
       setClassInfo(info);
       setRoster(data.roster || []);
+
+      if (info.classInstanceId) {
+        loadServants(info.classInstanceId);
+      }
 
       if (churchYearRes && churchYearRes.success) {
         setCurrentYear(churchYearRes.currentChurchYear || '2026–2027');
@@ -143,9 +198,9 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
 
       // Set default grade if available
       const groupGrades = info?.classGroupId && CLASS_GROUPS[info.classGroupId as ClassGroupId]?.grades;
-      if (groupGrades && groupGrades.length > 0 && !selectedGrade) {
+      if (groupGrades && groupGrades.length > 0) {
         setSelectedGrade(groupGrades[0].code);
-      } else if (info?.grades && info.grades.length > 0 && !selectedGrade) {
+      } else if (info?.grades && info.grades.length > 0) {
         setSelectedGrade(info.grades[0]);
       }
 
@@ -154,6 +209,68 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
       setLoadError(err?.message || (isAr ? 'حدث خطأ غير متوقع' : 'Unexpected error loading class'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Quick switch class by code
+  const handleSwitchClassByCode = async (codeToUse?: string) => {
+    const code = (codeToUse || classCodeInput).trim();
+    if (!code) {
+      setSwitchClassError(isAr ? 'يرجى كتابة كود الفصل' : 'Please enter a class code');
+      return;
+    }
+    setIsSwitchingClass(true);
+    setSwitchClassError(null);
+    try {
+      const res = await lookupClassByCode(code);
+      if (!res.success || !res.classGroupId) {
+        setSwitchClassError(res.error || (isAr ? `لم يتم العثور على فصل بالكود "${code}"` : `No class found with code "${code}"`));
+        return;
+      }
+      await loadClassData(res.classGroupId, code);
+      setClassCodeInput('');
+      setShowSwitchClassModal(false);
+      setRequestActionSuccess(
+        isAr 
+          ? `تم الانتقال وتشغيل فصل "${res.classInfo?.className || res.classGroupId}" بنجاح!` 
+          : `Successfully entered and operating class "${res.classInfo?.className || res.classGroupId}"!`
+      );
+    } catch (err: any) {
+      setSwitchClassError(err?.message || 'Error looking up class code');
+    } finally {
+      setIsSwitchingClass(false);
+    }
+  };
+
+  // Add teacher to class instance
+  const handleAddTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanTeacher = teacherInput.trim();
+    if (!cleanTeacher || !classInfo?.classInstanceId) {
+      setAddTeacherError(isAr ? 'يرجى إدخال بريد أو اسم أو كود الخادم' : 'Please enter teacher email, name, or code');
+      return;
+    }
+    setAddingTeacher(true);
+    setAddTeacherError(null);
+    setAddTeacherSuccess(null);
+    try {
+      const res = await addTeacherToClass(classInfo.classInstanceId, cleanTeacher, classInfo.classGroupId);
+      if (!res.success) {
+        setAddTeacherError(res.error || (isAr ? 'فشل إضافة الخادم' : 'Failed to add teacher'));
+        return;
+      }
+      setAddTeacherSuccess(
+        res.message || (isAr ? `تمت إضافة الخادم (${cleanTeacher}) إلى فريق تدريس الفصل بنجاح!` : `Teacher (${cleanTeacher}) added to class teaching team successfully!`)
+      );
+      setTeacherInput('');
+      if (classInfo?.classInstanceId) {
+        await loadServants(classInfo.classInstanceId);
+      }
+      await loadClassData(classInfo.classGroupId);
+    } catch (err: any) {
+      setAddTeacherError(err?.message || 'Error adding teacher');
+    } finally {
+      setAddingTeacher(false);
     }
   };
 
@@ -391,7 +508,7 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
   return (
     <div className="space-y-6" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Header Bar */}
-      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
             <Users size={24} />
@@ -399,7 +516,7 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-stone-100">
-                {isAr ? 'إدارة الفصل وقائمة الطلاب' : 'Class Management & Roster'}
+                {isAr ? 'استوديو وفصول مدارس الأحد' : 'Teacher Studio & Class Operations'}
               </h2>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <ShieldCheck size={11} />
@@ -412,16 +529,16 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
             </div>
 
             <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-stone-400">
-              <span>
+              <span className="font-semibold text-stone-200">
                 {classInfo 
-                  ? (isAr ? `فصلك: ${classInfo.classNameAr || classInfo.className}` : `Class: ${classInfo.className}`)
+                  ? (isAr ? `الفصل الحالي: ${classInfo.classNameAr || classInfo.className}` : `Operating Class: ${classInfo.className}`)
                   : (isAr ? 'جاري التحميل...' : 'Loading...')}
               </span>
               {classInfo?.servants && classInfo.servants.length > 0 && (
                 <>
                   <span className="text-stone-600">•</span>
                   <span className="text-stone-300 flex items-center gap-1">
-                    <span>👥 {isAr ? 'الخدام المعتمدون:' : 'Servants:'}</span>
+                    <span>👥 {isAr ? 'الخدام:' : 'Servants:'}</span>
                     <span className="font-semibold text-amber-200">{classInfo.servants.join(', ')}</span>
                   </span>
                 </>
@@ -448,27 +565,90 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap self-end md:self-center">
+        {/* Quick Class Code Input & Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap self-stretch xl:self-center justify-between xl:justify-end">
+          {/* Quick Switch Class Code Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSwitchClassByCode();
+            }}
+            className="flex items-center gap-1.5 bg-stone-950/80 border border-stone-800 p-1 rounded-xl"
+          >
+            <div className="flex items-center gap-1.5 px-2">
+              <Key size={14} className="text-amber-400 shrink-0" />
+              <input
+                type="text"
+                value={classCodeInput}
+                onChange={(e) => setClassCodeInput(e.target.value)}
+                placeholder={isAr ? 'اكتب كود الفصل (مثال: GRADE-4)' : 'Class code (e.g. GRADE-4)'}
+                className="bg-transparent text-xs text-stone-100 placeholder-stone-500 outline-none w-36 sm:w-44 font-mono uppercase"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSwitchingClass || !classCodeInput.trim()}
+              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+            >
+              {isSwitchingClass ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <ArrowRight size={12} className={isAr ? 'rotate-180' : ''} />
+              )}
+              <span>{isAr ? 'دخول وتشغيل' : 'Open'}</span>
+            </button>
+          </form>
+
+          {/* Dedicated Switch Class Modal Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowSwitchClassModal(true)}
+            className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-stone-700 cursor-pointer shrink-0"
+            title={isAr ? 'تصفح ودخول الفصول بكود الفصل' : 'Browse and join classes by code'}
+          >
+            <DoorOpen size={14} className="text-amber-400" />
+            <span>{isAr ? 'تبديل الفصل' : 'Switch Class'}</span>
+          </button>
+
           {isAdmin && (
             <button
+              type="button"
               onClick={handleOpenNewYearModal}
               className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
             >
               <Sparkles size={13} />
-              <span>{isAr ? 'بدء عام كنسي جديد' : 'Start New Church Year'}</span>
+              <span>{isAr ? 'بدء عام كنسي جديد' : 'New Church Year'}</span>
             </button>
           )}
 
           <button
-            onClick={loadClassData}
+            type="button"
+            onClick={() => loadClassData(classInfo?.classGroupId)}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-stone-700 cursor-pointer disabled:opacity-50 shrink-0"
+            className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-stone-700 cursor-pointer disabled:opacity-50 shrink-0"
+            title={isAr ? 'تحديث السجل' : 'Refresh Roster'}
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            <span>{isAr ? 'تحديث السجل' : 'Refresh Roster'}</span>
           </button>
         </div>
       </div>
+
+      {/* Switch Class Error Alert */}
+      {switchClassError && (
+        <div className="bg-rose-950/60 border border-rose-800 rounded-xl p-3.5 text-rose-200 text-xs flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-rose-400 shrink-0" />
+            <span>{switchClassError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSwitchClassError(null)}
+            className="text-stone-400 hover:text-stone-200 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {codeSuccessMessage && (
         <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-amber-200 text-xs flex items-center gap-2.5">
@@ -498,334 +678,169 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
         </div>
       )}
 
-      {/* Pending Account Activations & Roster Approvals Section */}
-      <div className="bg-stone-900/90 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-              <Clock size={16} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-stone-100">
-                  {isAr ? 'طلبات تفعيل الحسابات والتسكين بالكشف' : 'Pending Activation & Roster Requests'}
-                </h3>
-                {pendingRequests.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 animate-pulse">
-                    {pendingRequests.length} {isAr ? 'جديد' : 'New'}
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-stone-400 mt-0.5">
-                {isAr
-                  ? 'طلبات الطلاب الجدد لاختيار الصف والانضمام إلى فصلك لاعتمادها يدوياً'
-                  : 'Student requests awaiting your manual approval for class roster assignment'}
-              </p>
-            </div>
-          </div>
+      {/* Teacher Studio Sub-Navigation Tabs */}
+      <div className="flex bg-stone-900 border border-stone-800 p-1.5 rounded-2xl gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setManagementTab('roster')}
+          className={`flex-1 min-w-[170px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            managementTab === 'roster'
+              ? 'bg-amber-500 text-stone-950 shadow-md font-extrabold'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+          }`}
+        >
+          <GraduationCap size={15} />
+          <span>{isAr ? 'كشف الطلاب والطلبات' : 'Students & Approvals'}</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-950/60 text-stone-300 font-mono">
+            {roster.length}
+          </span>
+          {pendingRequests.length > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold animate-pulse">
+              {pendingRequests.length}
+            </span>
+          )}
+        </button>
 
-          <button
-            type="button"
-            onClick={() => loadRequests(classInfo?.classGroupId)}
-            disabled={loadingRequests}
-            className="text-[11px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
-          >
-            <RefreshCw size={11} className={loadingRequests ? 'animate-spin' : ''} />
-            <span>{isAr ? 'تحديث الطلبات' : 'Refresh'}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setManagementTab('servants')}
+          className={`flex-1 min-w-[170px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            managementTab === 'servants'
+              ? 'bg-amber-500 text-stone-950 shadow-md font-extrabold'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+          }`}
+        >
+          <Users size={15} />
+          <span>{isAr ? 'خدام ومعلمو الفصل' : 'Co-Teachers & Servants'}</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-950/60 text-stone-300 font-mono">
+            {classServants.length || (classInfo?.servants?.length ?? 1)}
+          </span>
+        </button>
 
-        {loadingRequests ? (
-          <div className="py-6 text-center text-xs text-stone-500 flex items-center justify-center gap-2">
-            <RefreshCw size={14} className="animate-spin text-amber-500" />
-            <span>{isAr ? 'جاري فحص الطلبات...' : 'Checking pending requests...'}</span>
-          </div>
-        ) : pendingRequests.length === 0 ? (
-          <div className="py-5 text-center text-xs text-stone-500">
-            {isAr
-              ? 'لا توجد طلبات تفعيل أو تسكين معلقة لهذا الفصل حالياً. كل الطلاب مسكنون رسمياً.'
-              : 'No pending onboarding or roster requests for this class. All students are approved.'}
-          </div>
-        ) : (
-          <div className="divide-y divide-stone-800 space-y-3">
-            {pendingRequests.map((req) => {
-              const isProcessing = processingRequestId === req.id;
-              return (
-                <div 
-                  key={req.id}
-                  className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs bg-stone-950/40 p-3 rounded-xl border border-stone-800/80"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
-                      {req.studentName.charAt(0) || 'S'}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-100 text-sm">{req.studentName}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                          {req.requestedGrade}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-stone-400 flex items-center gap-2 flex-wrap">
-                        <span>ID: <code className="text-stone-300">{req.studentId}</code></span>
-                        {req.phone && <span>• 📞 {req.phone}</span>}
-                        {req.email && <span>• ✉️ {req.email}</span>}
-                        <span>• 🕒 {new Date(req.requestedAt).toLocaleDateString()}</span>
-                      </div>
-                      {req.notes && (
-                        <div className="text-[11px] text-amber-200/80 bg-amber-950/30 p-2 rounded-lg border border-amber-900/40 italic">
-                          "{req.notes}"
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                    <button
-                      type="button"
-                      disabled={isProcessing}
-                      onClick={() => handleReviewRequest(req.id, 'REJECT')}
-                      className="px-3 py-1.5 rounded-lg border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-stone-200 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {isAr ? 'رفض' : 'Reject'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isProcessing}
-                      onClick={() => handleReviewRequest(req.id, 'APPROVE', req.requestedGrade)}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <RefreshCw size={12} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={13} />
-                      )}
-                      <span>{isAr ? 'قبول وتسكين بالكشف' : 'Approve & Enroll'}</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => setManagementTab('allClasses')}
+          className={`flex-1 min-w-[170px] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            managementTab === 'allClasses'
+              ? 'bg-amber-500 text-stone-950 shadow-md font-extrabold'
+              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+          }`}
+        >
+          <Layers size={15} />
+          <span>{isAr ? 'فصول العام الكنسي' : 'All Church Classes'}</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-950/60 text-stone-300 font-mono">
+            {allClassInstances.length || 6}
+          </span>
+        </button>
       </div>
 
-      {/* Grid: Assignment Form + Roster View */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Student Assignment Workflow */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-stone-800">
-              <UserPlus size={18} className="text-amber-400" />
-              <h3 className="text-sm font-bold text-stone-200">
-                {isAr ? 'تعيين طالب إلى فصلي' : 'Assign Student to My Class'}
-              </h3>
-            </div>
-
-            <form onSubmit={handleAssignStudent} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-stone-300 font-medium mb-1.5">
-                  {isAr ? 'معرّف الطالب (Student ID / Code)' : 'Student ID or Code'}
-                </label>
-                <input
-                  type="text"
-                  value={studentIdInput}
-                  onChange={(e) => setStudentIdInput(e.target.value)}
-                  placeholder={isAr ? 'مثال: mark أو student-david' : 'e.g. mark or student-david'}
-                  className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-stone-100 placeholder-stone-600 outline-none transition-colors"
-                  disabled={isSubmitting || loading}
-                />
+      {/* SUBTAB 1: ROSTER & APPROVALS */}
+      {managementTab === 'roster' && (
+        <div className="space-y-6">
+          {/* Pending Account Activations & Roster Approvals Section */}
+          <div className="bg-stone-900/90 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                  <Clock size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-stone-100">
+                      {isAr ? 'طلبات تفعيل الحسابات والتسكين بالكشف' : 'Pending Activation & Roster Requests'}
+                    </h3>
+                    {pendingRequests.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-stone-950 animate-pulse">
+                        {pendingRequests.length} {isAr ? 'جديد' : 'New'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-0.5">
+                    {isAr
+                      ? 'طلبات الطلاب الجدد لاختيار الصف والانضمام إلى فصلك لاعتمادها وتسكينها فوراً'
+                      : 'Student grade requests awaiting your manual approval for immediate class enrollment'}
+                  </p>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-stone-300 font-medium mb-1.5 flex items-center justify-between">
-                  <span>{isAr ? 'المرحلة الدراسية المصرح بها' : 'Authorized Grade'}</span>
-                  <span className="text-[10px] text-amber-400/80 font-normal">
-                    {classInfo?.className || 'Class Group'}
-                  </span>
-                </label>
-                <select
-                  value={selectedGrade}
-                  onChange={(e) => setSelectedGrade(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-stone-100 outline-none transition-colors"
-                  disabled={isSubmitting || loading}
-                >
-                  {eligibleGrades.map((g) => (
-                    <option key={g.code} value={g.code}>
-                      {g.label} ({g.code})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-stone-500 mt-1">
-                  {isAr 
-                    ? 'الخيارات مقصورة تلقائياً على المراحل المصرح بها لفصلك فقط.'
-                    : 'Restricted strictly to grades authorized for your assigned class.'}
-                </p>
-              </div>
-
-              {/* Status alerts */}
-              <AnimatePresence>
-                {assignmentSuccess && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="p-3 bg-emerald-950/50 border border-emerald-800/80 rounded-xl text-emerald-300 text-xs flex items-start gap-2"
-                  >
-                    <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
-                    <span>{assignmentSuccess}</span>
-                  </motion.div>
-                )}
-
-                {assignmentError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="p-3 bg-rose-950/50 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-start gap-2"
-                  >
-                    <AlertCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
-                    <span>{assignmentError}</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               <button
-                type="submit"
-                disabled={isSubmitting || loading || !studentIdInput.trim()}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                type="button"
+                onClick={() => loadRequests(classInfo?.classGroupId)}
+                disabled={loadingRequests}
+                className="text-[11px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
               >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    <span>{isAr ? 'جاري التحقق والحفظ...' : 'Persisting Assignment...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={14} />
-                    <span>{isAr ? 'تأكيد التعيين وحفظه' : 'Confirm & Persist Assignment'}</span>
-                  </>
-                )}
+                <RefreshCw size={11} className={loadingRequests ? 'animate-spin' : ''} />
+                <span>{isAr ? 'تحديث الطلبات' : 'Refresh'}</span>
               </button>
-            </form>
-          </div>
-
-          {/* Removal / Policy Note */}
-          <div className="bg-stone-900/60 border border-stone-800/80 rounded-2xl p-4 text-[11px] text-stone-400 space-y-2">
-            <div className="flex items-center gap-1.5 text-stone-300 font-semibold">
-              <Info size={14} className="text-amber-400" />
-              <span>{isAr ? 'سياسة النقل والإلغاء' : 'Unassignment / Removal Policy'}</span>
-            </div>
-            <p className="leading-relaxed">
-              {isAr
-                ? 'حفاظاً على سجلات الحضور وسجل إتقان الطالب، يتم نقل أو إلغاء تعيين الطلاب من خلال التعيين الإداري المباشر فقط لتجنب حذف البيانات بالخطأ.'
-                : 'To protect student mastery records and attendance history, removal is handled via direct reassignment. Deletion without reassignment is deferred.'}
-            </p>
-          </div>
-        </div>
-
-        {/* Right Column: Authorized Roster View */}
-        <div className="lg:col-span-2">
-          <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-              <div className="flex items-center gap-2">
-                <GraduationCap size={18} className="text-amber-400" />
-                <h3 className="text-sm font-bold text-stone-200">
-                  {isAr ? 'الطلاب المقيدون بالفصل' : 'Enrolled Students Roster'}
-                </h3>
-              </div>
-              <span className="text-xs text-stone-400 font-medium">
-                {isAr ? `${roster.length} طالب` : `${roster.length} Students`}
-              </span>
             </div>
 
-            {loading && roster.length === 0 ? (
-              <div className="py-12 text-center text-stone-500 text-xs flex flex-col items-center gap-2">
-                <RefreshCw size={20} className="animate-spin text-amber-500" />
-                <span>{isAr ? 'جاري تحميل قائمة الطلاب...' : 'Loading roster...'}</span>
+            {loadingRequests ? (
+              <div className="py-6 text-center text-xs text-stone-500 flex items-center justify-center gap-2">
+                <RefreshCw size={14} className="animate-spin text-amber-500" />
+                <span>{isAr ? 'جاري فحص الطلبات...' : 'Checking pending requests...'}</span>
               </div>
-            ) : roster.length === 0 ? (
-              <div className="py-12 text-center text-stone-500 text-xs">
-                {isAr ? 'لا يوجد طلاب مسجلون في هذا الفصل حالياً.' : 'No students currently enrolled in this class.'}
+            ) : pendingRequests.length === 0 ? (
+              <div className="py-5 text-center text-xs text-stone-500">
+                {isAr
+                  ? 'لا توجد طلبات تفعيل أو تسكين معلقة لهذا الفصل حالياً. كل الطلاب مسكنون رسمياً.'
+                  : 'No pending onboarding or roster requests for this class. All students are approved.'}
               </div>
             ) : (
-              <div className="divide-y divide-stone-800/80 max-h-[520px] overflow-y-auto pr-1">
-                {roster.map((student) => {
-                  const mastery = student.learningSummary?.latestMasteryStatus;
-                  const lessonsCount = student.learningSummary?.lessonsCompletedCount ?? 0;
-                  const quizScore = student.learningSummary?.latestQuizScore ?? 0;
-
+              <div className="divide-y divide-stone-800 space-y-3">
+                {pendingRequests.map((req) => {
+                  const isProcessing = processingRequestId === req.id;
                   return (
                     <div 
-                      key={student.id}
-                      className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-stone-800/30 px-2 rounded-xl transition-colors"
+                      key={req.id}
+                      className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs bg-stone-950/40 p-3 rounded-xl border border-stone-800/80"
                     >
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={student.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`} 
-                          alt={student.name}
-                          className="w-10 h-10 rounded-full bg-stone-800 border border-stone-700 object-cover shrink-0" 
-                        />
-                        <div>
-                          <div className="font-bold text-stone-200 text-sm">
-                            {student.name}
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                          {req.studentName.charAt(0) || 'S'}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-stone-100 text-sm">{req.studentName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                              {req.requestedGrade}
+                            </span>
                           </div>
-                          <div className="text-[11px] text-stone-400 flex items-center gap-2 mt-0.5">
-                            <span className="text-amber-400/90 font-medium">{student.grade}</span>
-                            <span className="text-stone-600">•</span>
-                            <span className="text-stone-500">ID: {student.id}</span>
+                          <div className="text-[11px] text-stone-400 flex items-center gap-2 flex-wrap">
+                            <span>ID: <code className="text-stone-300">{req.studentId}</code></span>
+                            {req.phone && <span>• 📞 {req.phone}</span>}
+                            {req.email && <span>• ✉️ {req.email}</span>}
+                            <span>• 🕒 {new Date(req.requestedAt).toLocaleDateString()}</span>
                           </div>
+                          {req.notes && (
+                            <div className="text-[11px] text-amber-200/80 bg-amber-950/30 p-2 rounded-lg border border-amber-900/40 italic">
+                              "{req.notes}"
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Learning Summary - Privacy Safe Reused Data */}
-                      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                        {/* Mastery status badge */}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                          mastery === 'MASTERED'
-                            ? 'bg-emerald-950/70 border-emerald-800 text-emerald-400'
-                            : mastery === 'DEVELOPING'
-                            ? 'bg-amber-950/70 border-amber-800 text-amber-400'
-                            : mastery === 'NEEDS_REVIEW'
-                            ? 'bg-rose-950/70 border-rose-800 text-rose-400'
-                            : 'bg-stone-800 border-stone-700 text-stone-400'
-                        }`}>
-                          <Award size={10} />
-                          {mastery || 'NOT_STARTED'}
-                        </span>
-
-                        {/* Completed lessons count */}
-                        <span className="text-[11px] text-stone-400 bg-stone-950 px-2 py-1 rounded-lg border border-stone-800 flex items-center gap-1">
-                          <BookOpen size={11} className="text-stone-500" />
-                          <span>{lessonsCount} {isAr ? 'دروس' : 'lessons'}</span>
-                        </span>
-
-                        {/* Quiz score */}
-                        <span className="text-[11px] font-mono font-medium text-stone-300 bg-stone-950 px-2 py-1 rounded-lg border border-stone-800">
-                          {quizScore}% {isAr ? 'تقييم' : 'quiz'}
-                        </span>
-
-                        {/* Drill-down button to Learning Review */}
-                        <button
-                          onClick={() => setSelectedStudentForReview(student.id)}
-                          className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-300 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer shrink-0 border border-stone-700 hover:border-amber-400"
-                        >
-                          <span>{isAr ? 'تقرير التعلّم' : 'Learning Review'}</span>
-                          <ChevronRight size={13} className={isAr ? 'rotate-180' : ''} />
-                        </button>
-
-                        {/* Authorized Servant/Admin Remove Student Button */}
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
                         <button
                           type="button"
-                          onClick={() => {
-                            setStudentToRemove(student);
-                            setRemovalReason('');
-                          }}
-                          className="p-1.5 rounded-lg bg-stone-800 hover:bg-rose-950/60 hover:text-rose-400 text-stone-400 transition-colors border border-stone-700/80 cursor-pointer shrink-0"
-                          title={isAr ? 'إلغاء قيد الطالب من كشف هذا العام' : 'Remove student from current-year class'}
+                          disabled={isProcessing}
+                          onClick={() => handleReviewRequest(req.id, 'REJECT')}
+                          className="px-3 py-1.5 rounded-lg border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-stone-200 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          <UserMinus size={13} />
+                          {isAr ? 'رفض الطلب' : 'Deny'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => handleReviewRequest(req.id, 'APPROVE', req.requestedGrade)}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isProcessing ? (
+                            <RefreshCw size={12} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={13} />
+                          )}
+                          <span>{isAr ? 'قبول وتسكين فوري بالكشف' : 'Approve & Enroll'}</span>
                         </button>
                       </div>
                     </div>
@@ -834,50 +849,669 @@ export const ServantClassManagement: React.FC<ServantClassManagementProps> = ({
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Admin Church-Wide Class Instances & Servant Assignments Overview */}
-      {isAdmin && allClassInstances.length > 0 && (
-        <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-            <div className="flex items-center gap-2">
-              <Sparkles size={18} className="text-amber-400" />
-              <h3 className="text-sm font-bold text-stone-100">
-                {isAr ? `فصول العام الكنسي المعتمدة (${currentYear})` : `Church-Wide Class Instances (${currentYear})`}
-              </h3>
-            </div>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-bold border border-amber-500/20">
-              {isAr ? 'إدارة المشرف العام' : 'Admin View'}
-            </span>
-          </div>
+          {/* Grid: Manual Assignment Form + Roster View */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column: Student Assignment Workflow */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-stone-800">
+                  <UserPlus size={18} className="text-amber-400" />
+                  <h3 className="text-sm font-bold text-stone-200">
+                    {isAr ? 'تعيين طالب إلى فصلي' : 'Assign Student to My Class'}
+                  </h3>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {allClassInstances.map((inst) => (
-              <div 
-                key={inst.id}
-                className="p-3.5 rounded-xl bg-stone-950/60 border border-stone-800/80 space-y-2 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-stone-100 text-sm">{isAr ? inst.nameAr : inst.nameEn}</span>
-                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                    {inst.code}
-                  </span>
-                </div>
-                <div className="text-[11px] text-stone-400 flex items-center justify-between">
-                  <span>{isAr ? 'الخدام المكلفون:' : 'Assigned Servants:'}</span>
-                  <span className="font-medium text-stone-300">
-                    {inst.servantIds?.length > 0 ? inst.servantIds.join(', ') : (isAr ? 'لم يُحدد' : 'None')}
-                  </span>
-                </div>
-                <div className="text-[10px] text-stone-500">
-                  ID: <code className="text-stone-400">{inst.id}</code>
-                </div>
+                <form onSubmit={handleAssignStudent} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1.5">
+                      {isAr ? 'كود أو معرّف الطالب (Student Code / Link ID)' : 'Student Code or ID'}
+                    </label>
+                    <input
+                      type="text"
+                      value={studentIdInput}
+                      onChange={(e) => setStudentIdInput(e.target.value)}
+                      placeholder={isAr ? 'مثال: ST-4921 أو mark أو c1' : 'e.g. ST-4921, mark, or c1'}
+                      className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-stone-100 placeholder-stone-600 outline-none transition-colors font-mono"
+                      disabled={isSubmitting || loading}
+                    />
+
+                    {/* Instant Student Code Recognition Preview */}
+                    {(() => {
+                      const KNOWN_STUDENT_HINTS = [
+                        { code: 'ST-4921', id: 'student-david', name: 'David Shenouda (ديفيد شنودة)', grade: 'Grade 4' },
+                        { code: 'CH-9481', id: 'c1', name: 'Mina Emad (مينا عماد)', grade: 'Grade 4' },
+                        { code: 'CH-7320', id: 'c2', name: 'Mary Emad (مريم عماد)', grade: 'Grade 2' },
+                        { code: 'ST-3819', id: 'student-fadi', name: 'Fadi Nabil (فادي نبيل)', grade: 'Grade 3' },
+                        { code: 'ST-6104', id: 'student-marina', name: 'Marina George (مارينا جورج)', grade: 'Grade 5' },
+                        { code: 'ST-8255', id: 'student-kyrollos', name: 'Kyrollos Rafik (كيرلس رفيق)', grade: 'Grade 6' },
+                        { code: 'ST-1001', id: 'mark', name: 'Mark Bassem (مارك باسم)', grade: 'Grade 4' },
+                      ];
+                      const matched = studentIdInput.trim() ? KNOWN_STUDENT_HINTS.find(
+                        s => s.code.toUpperCase() === studentIdInput.trim().toUpperCase() ||
+                             s.id.toLowerCase() === studentIdInput.trim().toLowerCase() ||
+                             s.name.toLowerCase().includes(studentIdInput.trim().toLowerCase())
+                      ) : null;
+                      if (!matched) return null;
+                      return (
+                        <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={14} className="text-amber-400 shrink-0" />
+                            <div>
+                              <div className="font-bold text-stone-200">{matched.name}</div>
+                              <div className="text-[10px] text-stone-400">
+                                Code: <span className="font-mono text-amber-300">{matched.code}</span> • {matched.grade}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGrade(matched.grade)}
+                            className="px-2 py-1 bg-amber-500 text-stone-950 font-bold text-[10px] rounded-lg hover:bg-amber-400 transition-colors cursor-pointer"
+                          >
+                            {isAr ? 'تحديد الصف' : 'Use Grade'}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1.5 flex items-center justify-between">
+                      <span>{isAr ? 'المرحلة الدراسية المصرح بها' : 'Authorized Grade'}</span>
+                      <span className="text-[10px] text-amber-400/80 font-normal">
+                        {classInfo?.className || 'Class Group'}
+                      </span>
+                    </label>
+                    <select
+                      value={selectedGrade}
+                      onChange={(e) => setSelectedGrade(e.target.value)}
+                      className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-stone-100 outline-none transition-colors"
+                      disabled={isSubmitting || loading}
+                    >
+                      {eligibleGrades.map((g) => (
+                        <option key={g.code} value={g.code}>
+                          {g.label} ({g.code})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-stone-500 mt-1">
+                      {isAr 
+                        ? 'الخيارات مقصورة تلقائياً على المراحل المصرح بها لفصلك فقط.'
+                        : 'Restricted strictly to grades authorized for your assigned class.'}
+                    </p>
+                  </div>
+
+                  {/* Status alerts */}
+                  <AnimatePresence>
+                    {assignmentSuccess && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="p-3 bg-emerald-950/50 border border-emerald-800/80 rounded-xl text-emerald-300 text-xs flex items-start gap-2"
+                      >
+                        <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{assignmentSuccess}</span>
+                      </motion.div>
+                    )}
+
+                    {assignmentError && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="p-3 bg-rose-950/50 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-start gap-2"
+                      >
+                        <AlertCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+                        <span>{assignmentError}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || loading || !studentIdInput.trim()}
+                    className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>{isAr ? 'جاري التحقق والحفظ...' : 'Persisting Assignment...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={14} />
+                        <span>{isAr ? 'تأكيد التعيين وحفظه' : 'Confirm & Persist Assignment'}</span>
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
-            ))}
+
+              {/* Removal / Policy Note */}
+              <div className="bg-stone-900/60 border border-stone-800/80 rounded-2xl p-4 text-[11px] text-stone-400 space-y-2">
+                <div className="flex items-center gap-1.5 text-stone-300 font-semibold">
+                  <Info size={14} className="text-amber-400" />
+                  <span>{isAr ? 'سياسة النقل والإلغاء' : 'Unassignment / Removal Policy'}</span>
+                </div>
+                <p className="leading-relaxed">
+                  {isAr
+                    ? 'حفاظاً على سجلات الحضور وسجل إتقان الطالب، يتم نقل أو إلغاء تعيين الطلاب من خلال التعيين الإداري المباشر فقط لتجنب حذف البيانات بالخطأ.'
+                    : 'To protect student mastery records and attendance history, removal is handled via direct reassignment. Deletion without reassignment is deferred.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column: Authorized Roster View */}
+            <div className="lg:col-span-2">
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap size={18} className="text-amber-400" />
+                    <h3 className="text-sm font-bold text-stone-200">
+                      {isAr ? 'الطلاب المقيدون بالفصل' : 'Enrolled Students Roster'}
+                    </h3>
+                  </div>
+                  <span className="text-xs text-stone-400 font-medium font-mono">
+                    {isAr ? `${roster.length} طالب` : `${roster.length} Students`}
+                  </span>
+                </div>
+
+                {loading && roster.length === 0 ? (
+                  <div className="py-12 text-center text-stone-500 text-xs flex flex-col items-center gap-2">
+                    <RefreshCw size={20} className="animate-spin text-amber-500" />
+                    <span>{isAr ? 'جاري تحميل قائمة الطلاب...' : 'Loading roster...'}</span>
+                  </div>
+                ) : roster.length === 0 ? (
+                  <div className="py-12 text-center text-stone-500 text-xs">
+                    {isAr ? 'لا يوجد طلاب مسجلون في هذا الفصل حالياً.' : 'No students currently enrolled in this class.'}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-stone-800/80 max-h-[520px] overflow-y-auto pr-1">
+                    {roster.map((student) => {
+                      const mastery = student.learningSummary?.latestMasteryStatus;
+                      const lessonsCount = student.learningSummary?.lessonsCompletedCount ?? 0;
+                      const quizScore = student.learningSummary?.latestQuizScore ?? 0;
+
+                      return (
+                        <div 
+                          key={student.id}
+                          className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-stone-800/30 px-2 rounded-xl transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={student.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`} 
+                              alt={student.name}
+                              className="w-10 h-10 rounded-full bg-stone-800 border border-stone-700 object-cover shrink-0" 
+                            />
+                            <div>
+                              <div className="font-bold text-stone-200 text-sm">
+                                {student.name}
+                              </div>
+                              <div className="text-[11px] text-stone-400 flex items-center gap-2 mt-0.5">
+                                <span className="text-amber-400/90 font-medium">{student.grade}</span>
+                                <span className="text-stone-600">•</span>
+                                <span className="text-stone-500 font-mono">ID: {student.id}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Learning Summary & Actions */}
+                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                              mastery === 'MASTERED'
+                                ? 'bg-emerald-950/70 border-emerald-800 text-emerald-400'
+                                : mastery === 'DEVELOPING'
+                                ? 'bg-amber-950/70 border-amber-800 text-amber-400'
+                                : mastery === 'NEEDS_REVIEW'
+                                ? 'bg-rose-950/70 border-rose-800 text-rose-400'
+                                : 'bg-stone-800 border-stone-700 text-stone-400'
+                            }`}>
+                              <Award size={10} />
+                              {mastery || 'NOT_STARTED'}
+                            </span>
+
+                            <span className="text-[11px] text-stone-400 bg-stone-950 px-2 py-1 rounded-lg border border-stone-800 flex items-center gap-1">
+                              <BookOpen size={11} className="text-stone-500" />
+                              <span>{lessonsCount} {isAr ? 'دروس' : 'lessons'}</span>
+                            </span>
+
+                            <span className="text-[11px] font-mono font-medium text-stone-300 bg-stone-950 px-2 py-1 rounded-lg border border-stone-800">
+                              {quizScore}% {isAr ? 'تقييم' : 'quiz'}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentForReview(student.id)}
+                              className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-300 font-semibold text-[11px] transition-all flex items-center gap-1 cursor-pointer shrink-0 border border-stone-700 hover:border-amber-400"
+                            >
+                              <span>{isAr ? 'تقرير التعلّم' : 'Learning Review'}</span>
+                              <ChevronRight size={13} className={isAr ? 'rotate-180' : ''} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStudentToRemove(student);
+                                setRemovalReason('');
+                              }}
+                              className="p-1.5 rounded-lg bg-stone-800 hover:bg-rose-950/60 hover:text-rose-400 text-stone-400 transition-colors border border-stone-700/80 cursor-pointer shrink-0"
+                              title={isAr ? 'إلغاء قيد الطالب من كشف هذا العام' : 'Remove student from current-year class'}
+                            >
+                              <UserMinus size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* SUBTAB 2: CO-TEACHERS & SERVANTS */}
+      {managementTab === 'servants' && (
+        <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-stone-800 gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-amber-400" />
+                <h3 className="text-base font-bold text-stone-100">
+                  {isAr ? 'خدام ومعلمو هذا الفصل' : 'Class Teaching Staff & Co-Teachers'}
+                </h3>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  {classServants.length || (classInfo?.servants?.length ?? 1)} {isAr ? 'خدام' : 'Servants'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-400 mt-1">
+                {isAr
+                  ? 'المعلمون المصرح لهم بإدارة هذا الفصل، تسجيل الحضور، ومراجعة وتقييم الطلاب المشتركين.'
+                  : 'Authorized teachers collaborating on this class instance with shared roster & grading rights.'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTeacherInput('');
+                setAddTeacherError(null);
+                setAddTeacherSuccess(null);
+                setShowAddTeacherModal(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-md cursor-pointer shrink-0"
+            >
+              <Plus size={15} />
+              <span>{isAr ? 'إضافة خادم للفصل' : 'Add Co-Teacher'}</span>
+            </button>
+          </div>
+
+          {addTeacherSuccess && (
+            <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-3 text-emerald-200 text-xs flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+              <span>{addTeacherSuccess}</span>
+            </div>
+          )}
+
+          {loadingServants ? (
+            <div className="py-12 text-center text-xs text-stone-500 flex items-center justify-center gap-2">
+              <RefreshCw size={16} className="animate-spin text-amber-500" />
+              <span>{isAr ? 'جاري تحميل فريق الخدام...' : 'Loading teachers team...'}</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(classServants.length > 0 ? classServants : [
+                {
+                  id: 'servant-mina',
+                  name: classInfo?.servants?.[0] || 'Servant Mina',
+                  email: 'mina@church.org',
+                  role: 'teacher',
+                  assignedAt: new Date().toISOString()
+                }
+              ]).map((servant) => (
+                <div
+                  key={servant.id}
+                  className="p-4 rounded-2xl bg-stone-950/60 border border-stone-800 flex items-center gap-3.5 hover:border-amber-500/40 transition-colors"
+                >
+                  <img
+                    src={servant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${servant.id}`}
+                    alt={servant.name}
+                    className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-stone-100 text-sm truncate">
+                        {isAr && servant.nameAr ? servant.nameAr : servant.name}
+                      </span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        {servant.role || 'Teacher'}
+                      </span>
+                    </div>
+                    {servant.email && (
+                      <div className="text-[11px] text-stone-400 truncate mt-0.5">
+                        {servant.email}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-stone-500 font-mono mt-1">
+                      ID: {servant.id}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUBTAB 3: ALL CHURCH CLASSES OVERVIEW & INSTANT OPERATE */}
+      {managementTab === 'allClasses' && (
+        <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+            <div className="flex items-center gap-2">
+              <Layers size={18} className="text-amber-400" />
+              <div>
+                <h3 className="text-sm font-bold text-stone-100">
+                  {isAr ? `فصول العام الكنسي (${currentYear})` : `Church-Wide Class Instances (${currentYear})`}
+                </h3>
+                <p className="text-[11px] text-stone-400">
+                  {isAr ? 'انقر على أي فصل للدخول وتشغيله وإدارة قائمته مباشرة' : 'Click any class to switch and operate its roster immediately'}
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-bold border border-amber-500/20">
+              {allClassInstances.length} {isAr ? 'فصول' : 'Classes'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {allClassInstances.map((inst) => {
+              const isCurrent = classInfo?.classGroupId === inst.classGroupId;
+              return (
+                <div 
+                  key={inst.id}
+                  className={`p-4 rounded-xl border space-y-3 text-xs transition-all ${
+                    isCurrent 
+                      ? 'bg-amber-950/20 border-amber-500/50 shadow-md ring-1 ring-amber-500/30' 
+                      : 'bg-stone-950/60 border-stone-800/80 hover:border-stone-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-stone-100 text-sm">{isAr ? inst.nameAr : inst.nameEn}</span>
+                      {isCurrent && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.2 rounded bg-amber-500 text-stone-950 font-extrabold">
+                          {isAr ? 'الفصل النشط' : 'Active'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold">
+                      {inst.code}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-stone-400 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span>{isAr ? 'الخدام المكلفون:' : 'Assigned Servants:'}</span>
+                      <span className="font-medium text-stone-300">
+                        {inst.servantIds?.length > 0 ? inst.servantIds.join(', ') : (isAr ? 'لم يُحدد' : 'None')}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-stone-500">
+                      Instance ID: <code className="text-stone-400">{inst.id}</code>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-800 flex items-center justify-end">
+                    <button
+                      type="button"
+                      disabled={isCurrent || isSwitchingClass}
+                      onClick={() => handleSwitchClassByCode(inst.code)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-stone-800 text-stone-500 cursor-default'
+                          : 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-sm'
+                      }`}
+                    >
+                      <DoorOpen size={13} />
+                      <span>{isCurrent ? (isAr ? 'الفصل مفتوح حالياً' : 'Currently Open') : (isAr ? 'تشغيل هذا الفصل' : 'Operate Class')}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Switch / Join Class Modal */}
+      <AnimatePresence>
+        {showSwitchClassModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-stone-900 border border-stone-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 text-xs"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <DoorOpen size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-stone-100">
+                      {isAr ? 'دخول وتشغيل فصل بكود الفصل' : 'Open Class by Code'}
+                    </h3>
+                    <p className="text-[11px] text-stone-400">
+                      {isAr ? 'اكتب كود الفصل للانتقال فوراً وإدارة قائمته وطلابه' : 'Enter class code to switch to and operate any class'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSwitchClassModal(false)}
+                  className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-stone-200 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {switchClassError && (
+                <div className="bg-rose-950/50 border border-rose-800 rounded-xl p-3 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-400 shrink-0" />
+                  <span>{switchClassError}</span>
+                </div>
+              )}
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSwitchClassByCode();
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-stone-300 font-bold mb-1.5">
+                    {isAr ? 'كود الفصل (Class Code):' : 'Class Code:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={classCodeInput}
+                    onChange={(e) => setClassCodeInput(e.target.value)}
+                    placeholder={isAr ? 'مثال: GRADE-4 أو KG1 أو ANGELS' : 'e.g. GRADE-4, KG1, or ANGELS'}
+                    className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-stone-100 font-mono text-sm uppercase outline-none"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-stone-400 text-[11px] mb-2 font-medium">
+                    {isAr ? 'أو اختر فصلاً من الفصول الشائعة:' : 'Or quick-select a class:'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      { code: 'ANGELS', name: isAr ? 'الملائكة (حضانة)' : 'Angels (KG1-2)' },
+                      { code: 'GRADE-1', name: isAr ? 'ابتدائي أول (1-3)' : 'Primary 1 (Grades 1-3)' },
+                      { code: 'GRADE-4', name: isAr ? 'ابتدائي ثان (4-6)' : 'Primary 2 (Grades 4-6)' },
+                      { code: 'PREP-1', name: isAr ? 'إعدادي (1-3)' : 'Preparatory (Prep 1-3)' },
+                      { code: 'SEC-1', name: isAr ? 'ثانوي (1-3)' : 'Secondary (Sec 1-3)' },
+                      { code: 'UNIV', name: isAr ? 'جامعيين وخريجين' : 'University & Youth' },
+                    ].map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => handleSwitchClassByCode(c.code)}
+                        className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 hover:border-amber-500/60 hover:bg-amber-500/10 text-start flex items-center justify-between text-xs transition-colors cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-bold text-stone-200">{c.name}</div>
+                          <div className="font-mono text-[10px] text-amber-400">{c.code}</div>
+                        </div>
+                        <ArrowRight size={13} className="text-stone-500" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowSwitchClassModal(false)}
+                    className="px-4 py-2 rounded-xl border border-stone-700 text-stone-300 hover:bg-stone-800 font-semibold cursor-pointer"
+                  >
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSwitchingClass || !classCodeInput.trim()}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {isSwitchingClass ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <DoorOpen size={14} />
+                    )}
+                    <span>{isAr ? 'دخول وتشغيل الفصل' : 'Open Class'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Co-Teacher Modal */}
+      <AnimatePresence>
+        {showAddTeacherModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-stone-900 border border-stone-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-xs"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <UserPlus size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-stone-100">
+                      {isAr ? 'إضافة خادم / معلم للفصل' : 'Add Co-Teacher to Class'}
+                    </h3>
+                    <p className="text-[11px] text-stone-400">
+                      {isAr ? `الفصل: ${classInfo?.className || 'فصلي'}` : `Class: ${classInfo?.className || 'My Class'}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTeacherModal(false)}
+                  className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-stone-200 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {addTeacherError && (
+                <div className="bg-rose-950/50 border border-rose-800 rounded-xl p-3 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-400 shrink-0" />
+                  <span>{addTeacherError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAddTeacher} className="space-y-4">
+                <div>
+                  <label className="block text-stone-300 font-bold mb-1.5">
+                    {isAr ? 'بريد أو اسم أو كود الخادم:' : 'Teacher Email, Name, or Code:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={teacherInput}
+                    onChange={(e) => setTeacherInput(e.target.value)}
+                    placeholder={isAr ? 'مثال: mina@church.org أو Servant Mina' : 'e.g. mina@church.org or Servant Mina'}
+                    className="w-full bg-stone-950 border border-stone-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-stone-100 outline-none text-xs"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-stone-400 text-[11px] mb-2 font-medium">
+                    {isAr ? 'أو اختر خادماً من القائمة المقترحة:' : 'Or quick-select a servant:'}
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      { name: 'Servant Mina', email: 'mina@church.org', code: 'servant-mina' },
+                      { name: 'Servant Kyrollos', email: 'kyrollos@church.org', code: 'servant-kyrollos' },
+                      { name: 'Servant Mary', email: 'mary@church.org', code: 'servant-mary' },
+                    ].map((s) => (
+                      <button
+                        key={s.code}
+                        type="button"
+                        onClick={() => setTeacherInput(s.email)}
+                        className="w-full p-2.5 rounded-xl bg-stone-950 border border-stone-800 hover:border-amber-500/50 text-start flex items-center justify-between text-xs transition-colors cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-bold text-stone-200">{s.name}</div>
+                          <div className="text-[11px] text-stone-400">{s.email}</div>
+                        </div>
+                        <span className="text-[10px] text-amber-400 font-mono font-bold">
+                          {isAr ? 'تحديد' : 'Select'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTeacherModal(false)}
+                    className="px-4 py-2 rounded-xl border border-stone-700 text-stone-300 hover:bg-stone-800 font-semibold cursor-pointer"
+                  >
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingTeacher || !teacherInput.trim()}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {addingTeacher ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <UserPlus size={14} />
+                    )}
+                    <span>{isAr ? 'إضافة واعتماد الخادم' : 'Add Teacher'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Confirmation Modal: Remove Student from Current Year Class */}
       <AnimatePresence>

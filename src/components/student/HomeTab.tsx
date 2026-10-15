@@ -1,6 +1,6 @@
-import React from 'react';
-import { Flame, Medal, ChevronRight, Play, Cross, Palette, Sparkles, BookOpen, ShieldCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState } from 'react';
+import { Flame, Medal, ChevronRight, Play, Cross, Sparkles, BookOpen, Compass, MapPin, Award, Trophy } from 'lucide-react';
+import { motion } from 'motion/react';
 import { mockLessons } from '../../data';
 import { BibleVerseCard } from '../shared/BibleVerseCard';
 import { FamilyAltarCard } from './FamilyAltarCard';
@@ -10,9 +10,15 @@ import { useStage } from '../../context/StageContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { getUserRank } from '../../lib/pointsService';
 import { Language, Lesson } from '../../types';
-import { CopticCard } from '../design-system/CopticCard';
-import { CopticBadge } from '../design-system/CopticBadge';
-import { CopticButton } from '../design-system/CopticButton';
+import {
+  MosesDuneHeroBanner,
+  MosesStreakCard,
+  MosesPointsTreasuryCard,
+  MosesJourneyTrail,
+  MosesJourneyBadge
+} from './JourneyOfMosesVisuals';
+import { MosesLessonProgressBar } from './MosesLessonProgressBar';
+import { MosesLiveJourneyIllustration } from './MosesLiveJourneyIllustration';
 
 interface HomeTabProps {
   onNavigate: (tab: string, lessonId?: string) => void;
@@ -23,8 +29,9 @@ interface HomeTabProps {
 
 export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, lang }: HomeTabProps) {
   const { userData, isGuest } = useAuth();
-  const { lessons, curriculumLoading, curriculumError, refreshCurriculum } = useLessons();
+  const { lessons, curriculumLoading, curriculumError, refreshCurriculum, contentProgress } = useLessons();
   const { currentStage } = useStage();
+  const [badgeDismissed, setBadgeDismissed] = useState(false);
 
   const isOnlineAuth = Boolean(!isGuest && userData && isSupabaseConfigured);
 
@@ -41,6 +48,13 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
     nextLesson = onlineLessons.find(l => !l.isCompleted) || onlineLessons[0] || null;
   }
 
+  const activeLessonsList = (!isOnlineAuth ? mockLessons : (lessons || []));
+  const completedLessons = activeLessonsList.filter(l => 
+    l.isCompleted || (userData && contentProgress && contentProgress[`${userData.id}_${l.id}`]?.isCompleted)
+  );
+  const lastCompleted = completedLessons[completedLessons.length - 1];
+  const hasCompletedMilestone = completedLessons.length > 0 || (userData?.points ?? 0) >= 100;
+
   const userRank = userData ? getUserRank(userData.id, userData) : null;
 
   if (!userData) return null;
@@ -49,6 +63,10 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
   const isTeacher = userData.role === 'teacher';
   const isParent = userData.role === 'parent';
 
+  const totalLessonsCount = activeLessonsList.length;
+  const completedCount = completedLessons.length;
+  const progressPercentage = totalLessonsCount > 0 ? Math.round((completedCount / totalLessonsCount) * 100) : 0;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }} 
@@ -56,117 +74,144 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
       className="pb-24 pt-6 px-4 w-full max-w-7xl mx-auto space-y-6"
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
     >
-      {/* Header */}
+      {/* 0. Authoritative Total Lesson Progress Sunrise Component (Placed at the very top of HomeTab) */}
+      <motion.div 
+        initial={{ y: -15, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ duration: 0.25 }}
+      >
+        <MosesLessonProgressBar
+          totalLessons={totalLessonsCount}
+          completedLessons={completedCount}
+          isLoading={isOnlineAuth && curriculumLoading}
+          error={isOnlineAuth ? curriculumError : null}
+          lang={lang}
+          onExploreLessons={() => onNavigate('lessons')}
+        />
+      </motion.div>
+
+      {/* 1. The Journey of Moses: Illustrated Desert Dune Hero Banner */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }} 
         animate={{ y: 0, opacity: 1 }} 
         exit={{ y: -10, opacity: 0 }}
-        transition={{ duration: 0.25, delay: 0.05 }} 
-        className="flex justify-between items-center"
+        transition={{ duration: 0.25, delay: 0.05 }}
       >
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-[var(--color-church-blue)] md:text-3xl">
-              {isCoptic ? 'Ⲭⲉⲣⲉ' : lang === 'ar' ? 'أهلاً' : 'Hi'}, {userData.fullName.split(' ')[0]} 👋
-            </h1>
-            {isTeacher && (
-              <span className="text-xs bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 font-bold px-2 py-0.5 rounded-full">
-                {isCoptic ? '⛪ Ⲡⲓⲇⲓⲁⲕⲟⲛ' : lang === 'ar' ? '⛪ خادم كنسي' : '⛪ Servant'}
-              </span>
-            )}
-            {isParent && (
-              <span className="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                {isCoptic ? '👨‍👩‍👧 Ⲡⲓⲓⲱⲧ' : lang === 'ar' ? '👨‍👩‍👧 ولي أمر' : '👨‍👩‍👧 Parent'}
-              </span>
-            )}
-            {currentStage && (
-              <span className="text-xs bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200 border border-blue-300 dark:border-blue-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <span>{currentStage.icon}</span>
-                <span>{lang === 'ar' ? currentStage.nameAr : currentStage.nameEn}</span>
-              </span>
-            )}
-          </div>
-          <p className="text-[var(--color-church-burgundy)] dark:text-amber-300 font-bold md:text-lg mt-0.5">
-            {isTeacher 
-              ? (isCoptic ? 'Ⲡⲓⲥⲙⲟⲩ ⲛ̀ⲧⲉ ϯⲇⲓⲁⲕⲟⲛⲓⲁ ⲛⲉⲙⲁⲕ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'بركة الخدمة والتعليم معك اليوم' : 'Blessings on your ministry & teaching today')
-              : (isCoptic ? 'Ⲁⲕⲥⲉⲃⲧⲱⲧ ⲉ̀ⲡⲓⲙⲱⲓⲧ ⲛ̀ⲧⲉ ⲡⲓⲛⲁϩϯ ⲙ̀ⲫⲟⲟⲩ;' : lang === 'ar' ? 'مستعد لرحلة الإيمان والتعلم اليوم؟' : 'Ready for your journey of faith today?')}
-          </p>
-        </div>
-        <img src={userData.avatarUrl} alt="Avatar" className="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-[var(--color-church-gold)] bg-white shadow-sm object-cover" />
+        <MosesDuneHeroBanner
+          studentName={userData.fullName}
+          stageName={lang === 'ar' ? currentStage?.nameAr : currentStage?.nameEn}
+          stageIcon={currentStage?.icon}
+          isTeacher={isTeacher}
+          isParent={isParent}
+          lang={lang}
+          avatarUrl={userData.avatarUrl}
+          streakDays={userData.currentStreak}
+          totalPoints={userData.points}
+        />
       </motion.div>
 
-      {/* Trilingual Design System & Coptic Language Lab Showcase Banner */}
-      <CopticCard variant="sacred" padding="md" className="shadow-xs hover:border-[var(--brand-gold)] transition-colors">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">☦</span>
-              <CopticBadge variant="burgundy" size="sm">Trilingual Architecture</CopticBadge>
-              <CopticBadge variant="gold" size="sm">Bohairic Standard</CopticBadge>
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold text-[var(--brand-burgundy)] dark:text-[var(--brand-gold)]">
-              {isCoptic
-                ? 'Ⲡⲓⲥⲩⲥⲧⲏⲙⲁ ⲛ̀ⲧⲉ ⲡⲓⲥⲙⲟⲧ ⲛ̀ⲣⲉⲙⲛ̀ⲭⲏⲙⲓ'
-                : lang === 'ar'
-                  ? 'نظام التصميم القبطي والمختبر اللغوي'
-                  : 'Coptic Orthodox Design System & Language Lab'}
-            </h2>
-            <p className="text-xs text-[var(--color-neutral)] max-w-xl">
-              {isCoptic
-                ? 'Ⲭⲣⲱⲙⲁ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ, ⲛⲓⲥϧⲁⲓ ⲉⲑⲟⲩⲁⲃ, ⲛⲉⲙ ⲡⲓⲱϣ ⲛ̀ⲅⲁⲙⲧ ⲛ̀ⲁⲥⲡⲓ (English, العربية, Ⲙⲉⲑⲣⲉⲙⲛ̀ⲭⲏⲙⲓ).'
-                : lang === 'ar'
-                  ? 'ألوان كنسية موثقة، تدرجات طباعية مقدسة، ومحرك قراءة ثلاثي اللغات مع فحص جودة الترجمة القبطية.'
-                  : 'Authentic liturgical palette, sacred/UI dual typography roles, trilingual scripture reader, and Bohairic QA registry.'}
-            </p>
-          </div>
+      {/* The Journey of Moses: Milestone Completion Badge (using mousa-gold & mousa-coral) */}
+      {hasCompletedMilestone && !badgeDismissed && (
+        <motion.div
+          initial={{ opacity: 0, y: -10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.98 }}
+          transition={{ duration: 0.3 }}
+        >
+          <MosesJourneyBadge
+            completedLessonsCount={completedLessons.length || 1}
+            lastCompletedLessonTitle={
+              lastCompleted 
+                ? (lang === 'ar' ? (lastCompleted.titleAr || lastCompleted.title) : lastCompleted.title)
+                : (lang === 'ar' ? 'محطة برية شيهيت الأولى' : 'First Scetis Milestone')
+            }
+            pointsEarned={lastCompleted?.pointsAvailable || 50}
+            lang={lang}
+            onExploreMore={() => onNavigate('lessons')}
+            onDismiss={() => setBadgeDismissed(true)}
+            isRecentCompletion={Boolean(lastCompleted)}
+          />
+        </motion.div>
+      )}
 
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <CopticButton
-              variant="primary"
-              size="sm"
-              icon={<Palette size={15} />}
-              onClick={() => onNavigate('designSystem')}
-            >
-              {isCoptic ? 'Ⲡⲓⲥⲙⲟⲧ' : lang === 'ar' ? 'نظام التصميم' : 'Design System'}
-            </CopticButton>
-            <CopticButton
-              variant="outline"
-              size="sm"
-              icon={<ShieldCheck size={15} />}
-              onClick={() => onNavigate('localizationQa')}
-            >
-              {isCoptic ? 'Ⲡⲓϫⲱⲕ' : lang === 'ar' ? 'جودة الترجمة' : 'Coptic QA'}
-            </CopticButton>
-          </div>
-        </div>
-      </CopticCard>
+      {/* 2. Streak & Points Row: Desert Flame & Blessing Treasury */}
+      <motion.div 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.25, delay: 0.1 }}
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+      >
+        <MosesStreakCard
+          streakDays={userData.currentStreak}
+          lang={lang}
+        />
+        <MosesPointsTreasuryCard
+          points={userData.points}
+          onNavigatePoints={() => onNavigate('points')}
+          lang={lang}
+        />
+      </motion.div>
+
+      {/* 3. The Journey of Moses: 5-Milestone Desert Trail Map with Restrained Gold Pulse on Next Node */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.25, delay: 0.15 }}
+      >
+        <MosesJourneyTrail
+          currentStreak={userData.currentStreak}
+          totalPoints={userData.points}
+          completedLessonsCount={completedCount}
+          totalLessonsCount={totalLessonsCount}
+          lang={lang}
+        />
+      </motion.div>
+
+      {/* 4. The Journey of Moses: Live Journey Responsive Landscape (Time-of-day & Progress linked) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.25, delay: 0.17 }}
+      >
+        <MosesLiveJourneyIllustration
+          progressPercentage={progressPercentage}
+          completedLessonsCount={completedCount}
+          totalLessonsCount={totalLessonsCount}
+          streakDays={userData.currentStreak}
+          lang={lang}
+        />
+      </motion.div>
 
       {/* Quick Role Privilege Cards for Teachers / Parents */}
       {(isTeacher || isParent) && (
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }} 
+          initial={{ opacity: 0, scale: 0.98 }} 
           animate={{ opacity: 1, scale: 1 }} 
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.25, delay: 0.1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.25, delay: 0.18 }}
           className="grid grid-cols-1 sm:grid-cols-2 gap-3"
         >
           {isTeacher && onOpenTeacherStudio && (
-            <div className="bg-amber-50 dark:bg-amber-950/40 border border-[var(--color-church-gold)]/40 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+            <div className="bg-[#FAF5EB] dark:bg-[#25201A] border-2 border-[var(--mousa-gold)]/40 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
               <div className="flex items-center gap-3">
-                <span className="text-2xl p-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xs">⛪</span>
+                <span className="text-2xl p-2 bg-white dark:bg-[#1C1814] rounded-xl shadow-2xs border border-[var(--mousa-border-sand)]">⛪</span>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-amber-950 dark:text-amber-200">
-                    {lang === 'copt' ? 'Ⲡⲓⲙⲁⲛ̀ⲥⲃⲱ ⲛ̀ⲧⲉ ⲡⲓⲇⲓⲁⲕⲟⲛ' : lang === 'ar' ? 'استوديو الخادم والذكاء الاصطناعي' : 'Servant AI Curriculum Studio'}
+                  <h4 className="font-extrabold text-xs sm:text-sm text-[var(--mousa-teal-deep)] dark:text-[var(--mousa-gold-light)]">
+                    {lang === 'copt' ? 'Ⲡⲓⲙⲁⲛ̀ⲥⲃⲱ ⲛ̀ⲧⲉ ⲡⲓⲇⲓⲁⲕⲟⲛ' : lang === 'ar' ? 'استوديو الخادم وتحضير الدروس' : 'Sunday School Servant Studio'}
                   </h4>
-                  <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                    {lang === 'copt' ? 'Ⲑⲁⲙⲓⲟ ⲛ̀ⲛⲓⲥⲃⲱ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'تحضير الدروس، الاختبارات والإشراف' : 'Generate lessons, edit quizzes & moderate'}
+                  <p className="text-[11px] text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+                    {lang === 'copt' ? 'Ⲑⲁⲙⲓⲟ ⲛ̀ⲛⲓⲥⲃⲱ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'نشر الدروس، متابعة تقدم الطلاب والإشراف' : 'Publish manual lessons, monitor progress & moderate'}
                   </p>
                 </div>
               </div>
               <button 
                 onClick={onOpenTeacherStudio}
-                className="px-3 py-1.5 rounded-xl bg-[var(--color-church-gold)] hover:opacity-90 text-[var(--color-church-blue)] font-extrabold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-110 text-white font-black text-xs shadow-xs transition-all cursor-pointer shrink-0"
               >
                 {lang === 'copt' ? 'Ϣⲉ ⲉ̀ϧⲟⲩⲛ' : lang === 'ar' ? 'دخول الاستوديو' : 'Launch Studio'}
               </button>
@@ -174,21 +219,21 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
           )}
 
           {(isParent || isTeacher) && onOpenParentPortal && (
-            <div className="bg-rose-50 dark:bg-slate-900 border border-[var(--color-church-burgundy)]/30 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+            <div className="bg-[#FAF5EB] dark:bg-[#25201A] border-2 border-[var(--mousa-coral)]/30 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
               <div className="flex items-center gap-3">
-                <span className="text-2xl p-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xs">👨‍👩‍👧</span>
+                <span className="text-2xl p-2 bg-white dark:bg-[#1C1814] rounded-xl shadow-2xs border border-[var(--mousa-border-sand)]">👨‍👩‍👧</span>
                 <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-[var(--color-church-burgundy)] dark:text-rose-300">
+                  <h4 className="font-extrabold text-xs sm:text-sm text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)]">
                     {lang === 'copt' ? 'Ⲡⲓⲡⲩⲗⲏ ⲛ̀ⲧⲉ ⲛⲓⲓⲟϯ' : lang === 'ar' ? 'بوابة متابعة الأبناء' : 'Parent Portal & Child Tracking'}
                   </h4>
-                  <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                  <p className="text-[11px] text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
                     {lang === 'copt' ? 'Ⲛⲓⲁⲗⲱⲟⲩⲓ ⲛⲉⲙ ⲡⲟⲩⲧⲁⲓⲟ' : lang === 'ar' ? 'أوقات الشاشة، الحضور، وموافقة الجوائز' : 'Screen time, attendance & reward approvals'}
                   </p>
                 </div>
               </div>
               <button 
                 onClick={onOpenParentPortal}
-                className="px-3 py-1.5 rounded-xl bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                className="px-3.5 py-1.5 rounded-xl bg-[var(--mousa-teal)] hover:bg-[var(--mousa-teal-deep)] text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
               >
                 {lang === 'copt' ? 'Ⲛⲁⲩ ⲉ̀ⲛⲓⲁⲗⲱⲟⲩⲓ' : lang === 'ar' ? 'عرض الأبناء' : 'View Children'}
               </button>
@@ -202,7 +247,8 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.25, delay: 0.15 }}
+        transition={{ duration: 0.25, delay: 0.2 }}
+        className="rounded-3xl border-2 border-[var(--mousa-border-sand)] overflow-hidden bg-[var(--mousa-cream-surface)] shadow-xs"
       >
         <BibleVerseCard lang={lang} />
       </motion.div>
@@ -212,74 +258,44 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.25, delay: 0.2 }}
+        transition={{ duration: 0.25, delay: 0.22 }}
+        className="rounded-3xl border-2 border-[var(--mousa-border-sand)] overflow-hidden bg-[var(--mousa-cream-surface)] shadow-xs"
       >
         <FamilyAltarCard lang={lang} />
       </motion.div>
 
-      {/* Stats Row */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96 }}
-        transition={{ duration: 0.25, delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4"
-      >
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-church-cream-dark)] flex items-center gap-3">
-          <div className="bg-[var(--color-church-cream)] p-2 md:p-3 rounded-full text-[var(--color-church-gold)]">
-            <Flame size={24} className="md:w-8 md:h-8" fill="currentColor" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 font-bold">{lang === 'copt' ? 'Ⲛⲓⲉϩⲟⲟⲩ' : lang === 'ar' ? 'أيام متتالية' : 'Streak'}</p>
-            <p className="text-xl md:text-2xl font-bold text-[var(--color-church-blue)]">{userData.currentStreak} {lang === 'copt' ? 'Ⲛ̀ⲉϩⲟⲟⲩ' : lang === 'ar' ? 'يوم' : 'Days'}</p>
-          </div>
-        </div>
-        
-        <div 
-          onClick={() => onNavigate('points')}
-          className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-church-cream-dark)] flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
-        >
-          <div className="bg-[var(--color-church-cream)] p-2 md:p-3 rounded-full text-[var(--color-church-gold)]">
-            <Medal size={24} className="md:w-8 md:h-8" fill="currentColor" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 font-bold">{lang === 'copt' ? 'Ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'النقاط' : 'Points'}</p>
-            <p className="text-xl md:text-2xl font-bold text-[var(--color-church-blue)]">{userData.points}</p>
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="md:grid md:grid-cols-2 md:gap-8 space-y-6 md:space-y-0">
-        {/* Main Action - Next Lesson */}
+      {/* Main Grid: Today's Quest (Lesson) + Weekly Caravan Leaderboard */}
+      <div className="md:grid md:grid-cols-2 md:gap-8 space-y-6 md:space-y-0 items-stretch">
+        {/* Main Action - Today's Desert Milestone Quest */}
         {isOnlineAuth ? (
           curriculumLoading ? (
-            <div className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-3 min-h-[220px]">
-              <div className="w-8 h-8 border-3 border-[var(--color-church-gold)] border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs sm:text-sm text-blue-100 font-medium">
+            <div className="mousa-quest-card p-6 md:p-8 flex flex-col justify-center items-center text-center space-y-3 min-h-[260px]">
+              <div className="w-10 h-10 border-4 border-[var(--mousa-gold)] border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-sm font-bold text-[var(--mousa-teal)] dark:text-[var(--mousa-sand-400)]">
                 {lang === 'copt' || lang === 'cop'
                   ? 'Ⲥⲉⲓⲛⲓ ⲛ̀ⲛⲓⲥⲃⲱ ⲉ̀ⲃⲟⲗ...'
                   : lang === 'ar'
-                    ? 'جاري تحميل منهج الفصل...'
+                    ? 'جاري تحميل محطة اليوم في البرية...'
                     : 'Loading online curriculum...'}
               </p>
             </div>
           ) : curriculumError ? (
-            <div className="bg-stone-900 border border-red-900/60 text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-3 min-h-[220px]">
-              <div className="text-2xl text-amber-500">⚠️</div>
-              <h3 className="text-base font-bold text-amber-200">
+            <div className="mousa-card-sand p-6 md:p-8 border-2 border-red-300 dark:border-red-900/60 flex flex-col justify-center items-center text-center space-y-3 min-h-[260px]">
+              <div className="text-3xl">🏜️</div>
+              <h3 className="text-base font-bold text-red-900 dark:text-red-300">
                 {lang === 'copt' || lang === 'cop'
                   ? 'Ⲡⲓⲥⲱⲣⲉⲙ ϧⲉⲛ ⲡⲓⲱϣ'
                   : lang === 'ar'
                     ? 'تعذر تحميل منهج الخدام أونلاين'
                     : 'Unable to Load Online Curriculum'}
               </h3>
-              <p className="text-xs text-stone-400 max-w-sm">
+              <p className="text-xs text-[var(--mousa-sand-600)] dark:text-stone-400 max-w-sm">
                 {curriculumError}
               </p>
               {refreshCurriculum && (
                 <button
                   onClick={() => refreshCurriculum()}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--mousa-coral)] hover:brightness-110 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
                 >
                   {lang === 'copt' || lang === 'cop' ? 'Ⲟⲩⲁϩⲙⲉϥ' : lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
                 </button>
@@ -291,48 +307,67 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
               animate={{ opacity: 1, y: 0 }} 
               exit={{ opacity: 0, y: -10 }} 
               transition={{ duration: 0.3, delay: 0.25 }} 
-              className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center"
+              className="mousa-quest-card p-6 md:p-8 flex flex-col justify-between h-full group"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-xl"></div>
-              <div className="absolute -bottom-10 -left-10 text-[var(--color-church-gold)] opacity-10">
-                <Cross size={160} strokeWidth={1} />
+              {/* Illustrated Dune Backdrop Watermark */}
+              <div className="absolute top-0 right-0 w-44 h-44 rounded-full bg-[var(--mousa-gold)]/10 blur-2xl pointer-events-none"></div>
+              <div className="absolute -bottom-8 -left-8 text-[var(--mousa-gold)] opacity-10 pointer-events-none select-none">
+                <Cross size={180} strokeWidth={1} />
               </div>
               
-              <h2 className="text-[var(--color-church-gold-light)] font-bold text-sm md:text-base uppercase tracking-wider mb-2">
-                {lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'درس النهاردة' : "Today's Lesson"}
-              </h2>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 leading-tight">
-                {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
-              </h3>
-              <p className="text-blue-100 mb-6 md:text-lg text-sm line-clamp-2 md:line-clamp-none" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
-              </p>
+              <div className="relative z-10 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[var(--mousa-gold)]/20 text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] border border-[var(--mousa-gold)]/40">
+                    <Compass size={14} className="text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)]" />
+                    <span>{lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'محطة اليوم في البرية' : "Today's Desert Quest"}</span>
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-[var(--mousa-coral-soft)] text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)] border border-[var(--mousa-coral)]/30">
+                    <Sparkles size={12} />
+                    <span>+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : lang === 'ar' ? 'نقطة بركة' : 'pts'}</span>
+                  </span>
+                </div>
+
+                <h3 className="text-2xl md:text-3xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] leading-tight">
+                  {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
+                </h3>
+
+                <p className="text-[var(--mousa-teal)] dark:text-[var(--mousa-sand-400)] text-sm md:text-base leading-relaxed line-clamp-3" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                  {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
+                </p>
+              </div>
               
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigate('lessons', nextLesson.id)}
-                className="w-full bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold py-4 md:py-5 md:text-lg rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm relative z-10 mt-auto cursor-pointer border border-red-700/50"
-              >
-                <Play size={20} fill="currentColor" />
-                {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'ابدأ الدرس' : 'Start Lesson'} (+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'})
-              </motion.button>
+              <div className="pt-6 relative z-10 mt-auto">
+                <motion.button 
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onNavigate('lessons', nextLesson.id)}
+                  className="w-full mousa-btn-quest py-4 md:py-4.5 px-6 text-base md:text-lg flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  <Play size={20} className="fill-current" />
+                  <span>
+                    {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'انطلق في محطة اليوم' : 'Begin Milestone'}
+                  </span>
+                </motion.button>
+              </div>
             </motion.div>
           ) : (
-            <div className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center items-center text-center space-y-2 min-h-[220px]">
-              <BookOpen size={32} className="text-[var(--color-church-gold)]" />
-              <h3 className="text-lg font-bold text-white">
+            <div className="mousa-card-sand p-6 md:p-8 flex flex-col justify-center items-center text-center space-y-3 min-h-[260px]">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--mousa-sand-100)] dark:bg-stone-800 flex items-center justify-center text-2xl border border-[var(--mousa-border-sand)]">
+                ⛪
+              </div>
+              <h3 className="text-lg font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
                 {lang === 'copt' || lang === 'cop'
                   ? 'Ⲙ̀ⲙⲟⲛ ϩⲁⲛⲥⲃⲱ ⲉⲧϩⲓⲱⲓϣ'
                   : lang === 'ar'
-                    ? 'لا توجد دروس منشورة بعد'
-                    : 'No Published Lessons Yet'}
+                    ? 'في انتظار محطة الأحد القادمة'
+                    : 'Awaiting Next Sunday Milestone'}
               </h3>
-              <p className="text-xs text-blue-200 max-w-xs">
+              <p className="text-xs text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)] max-w-xs">
                 {lang === 'copt' || lang === 'cop'
                   ? 'Ⲛⲓⲇⲓⲁⲕⲟⲛ ⲥⲉⲥⲟⲃϯ ⲛ̀ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ⲡⲉⲕⲧⲁⲝⲓⲥ.'
                   : lang === 'ar'
-                    ? 'يقوم الخدام بتحضير ونشر الدروس لمرحلتك قريباً.'
+                    ? 'يقوم خدامك الكنسيون بتحضير المحطة التالية لمرحلتك قريباً.'
                     : 'Your Sunday School servants will publish lessons for your class soon.'}
               </p>
             </div>
@@ -345,69 +380,121 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
               animate={{ opacity: 1, y: 0 }} 
               exit={{ opacity: 0, y: -10 }} 
               transition={{ duration: 0.3, delay: 0.25 }} 
-              className="bg-[var(--color-church-blue)] text-white rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden h-full flex flex-col justify-center"
+              className="mousa-quest-card p-6 md:p-8 flex flex-col justify-between h-full group"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-xl"></div>
-              <div className="absolute -bottom-10 -left-10 text-[var(--color-church-gold)] opacity-10">
-                <Cross size={160} strokeWidth={1} />
+              <div className="absolute top-0 right-0 w-44 h-44 rounded-full bg-[var(--mousa-gold)]/10 blur-2xl pointer-events-none"></div>
+              <div className="absolute -bottom-8 -left-8 text-[var(--mousa-gold)] opacity-10 pointer-events-none select-none">
+                <Cross size={180} strokeWidth={1} />
               </div>
               
-              <h2 className="text-[var(--color-church-gold-light)] font-bold text-sm md:text-base uppercase tracking-wider mb-2">
-                {lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'درس النهاردة' : "Today's Lesson"}
-              </h2>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4 leading-tight">
-                {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
-              </h3>
-              <p className="text-blue-100 mb-6 md:text-lg text-sm line-clamp-2 md:line-clamp-none" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
-              </p>
+              <div className="relative z-10 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[var(--mousa-gold)]/20 text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] border border-[var(--mousa-gold)]/40">
+                    <Compass size={14} className="text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)]" />
+                    <span>{lang === 'copt' || lang === 'cop' ? 'Ϯⲥⲃⲱ ⲙ̀ⲫⲟⲟⲩ' : lang === 'ar' ? 'محطة اليوم في البرية' : "Today's Desert Quest"}</span>
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-[var(--mousa-coral-soft)] text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)] border border-[var(--mousa-coral)]/30">
+                    <Sparkles size={12} />
+                    <span>+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : lang === 'ar' ? 'نقطة بركة' : 'pts'}</span>
+                  </span>
+                </div>
+
+                <h3 className="text-2xl md:text-3xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] leading-tight">
+                  {lang === 'ar' ? (nextLesson.titleAr || nextLesson.title) : (lang === 'copt' || lang === 'cop' ? (nextLesson.titleCop || nextLesson.title) : nextLesson.title)}
+                </h3>
+
+                <p className="text-[var(--mousa-teal)] dark:text-[var(--mousa-sand-400)] text-sm md:text-base leading-relaxed line-clamp-3" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                  {lang === 'ar' ? (nextLesson.summaryAr || nextLesson.summary) : (lang === 'copt' || lang === 'cop' ? (nextLesson.summaryCop || nextLesson.summary) : nextLesson.summary)}
+                </p>
+              </div>
               
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigate('lessons', nextLesson.id)}
-                className="w-full bg-[var(--color-church-burgundy)] hover:bg-[#6e1623] text-white font-bold py-4 md:py-5 md:text-lg rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm relative z-10 mt-auto cursor-pointer border border-red-700/50"
-              >
-                <Play size={20} fill="currentColor" />
-                {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'ابدأ الدرس' : 'Start Lesson'} (+{nextLesson.pointsAvailable} {lang === 'copt' || lang === 'cop' ? 'ⲧⲁⲓⲟ' : 'pts'})
-              </motion.button>
+              <div className="pt-6 relative z-10 mt-auto">
+                <motion.button 
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onNavigate('lessons', nextLesson.id)}
+                  className="w-full mousa-btn-quest py-4 md:py-4.5 px-6 text-base md:text-lg flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  <Play size={20} className="fill-current" />
+                  <span>
+                    {lang === 'copt' || lang === 'cop' ? 'Ⲁⲣⲓϩⲏⲧⲥ ⲉ̀ϯⲥⲃⲱ' : lang === 'ar' ? 'انطلق في محطة اليوم' : 'Begin Milestone'}
+                  </span>
+                </motion.button>
+              </div>
             </motion.div>
           )
         )}
 
-        {/* Leaderboard Preview */}
+        {/* Weekly Caravan of Light - Leaderboard Preview */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }} 
           animate={{ opacity: 1, y: 0 }} 
           exit={{ opacity: 0, y: -10 }} 
           transition={{ duration: 0.3, delay: 0.3 }} 
-          className="bg-white rounded-2xl p-5 md:p-8 shadow-sm border border-[var(--color-church-cream-dark)] h-full flex flex-col justify-center"
+          className="mousa-card-sand p-5 sm:p-7 flex flex-col justify-between h-full"
         >
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-[var(--color-church-blue)] md:text-xl">
-              {lang === 'copt' ? 'Ⲡⲓⲧⲁⲝⲓⲥ ⲛ̀ⲧⲉ ϯⲉⲃⲇⲟⲙⲁⲥ' : lang === 'ar' ? 'ترتيب الأسبوع' : 'Weekly Rank'}
-            </h3>
-            <button onClick={() => onNavigate('points')} className="text-sm md:text-base font-bold text-[var(--color-church-burgundy)] flex items-center hover:underline cursor-pointer">
-              {lang === 'copt' ? 'Ⲛⲁⲩ ⲉ̀ⲡⲧⲏⲣϥ' : lang === 'ar' ? 'عرض الكل' : 'View All'} <ChevronRight size={16} />
-            </button>
-          </div>
-          
-          {userRank && (
-            <div className="flex items-center gap-4 p-4 bg-[var(--color-church-cream)] rounded-xl border border-[var(--color-church-gold)]/20 mb-6">
-              <div className="font-bold text-xl text-[var(--color-church-blue)] w-8 text-center">#{userRank.rank}</div>
-              <img src={userData.avatarUrl} alt="You" className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white object-cover" />
-              <div className="flex-1">
-                <p className="font-bold text-lg text-[var(--color-church-blue)]">{lang === 'copt' ? 'Ⲛ̀ⲑⲟⲕ' : lang === 'ar' ? 'أنت' : 'You'}</p>
+          <div>
+            <div className="flex justify-between items-center mb-5 pb-3 border-b border-[var(--mousa-border-sand)]/60">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[var(--mousa-gold)] text-white shadow-xs">
+                  <Trophy size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+                    {lang === 'copt' ? 'Ⲡⲓⲧⲁⲝⲓⲥ ⲛ̀ⲧⲉ ϯⲉⲃⲇⲟⲙⲁⲥ' : lang === 'ar' ? 'قافلة الأسبوع (الترتيب)' : 'Weekly Caravan Ranking'}
+                  </h3>
+                  <p className="text-xs text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+                    {lang === 'ar' ? 'رفقاء المسيرة في برية شيهيت' : 'Fellow travelers on the road'}
+                  </p>
+                </div>
               </div>
-              <div className="font-bold text-lg text-[var(--color-church-gold)]">{userRank.pointsThisWeek} pts</div>
+              <button 
+                onClick={() => onNavigate('points')} 
+                className="text-xs sm:text-sm font-extrabold text-[var(--mousa-coral)] dark:text-[var(--mousa-coral-glow)] flex items-center gap-0.5 hover:underline cursor-pointer"
+              >
+                <span>{lang === 'copt' ? 'Ⲛⲁⲩ ⲉ̀ⲡⲧⲏⲣϥ' : lang === 'ar' ? 'عرض القافلة' : 'View Caravan'}</span>
+                <ChevronRight size={15} />
+              </button>
             </div>
-          )}
-          <p className="text-center text-sm md:text-base text-gray-500 mt-auto">
-            {lang === 'copt' ? 'Ⲁⲣⲓϩⲟⲧⲡ! ϯⲥⲃⲱ ⲛⲓⲃⲉⲛ ⲥⲱⲕ ⲙ̀ⲙⲟⲕ ⲉ̀ⲡϣⲱⲓ.' : lang === 'ar' ? 'عاش! كل درس بيقربك للقمة.' : 'Keep going! Every lesson helps you climb.'}
-          </p>
+            
+            {userRank && (
+              <div className="flex items-center gap-3.5 p-3.5 sm:p-4 bg-gradient-to-r from-[#FFFDF9] to-[#FAF5EB] dark:from-[#25201A] dark:to-[#1C1814] rounded-2xl border-2 border-[var(--mousa-gold)]/40 shadow-xs mb-4">
+                <div className="font-black text-lg sm:text-xl text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)] w-8 text-center">
+                  #{userRank.rank}
+                </div>
+                <img 
+                  src={userData.avatarUrl} 
+                  alt="You" 
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-[var(--mousa-gold)] bg-white object-cover shadow-2xs" 
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-extrabold text-base text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] truncate">
+                      {lang === 'copt' ? 'Ⲛ̀ⲑⲟⲕ' : lang === 'ar' ? 'أنت (مسافر النور)' : 'You'}
+                    </p>
+                    <span className="text-[10px] bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black px-1.5 py-0.5 rounded-md">
+                      {isCoptic ? 'Ⲛ̀ⲑⲟⲕ' : lang === 'ar' ? 'أنت' : 'You'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+                    {lang === 'ar' ? 'نقاط السعي هذا الأسبوع' : 'Points this week'}
+                  </p>
+                </div>
+                <div className="font-black text-base sm:text-lg text-[var(--mousa-gold-dark)] dark:text-[var(--mousa-gold-light)]">
+                  {userRank.pointsThisWeek} <span className="text-xs font-bold text-[var(--mousa-sand-500)]">pts</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[var(--mousa-border-sand)]/60 text-center">
+            <p className="text-xs sm:text-sm text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] font-medium">
+              {lang === 'copt' ? 'Ⲁⲣⲓϩⲟⲧⲡ! ϯⲥⲃⲱ ⲛⲓⲃⲉⲛ ⲥⲱⲕ ⲙ̀ⲙⲟⲕ ⲉ̀ⲡϣⲱⲓ.' : lang === 'ar' ? 'عاش! كل محطة بتكملها بتقربك أكتر لنور البركة.' : 'Keep going! Every milestone brings you closer to the crown.'}
+            </p>
+          </div>
         </motion.div>
       </div>
-
     </motion.div>
   );
 }

@@ -15,6 +15,8 @@ export interface SubmitQuizAttemptInput {
   score?: number;
   totalScore?: number;
   percentage?: number;
+  earnedPoints?: number;
+  totalPointsPossible?: number;
 }
 
 // In-memory fallback for guest/offline resilience

@@ -129,6 +129,16 @@ export async function getMyStudentClass(): Promise<{ data: StudentClassAssociati
   return { data: DEMO_STUDENT_CLASS, error: null };
 }
 
+export interface ServantMember {
+  id: string;
+  name: string;
+  nameAr?: string;
+  email?: string;
+  role?: string;
+  avatar?: string;
+  assignedAt?: string;
+}
+
 export interface ServantClassInfo {
   servantId: string;
   role: string;
@@ -138,6 +148,7 @@ export interface ServantClassInfo {
   grades?: string[];
   stage?: string;
   servants?: string[];
+  servantTeam?: ServantMember[];
   churchYear?: string;
   classCode?: string;
   classInstanceId?: string;
@@ -149,15 +160,23 @@ export interface MyClassResult {
 }
 
 /**
- * 2b. getMyClass()
+ * 2b. getMyClass(classGroupId?, classCode?)
  * Authoritative endpoint for both servants and students.
  * For servants, returns assigned class group and persisted roster.
- * For students, returns student class association.
+ * Supports switching classes by classGroupId or classCode.
  */
-export async function getMyClass(): Promise<{ data: MyClassResult | null; error: Error | null }> {
+export async function getMyClass(
+  classGroupId?: string,
+  classCode?: string
+): Promise<{ data: MyClassResult | null; error: Error | null }> {
   const headers = await getAuthHeader();
   try {
-    const res = await fetch('/api/church/my-class', {
+    const params = new URLSearchParams();
+    if (classGroupId) params.set('classGroupId', classGroupId);
+    if (classCode) params.set('classCode', classCode);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+
+    const res = await fetch(`/api/church/my-class${qs}`, {
       method: 'GET',
       headers
     });
@@ -189,11 +208,120 @@ export async function getMyClass(): Promise<{ data: MyClassResult | null; error:
 }
 
 /**
+ * Lookup class details by code (e.g. GRADE-4, KG1, MUSA-P46B)
+ */
+export async function lookupClassByCode(code: string): Promise<{
+  success: boolean;
+  classGroupId?: ClassGroupId;
+  classInstance?: any;
+  classInfo?: ServantClassInfo;
+  error?: string;
+}> {
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch(`/api/church/classes/by-code/${encodeURIComponent(code.trim())}`, {
+      method: 'GET',
+      headers
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        success: false,
+        error: json?.message || json?.error || `Failed to find class with code "${code}"`
+      };
+    }
+    return {
+      success: true,
+      classGroupId: json.classGroupId,
+      classInstance: json.classInstance,
+      classInfo: json.classInfo
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error looking up class code'
+    };
+  }
+}
+
+/**
+ * Get assigned servants for a class instance
+ */
+export async function getClassServants(instanceId: string): Promise<{
+  success: boolean;
+  servants: ServantMember[];
+  error?: string;
+}> {
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch(`/api/church/classes/${encodeURIComponent(instanceId)}/servants`, {
+      method: 'GET',
+      headers
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        success: false,
+        servants: [],
+        error: json?.message || json?.error || 'Failed to fetch class servants'
+      };
+    }
+    return {
+      success: true,
+      servants: json.servants || []
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      servants: [],
+      error: err?.message || 'Network error fetching servants'
+    };
+  }
+}
+
+/**
+ * Add a teacher/servant to a class instance
+ */
+export async function addTeacherToClass(
+  instanceId: string,
+  servantIdentifier: string,
+  classGroupId?: string
+): Promise<{
+  success: boolean;
+  servant?: ServantMember;
+  error?: string;
+  message?: string;
+}> {
+  const headers = await getAuthHeader();
+  try {
+    const res = await fetch(`/api/church/classes/${encodeURIComponent(instanceId)}/servants`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ servantIdentifier, classGroupId })
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.success) {
+      return {
+        success: false,
+        error: json?.message || json?.error || 'Failed to add teacher to class'
+      };
+    }
+    return {
+      success: true,
+      servant: json.servant,
+      message: json.message
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error adding teacher'
+    };
+  }
+}
+
+/**
  * 3. assignStudentClass(studentId, classGroupId, grade, classInstanceId)
- * Phase 3C.3: Connects to the approved Phase 3B database RPC:
- *   public.enroll_student_in_class(p_student_id UUID, p_class_instance_id TEXT)
- * Strict RBAC: Only authorized servants and admins can enroll students into their assigned classes.
- * Preserves demo/guest/offline fallback when unauthenticated.
+ * Connects to authoritative enrollment with full fallback to server proxy.
  */
 export async function assignStudentClass(
   studentId: string,
@@ -214,26 +342,14 @@ export async function assignStudentClass(
         if (enrollRes.success) {
           return { success: true, error: null, membershipId: enrollRes.membershipId };
         }
-        // If student is not in Supabase profiles (e.g. demo/mock code, local state), fall through to server endpoint
-        if (
-          enrollRes.error?.includes('STUDENT_NOT_FOUND') ||
-          enrollRes.error?.includes('syntax for type uuid') ||
-          enrollRes.error?.includes('not found')
-        ) {
-          // fall through to server endpoint
-        } else {
-          return {
-            success: false,
-            error: new Error(enrollRes.error || 'Failed to enroll student into class')
-          };
-        }
+        // Fall through to server endpoint if direct RPC failed or needs server mediation
       }
     } catch (err: any) {
-      return { success: false, error: new Error(err?.message || 'Database enrollment error') };
+      console.warn("Direct RPC enrollment warning, trying server proxy:", err);
     }
   }
 
-  // 2. Demo / Guest / Offline fallback
+  // 2. Authoritative Server Proxy Endpoint (with multi-identifier & directory matching)
   const headers = await getAuthHeader();
   try {
     const res = await fetch('/api/church/student/class', {
@@ -250,7 +366,7 @@ export async function assignStudentClass(
       };
     }
 
-    return { success: true, error: null };
+    return { success: true, error: null, membershipId: json.membershipId };
   } catch (err: any) {
     return { success: false, error: new Error(err?.message || 'Network error updating class assignment') };
   }

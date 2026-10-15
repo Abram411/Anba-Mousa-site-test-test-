@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Globe, Cross, X, Sun, Moon, Calendar, Music, BookOpen, Check, Palette, ShieldCheck } from 'lucide-react';
+import { Bell, Globe, Cross, X, Sun, Moon, Calendar, Music, BookOpen, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useTheme } from '../../context/ThemeContext';
@@ -45,7 +45,7 @@ export function TopBar({
       : 'St. Musa Church';
 
   return (
-    <div className="bg-[var(--color-church-burgundy)] text-white shadow-md sticky top-0 z-50 md:rounded-b-none border-b border-white/10">
+    <div className="bg-gradient-to-r from-[var(--mousa-teal-deep)] via-[#103D46] to-[var(--mousa-teal)] text-white shadow-md sticky top-0 z-50 md:rounded-b-none border-b border-[var(--mousa-gold)]/30">
       <div className="max-w-7xl mx-auto flex justify-between items-center p-2.5 sm:p-4 px-2 sm:px-4 gap-2">
         
         {/* Church Brand */}
@@ -65,7 +65,7 @@ export function TopBar({
               onClick={() => onNavigate('calendar')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'calendar'
-                  ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] shadow-xs font-black'
+                  ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] shadow-xs font-black'
                   : 'text-white/85 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -77,7 +77,7 @@ export function TopBar({
               onClick={() => onNavigate('hymns')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'hymns'
-                  ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] shadow-xs font-black'
+                  ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] shadow-xs font-black'
                   : 'text-white/85 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -89,38 +89,12 @@ export function TopBar({
               onClick={() => onNavigate('agpeya')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'agpeya'
-                  ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] shadow-xs font-black'
+                  ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] shadow-xs font-black'
                   : 'text-white/85 hover:text-white hover:bg-white/10'
               }`}
             >
               <BookOpen size={15} />
               <span>{lang === 'copt' || lang === 'cop' ? 'Ϯⲁϫⲡⲓⲁ' : lang === 'ar' ? 'صلوات الأجبية' : 'Daily Agpeya'}</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('designSystem')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'designSystem'
-                  ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] shadow-xs font-black'
-                  : 'text-white/85 hover:text-white hover:bg-white/10'
-              }`}
-              title="Design System & Typography Laboratory"
-            >
-              <Palette size={15} />
-              <span>{lang === 'copt' || lang === 'cop' ? 'Ⲡⲓⲥⲙⲟⲧ' : lang === 'ar' ? 'نظام التصميم' : 'Design System'}</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('localizationQa')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'localizationQa'
-                  ? 'bg-[var(--color-church-gold)] text-[var(--color-church-blue)] shadow-xs font-black'
-                  : 'text-white/85 hover:text-white hover:bg-white/10'
-              }`}
-              title="Bohairic Coptic Localization QA & Review Dashboard"
-            >
-              <ShieldCheck size={15} />
-              <span>{lang === 'copt' || lang === 'cop' ? 'Ⲡⲓϫⲱⲕ' : lang === 'ar' ? 'جودة الترجمة' : 'Coptic QA'}</span>
             </button>
           </div>
         )}

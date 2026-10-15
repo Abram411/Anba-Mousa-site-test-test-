@@ -124,11 +124,40 @@ export const mockLessons: Lesson[] = [
     summary: 'Learn about the brave life of St. Mina, the wonder-worker of Egypt and patron of our faith.',
     summaryAr: 'تعرف على الشجاعة والإيمان في حياة الشهيد مارمينا العجائبي حامي الإيمان في مصر.',
     status: 'published',
+    currentVersionId: 'ver-mina-v1',
     date: '2026-09-13',
     pointsAvailable: 150,
     isCompleted: false,
     sourcesCount: 2,
     versionsCount: 1,
+    grade: '3rd & 4th Grade',
+    category: 'history',
+    scriptureVerseEn: 'Be faithful until death, and I will give you the crown of life.',
+    scriptureVerseAr: 'كن أميناً إلى الموت فسأعطيك إكليل الحياة. (رؤيا ٢: ١٠)',
+    verseReference: 'Revelation 2:10 • رؤيا ٢: ١٠',
+    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    audioUrl: 'https://cdn.freesound.org/previews/560/560446_12398463-lq.mp3',
+    teacherNotes: 'Focus on how St. Mina left earthly military rank to serve the King of Kings with fearless love.',
+    quiz: [
+      {
+        question: 'What earthly career did St. Mina leave to witness for Christ?',
+        options: ['Roman army commander', 'Merchant', 'Fisherman'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      },
+      {
+        question: 'Where is the historic great cathedral and monastery of St. Mina located?',
+        options: ['Mariout desert near Alexandria', 'Jerusalem', 'Antioch'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      },
+      {
+        question: 'What is our memory verse from Revelation 2:10?',
+        options: ['Be faithful until death, and I will give you the crown of life', 'The Lord is my shepherd', 'In the beginning was the Word'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      }
+    ]
   },
   {
     id: 'l2',
@@ -138,12 +167,41 @@ export const mockLessons: Lesson[] = [
     summary: 'Discover how Noah trusted God and built a giant ark to save his family and creation.',
     summaryAr: 'اكتشف كيف وثق نوح بالله وبنى فلكاً عظيماً لخلاص أسرته والخليقة.',
     status: 'published',
+    currentVersionId: 'ver-noah-v1',
     date: '2026-09-06',
     pointsAvailable: 150,
     isCompleted: true,
     sourcesCount: 3,
     versionsCount: 1,
-  },
+    grade: '1st & 2nd Grade',
+    category: 'bible',
+    scriptureVerseEn: 'By faith Noah, being divinely warned of things not yet seen, prepared an ark for the saving of his household.',
+    scriptureVerseAr: 'بالإيمان نوح لما أُوحي إليه عن أمور لم تُرى بعد خاف فبنى فلكاً لخلاص بيته. (عبرانيين ١١: ٧)',
+    verseReference: 'Hebrews 11:7 • عبرانيين ١١: ٧',
+    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    audioUrl: 'https://cdn.freesound.org/previews/560/560446_12398463-lq.mp3',
+    teacherNotes: 'Explain how the Ark is a beautiful symbol of the Church and baptism where God preserves us.',
+    quiz: [
+      {
+        question: 'What bird did Noah send out that returned with an olive leaf?',
+        options: ['A dove', 'A raven', 'An eagle'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      },
+      {
+        question: 'What sign in the sky did God place as a covenant of peace?',
+        options: ['The rainbow', 'The sun', 'A bright star'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      },
+      {
+        question: 'How did Noah respond when God asked him to build the ark?',
+        options: ['He obeyed with faithful trust', 'He refused', 'He ignored God'],
+        correctIndex: 0,
+        type: 'multiple_choice'
+      }
+    ]
+  }
 ];
 
 export const mockBadges: Badge[] = [
@@ -1063,6 +1121,272 @@ export const mockLessonVersions: Record<string, LessonVersion[]> = {
       ttsAudioUrlEn: 'https://cdn.freesound.org/previews/560/560446_12398463-lq.mp3',
       ttsAudioUrlAr: 'https://cdn.freesound.org/previews/560/560446_12398463-lq.mp3',
       ttsStatus: 'GENERATED'
+    }
+  ],
+  'l1': [
+    {
+      id: 'ver-mina-v1',
+      lessonId: 'l1',
+      versionNumber: 1,
+      status: 'PUBLISHED',
+      createdBy: 'Servant Mina',
+      createdAt: '2026-09-13T10:00:00Z',
+      approvedBy: 'Servant Mina',
+      approvedAt: '2026-09-13T11:00:00Z',
+      summaryEn: 'Saint Mina was a courageous young Egyptian soldier who gave up his high military rank to fearlessly proclaim Jesus Christ. He worked wondrous miracles and became a beloved patron of our Coptic Church.',
+      summaryAr: 'الشهيد مارمينا العجائبي كان جندياً مصرياً شجاعاً ترك رتبته العسكرية ليعترف بإيمانه بالسيد المسيح دون خوف. صنع معجزات باهرة وصار شفيعاً محبوباً لكنيستنا القبطية.',
+      summaryCop: 'Ⲁⲡⲁ Ⲙⲏⲛⲁ ⲡⲓⲙⲁⲣⲧⲩⲣⲟⲥ',
+      bigIdeaEn: 'True courage comes from loving God more than earthly titles or fear of men.',
+      bigIdeaAr: 'الشجاعة الحقيقية تنبع من محبة الله فوق كل مناصب الأرض ومخاوف البشر.',
+      objectivesEn: [
+        'Understand why St. Mina left the army to withdraw to the desert in prayer.',
+        'Learn how St. Mina boldly confessed his faith before the ruler.',
+        'Memorize Revelation 2:10.'
+      ],
+      objectivesAr: [
+        'فهم لماذا ترك مارمينا الجندية وتوجه للبرية للصلاة والاعتكاف.',
+        'تعلم كيف اعترف مارمينا بشجاعة أمام الوالي الروماني.',
+        'حفظ آية: كن أميناً إلى الموت فسأعطيك إكليل الحياة (رؤيا ٢: ١٠).'
+      ],
+      sections: [
+        {
+          id: 'sec-mina-1',
+          order: 1,
+          titleEn: '1. The Young Officer of Faith',
+          titleAr: '١. الضابط الشاب المتمسك بإيمانه',
+          titleCop: 'Ⲁⲡⲁ Ⲙⲏⲛⲁ ϧⲉⲛ ϯⲥⲧⲣⲁϯⲁ',
+          contentEn: 'Mina was born in Egypt to pious parents, Eudoxius and Euphemia. Because of his honesty and valor, he was appointed as a commander in the Roman army in Phrygia. When Emperor Diocletian commanded worship of false idols, Mina cast down his military belt and proclaimed that he belonged to Jesus Christ.',
+          contentAr: 'وُلد مارمينا في مصر لأبوين تقيين، أوودوكسيوس وأوفيمية. ولأمانته وشجاعته عُين قائداً في الجيش الروماني. وعندما أصدر دقلديانوس أمره بعبادة الأوثان، ألقى مارمينا منطقة جنديته العسكرية وأعلن أنه خادم للمسيح الملك الحقيقي.',
+          contentCop: 'Ⲁⲡⲁ Ⲙⲏⲛⲁ ⲡⲓⲣⲉϥϣⲉⲙϣⲓ ⲙ̀Ⲡⲭⲣⲓⲥⲧⲟⲥ.',
+          sourceRefs: [{ sourceId: 'src-synaxarium', sourceName: 'Coptic Synaxarium 15 Hathor', location: 'Page 1' }]
+        },
+        {
+          id: 'sec-mina-2',
+          order: 2,
+          titleEn: '2. Bold Witness & Heavenly Crown',
+          titleAr: '٢. الشهادة الجريئة ونيل الأكاليل السماوية',
+          titleCop: 'Ⲡⲓⲭⲗⲟⲙ ⲛ̀ⲧⲉ ϯⲙⲉⲑⲙⲁⲣⲧⲩⲣⲟⲥ',
+          contentEn: 'After solitary prayer and fasting in the mountains, Mina returned on a festival day and proclaimed Christ before the stadium crowd. Neither threats nor promises could turn his heart. He received the crown of martyrdom and became known across the world as the Wonder-Worker.',
+          contentAr: 'بعد فترة من الصلاة والصوم في الجبال، عاد مارمينا في يوم الاحتفال وصرخ في وسط الملعب معترفاً بالمسيح. لم تثنه التهديدات ولا الإغراءات، ونال إكليل الشهادة الأبدي وصار مشهوراً في العالم بـ"العجائبي".',
+          contentCop: 'Ⲁϥϭⲓ ⲙ̀ⲡⲓⲭⲗⲟⲙ ⲛ̀ⲧⲉ ⲡⲱⲛϦ.',
+          sourceRefs: [{ sourceId: 'src-synaxarium', sourceName: 'Coptic Synaxarium', location: 'Page 2' }]
+        }
+      ],
+      slides: [
+        {
+          number: 1,
+          titleEn: 'St. Mina the Wonder-Worker',
+          titleAr: 'الشهيد العظيم مارمينا العجائبي',
+          bulletsEn: ['Patron saint of Egypt and beloved protector', 'Left earthly prestige for the Kingdom of Heaven', 'Feast celebrated on 15 Hathor'],
+          bulletsAr: ['حامي الإيمان وشفيع مصر المحبوب', 'ترك الرتبة العسكرية من أجل ملكوت السماوات', 'عيده في ١٥ هاتور']
+        },
+        {
+          number: 2,
+          titleEn: 'Courage to Stand for Truth',
+          titleAr: 'شجاعة الثبات على الحق',
+          bulletsEn: ['Prayed in the wilderness', 'Confessed Christ before the Roman governor', 'Revelation 2:10: "Be faithful until death"'],
+          bulletsAr: ['صلى في البرية لطلب القوة الإلهية', 'اعترف بالمسيح أمام الوالي الروماني', 'رؤيا ٢: ١٠: "كن أميناً إلى الموت"']
+        }
+      ],
+      flashcards: [
+        {
+          id: 'fc-m-1',
+          frontEn: 'Who were the pious parents of St. Mina?',
+          frontAr: 'من هما والدا الشهيد مارمينا؟',
+          backEn: 'Eudoxius and Euphemia.',
+          backAr: 'أوودوكسيوس وأوفيمية.'
+        },
+        {
+          id: 'fc-m-2',
+          frontEn: 'What is our memory verse (Rev 2:10)?',
+          frontAr: 'ما هي الآية الذهبية لدرس مارمينا (رؤيا ٢: ١٠)؟',
+          backEn: '"Be faithful until death, and I will give you the crown of life."',
+          backAr: '"كن أميناً إلى الموت فسأعطيك إكليل الحياة."'
+        }
+      ],
+      quizDraft: {
+        id: 'quiz-mina-01',
+        lessonId: 'l1',
+        titleEn: 'St. Mina Review Quiz',
+        titleAr: 'اختبار مراجعة درس مارمينا العجائبي',
+        instructionsEn: 'Tiered review quiz with point multipliers for St. Mina.',
+        instructionsAr: 'اختبار مراجعة متدرج الصعوبة مع نقاط مضاعفة.',
+        status: 'APPROVED',
+        questions: [
+          {
+            id: 'qm-1',
+            type: 'multiple_choice',
+            difficulty: 'EASY',
+            points: 10,
+            questionEn: 'What position did St. Mina hold before his martyrdom?',
+            questionAr: 'ما الرتبة التي كان يشغلها مارمينا قبل استشهاده؟',
+            optionsEn: ['Officer in the army', 'Sailor', 'Baker'],
+            optionsAr: ['ضابط في الجيش الروماني', 'بحار', 'خباز'],
+            correctIndex: 0,
+            explanationEn: 'Mina was an honored military commander who laid down his sword for Christ.',
+            explanationAr: 'كان مارمينا قائداً عسكرياً شجاعاً ترك سيفه من أجل المسيح.'
+          },
+          {
+            id: 'qm-2',
+            type: 'multiple_choice',
+            difficulty: 'MEDIUM',
+            points: 20,
+            questionEn: 'Where did St. Mina withdraw to fast and pray before his public witness?',
+            questionAr: 'إلى أين توجه مارمينا للصوم والصلاة قبل أن يشهد علناً؟',
+            optionsEn: ['To the solitary mountains and desert', 'To Rome', 'To Alexandria harbor'],
+            optionsAr: ['إلى الجبال والبرية للاعتكاف', 'إلى روما', 'إلى ميناء الإسكندرية'],
+            correctIndex: 0,
+            explanationEn: 'He spent time in prayer in the desert to receive divine strength from God.',
+            explanationAr: 'اعتكف في البرية مصلّياً ليمتلئ بالقوة والمعونة الإلهية.'
+          },
+          {
+            id: 'qm-3',
+            type: 'multiple_choice',
+            difficulty: 'HARD',
+            points: 30,
+            questionEn: 'Complete Revelation 2:10: "Be faithful until death, and I will give you..."',
+            questionAr: 'أكمل الآية (رؤيا ٢: ١٠): "كن أميناً إلى الموت فسأعطيك..."',
+            optionsEn: ['The crown of life', 'The gold of kings', 'The shield of bronze'],
+            optionsAr: ['إكليل الحياة', 'ذهب الملوك', 'درع النحاس'],
+            correctIndex: 0,
+            explanationEn: 'The Lord promises the heavenly crown of life to those who remain faithful.',
+            explanationAr: 'وعد الرب بإكليل الحياة الأبدية لكل من يثبت في الأمانة حتى النهاية.'
+          }
+        ]
+      }
+    }
+  ],
+  'l2': [
+    {
+      id: 'ver-noah-v1',
+      lessonId: 'l2',
+      versionNumber: 1,
+      status: 'PUBLISHED',
+      createdBy: 'Servant Mina',
+      createdAt: '2026-09-06T10:00:00Z',
+      approvedBy: 'Servant Mina',
+      approvedAt: '2026-09-06T11:00:00Z',
+      summaryEn: 'Noah was a righteous man who walked with God. By faith, he built a massive ark according to God’s divine blueprint to preserve his family and animals from the flood.',
+      summaryAr: 'كان نوح رجلاً باراً سار مع الله بأمانة. وبالإيمان بنى فلكاً عظيماً بحسب التصميم الإلهي ليحفظ أسرته والكائنات الحية من الطوفان.',
+      summaryCop: 'Ⲛⲱⲉ ⲛⲉⲙ ϯⲕⲓⲃⲱⲧⲟⲥ',
+      bigIdeaEn: 'Trusting and obeying God brings safety and life, even when everyone else doubts.',
+      bigIdeaAr: 'الثقة في وصايا الله وطاعتها تمنحنا النجاة والحياة حتى لو شك الجميع من حولنا.',
+      objectivesEn: [
+        'Learn why God chose Noah to build the Ark.',
+        'Understand the symbol of the Ark as the Church of salvation.',
+        'Memorize Hebrews 11:7.'
+      ],
+      objectivesAr: [
+        'معرفة سبب اختيار الله لنوح البار لبناء الفلك.',
+        'فهم أن الفلك هو رمز للكنيسة وسفينة خلاصنا.',
+        'حفظ آية: بالإيمان نوح بنى فلكاً لخلاص بيته (عبرانيين ١١: ٧).'
+      ],
+      sections: [
+        {
+          id: 'sec-noah-1',
+          order: 1,
+          titleEn: '1. Building the Ark by Faith',
+          titleAr: '١. بناء الفلك بروح الإيمان والطاعة',
+          titleCop: 'Ⲛⲱⲉ ⲁϥⲕⲱⲧ ⲛ̀ϯⲕⲓⲃⲱⲧⲟⲥ',
+          contentEn: 'God saw that Noah was righteous and faithful. He instructed him to construct an ark of gopher wood with three decks, a window, and a door on its side. Although it had never rained so heavily, Noah trusted God completely and worked tirelessly.',
+          contentAr: 'رأى الله أن نوحاً كان باراً في جيله ويسلك بالأمانة. أمره أن يصنع فلكاً من خشب السنت بثلاثة طوابق وطاقة وباب في جانبه. ورغم استغراب الناس، أطاع نوح الله بكل قلبه وبنى الفلك خطوة بخطوة.',
+          contentCop: 'Ⲛⲱⲉ ⲁϥⲥⲱⲧⲉⲙ ⲛ̀ⲥⲁ Ⲫϯ.',
+          sourceRefs: [{ sourceId: 'src-bible-gen', sourceName: 'Genesis 6-8', location: 'Gen 6:9-22' }]
+        },
+        {
+          id: 'sec-noah-2',
+          order: 2,
+          titleEn: '2. The Covenant of the Rainbow',
+          titleAr: '٢. علامة قوس قزح وعهد السلام',
+          titleCop: 'Ⲡⲓⲧⲓⲧ ⲛ̀ⲧⲉ ϯϩⲓⲣⲏⲛⲏ',
+          contentEn: 'When the flood subsided, Noah sent out a dove which returned with a fresh olive leaf! Noah and his family stepped onto dry land and offered thanksgiving to God. The Lord set a brilliant rainbow in the clouds as an eternal promise of mercy and protection.',
+          contentAr: 'عندما انحسرت المياه، أطلق نوح حمامة فعادت إليه وفي فمها غصن زيتون أخضر! خرج نوح وأسرته وقدموا ذبيحة شكر لله. ووضع الرب قوس قزح في السحاب علامة لعهد السلام والرحمة الدائم مع الخليقة.',
+          contentCop: 'Ϧⲉⲛ ⲟⲩϩⲓⲣⲏⲛⲏ ⲉ̀ⲃⲟⲗ ϩⲓⲧⲉⲛ Ⲫϯ.',
+          sourceRefs: [{ sourceId: 'src-bible-gen', sourceName: 'Genesis 8-9', location: 'Gen 8:11-9:13' }]
+        }
+      ],
+      slides: [
+        {
+          number: 1,
+          titleEn: 'Noah’s Ark: Ship of Salvation',
+          titleAr: 'فلك نوح: سفينة الخلاص',
+          bulletsEn: ['Built by faith and patience', 'Prefigured the Holy Church that preserves us', 'Hebrews 11:7: "Prepared an ark for saving his household"'],
+          bulletsAr: ['بُني بالإيمان والصبر العجيب', 'رمز للكنيسة المقدسة وسفينة نجاتنا', 'عبرانيين ١١: ٧: "بنى فلكاً لخلاص بيته"']
+        },
+        {
+          number: 2,
+          titleEn: 'The Dove and the Rainbow',
+          titleAr: 'الحمامة وغصن الزيتون وقوس قزح',
+          bulletsEn: ['The olive leaf symbolized peace and new life', 'The rainbow is God’s covenant of faithfulness', 'We trust God in every storm'],
+          bulletsAr: ['غصن الزيتون رمز للسلام وبداية حياة جديدة', 'قوس قزح هو ميثاق أمانة الله ورحمته', 'نثق في رعاية الله في وسط كل عاصفة']
+        }
+      ],
+      flashcards: [
+        {
+          id: 'fc-n-1',
+          frontEn: 'What did the dove bring back to Noah in the Ark?',
+          frontAr: 'ماذا أحضرت الحمامة لنوح في الفلك؟',
+          backEn: 'A freshly plucked olive leaf in its beak.',
+          backAr: 'غصن زيتون أخضر في فمها.'
+        },
+        {
+          id: 'fc-n-2',
+          frontEn: 'What is our memory verse from Hebrews 11:7?',
+          frontAr: 'ما هي الآية الذهبية لدرس نوح (عبرانيين ١١: ٧)؟',
+          backEn: '"By faith Noah... prepared an ark for the saving of his household."',
+          backAr: '"بالإيمان نوح... بنى فلكاً لخلاص بيته."'
+        }
+      ],
+      quizDraft: {
+        id: 'quiz-noah-01',
+        lessonId: 'l2',
+        titleEn: 'Noah and the Ark Review Quiz',
+        titleAr: 'اختبار مراجعة فلك نوح',
+        instructionsEn: 'Review questions with tiered point multipliers for Noah.',
+        instructionsAr: 'أسئلة مراجعة متدرجة الصعوبة مع نقاط مضاعفة لدرس نوح.',
+        status: 'APPROVED',
+        questions: [
+          {
+            id: 'qn-1',
+            type: 'multiple_choice',
+            difficulty: 'EASY',
+            points: 10,
+            questionEn: 'What bird returned to Noah carrying an olive leaf?',
+            questionAr: 'ما الطائر الذي عاد إلى نوح حاملاً غصن الزيتون؟',
+            optionsEn: ['A dove', 'An eagle', 'A sparrow'],
+            optionsAr: ['حمامة', 'نسر', 'عصفور'],
+            correctIndex: 0,
+            explanationEn: 'The gentle dove returned with an olive branch indicating dry land and peace.',
+            explanationAr: 'عادت الحمامة الوديعة بغصن الزيتون إعلاناً عن السلام وبداية عهد جديد.'
+          },
+          {
+            id: 'qn-2',
+            type: 'multiple_choice',
+            difficulty: 'MEDIUM',
+            points: 20,
+            questionEn: 'What beautiful sign did God place in the sky as a covenant of peace?',
+            questionAr: 'ما العلامة المبهجة التي وضعها الله في السماء عهداً للسلام؟',
+            optionsEn: ['The rainbow', 'A comet', 'A silver shield'],
+            optionsAr: ['قوس قزح', 'مذنب', 'درع فضي'],
+            correctIndex: 0,
+            explanationEn: 'God placed the rainbow in the clouds as an eternal sign of His covenant of mercy.',
+            explanationAr: 'وضع الله قوس قزح في السحاب علامة أبدية لعهده ورحمته مع البشرية.'
+          },
+          {
+            id: 'qn-3',
+            type: 'multiple_choice',
+            difficulty: 'HARD',
+            points: 30,
+            questionEn: 'According to Hebrews 11:7, what motivated Noah to build the ark?',
+            questionAr: 'بحسب عبرانيين ١١: ٧، ما الذي قاد نوحاً لبناء الفلك؟',
+            optionsEn: ['By faith and holy fear of God', 'By curiosity', 'By the advice of merchants'],
+            optionsAr: ['بالإيمان والتقوى لله', 'بالفضول', 'بنصيحة التجار'],
+            correctIndex: 0,
+            explanationEn: 'Saint Paul writes that by faith Noah obeyed God’s warning and saved his house.',
+            explanationAr: 'يؤكد معلمنا بولس الرسول أن نوحاً بنى الفلك بالإيمان الكامل في مواعيد الله.'
+          }
+        ]
+      }
     }
   ]
 };

@@ -3,7 +3,7 @@ import { X, Plus, Trash2, Save, AlertCircle, BookOpen, Lock, Loader2 } from 'luc
 import { Lesson, QuizQuestion, Language, QuizDraft } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { getEditableLessonVersion, updateLessonDraft } from '../../lib/lessonAuthoringService';
+import { getEditableLessonVersion, updateLessonDraft, createLessonDraft } from '../../lib/lessonAuthoringService';
 
 interface LessonEditModalProps {
   lesson: Lesson;
@@ -11,23 +11,24 @@ interface LessonEditModalProps {
   onClose: () => void;
   onSave: (updated: Partial<Lesson>) => void;
   lang: Language;
+  isNew?: boolean;
 }
 
-export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: LessonEditModalProps) {
+export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang, isNew = false }: LessonEditModalProps) {
   if (!isOpen) return null;
 
   const { userData, isGuest } = useAuth();
   const isOnlineAuth = !isGuest && Boolean(userData) && isSupabaseConfigured;
 
-  const [title, setTitle] = useState(lesson.title);
-  const [summary, setSummary] = useState(lesson.summary);
+  const [title, setTitle] = useState(lesson.title || '');
+  const [summary, setSummary] = useState(lesson.summary || '');
   const [pointsAvailable, setPointsAvailable] = useState(lesson.pointsAvailable || 150);
-  const [status, setStatus] = useState(lesson.status || 'published');
+  const [status, setStatus] = useState(lesson.status || 'draft');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => {
     if (lesson.quiz && lesson.quiz.length > 0) return lesson.quiz;
     return [
       {
-        question: lang === 'ar' ? 'ما الفكرة الرئيسية للدرس؟' : 'What is the main takeaway of this lesson?',
+        question: lang === 'ar' ? 'ما الفكرة الروحية الرئيسية للدرس؟' : 'What is the main spiritual takeaway of this lesson?',
         options: [
           lang === 'ar' ? 'الإيمان ومحبة الله' : 'Faith and loving God',
           lang === 'ar' ? 'الابتعاد عن الصلاة' : 'Avoiding prayer',
@@ -44,10 +45,10 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // For online lessons, fetch the authorized editable draft version
+  // For online lessons, fetch the authorized editable draft version if not a brand new lesson
   useEffect(() => {
     let isMounted = true;
-    if (isOnlineAuth && lesson.id) {
+    if (isOnlineAuth && lesson.id && !isNew) {
       setLoadingDraft(true);
       setErrorMsg(null);
       getEditableLessonVersion(lesson.id)
@@ -82,7 +83,7 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
     return () => {
       isMounted = false;
     };
-  }, [lesson.id, isOnlineAuth]);
+  }, [lesson.id, isOnlineAuth, isNew]);
 
   const handleAddQuestion = () => {
     setQuizQuestions([
@@ -161,12 +162,25 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
         }))
       };
 
-      const result = await updateLessonDraft(lesson.id, {
-        versionId: editableVersionId || undefined,
-        titleEn: title.trim(),
-        summaryEn: summary.trim(),
-        quizDraft
-      });
+      let result;
+      if (isNew) {
+        result = await createLessonDraft({
+          titleEn: title.trim(),
+          titleAr: title.trim(),
+          summaryEn: summary.trim(),
+          summaryAr: summary.trim(),
+          category: 'bible',
+          gradeLevel: lesson.grade || '4th Grade',
+          quizDraft
+        });
+      } else {
+        result = await updateLessonDraft(lesson.id, {
+          versionId: editableVersionId || undefined,
+          titleEn: title.trim(),
+          summaryEn: summary.trim(),
+          quizDraft
+        });
+      }
 
       setSaving(false);
 
@@ -176,7 +190,9 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
       }
 
       // Safe update to parent state without mutating publication fields
+      const createdLessonId = (result.data && 'lesson' in result.data) ? (result.data as any).lesson.id : lesson.id;
       onSave({
+        id: createdLessonId,
         title: title.trim(),
         summary: summary.trim(),
         quiz: quizQuestions,
@@ -212,11 +228,13 @@ export function LessonEditModal({ lesson, isOpen, onClose, onSave, lang }: Lesso
             </div>
             <div>
               <h3 className="text-lg font-bold text-[var(--color-church-blue)] dark:text-white">
-                {lang === 'ar' ? 'تعديل مسودة الدرس وإدارتها' : 'Edit & Manage Lesson Draft'}
+                {isNew 
+                  ? (lang === 'ar' ? 'إعداد درس جديد (مسار يدوي مباشر)' : 'Create New Lesson (Direct Manual)')
+                  : (lang === 'ar' ? 'تعديل مسودة الدرس وإدارتها' : 'Edit & Manage Lesson Draft')}
               </h3>
               <p className="text-xs text-gray-500">
                 {isOnlineAuth 
-                  ? (lang === 'ar' ? 'مسودة الإصدار المحمية • تعديل آمن' : 'Versioned Draft Foundation • Safe Authoring')
+                  ? (lang === 'ar' ? 'مسودة الإصدار المحمية • تعديل آمن وحفظ في Supabase' : 'Versioned Draft Foundation • Safe Supabase Storage')
                   : (lang === 'ar' ? 'صلاحيات المعلم / خادم مدارس الأحد' : 'Teacher & Servant Privileges')}
               </p>
             </div>
