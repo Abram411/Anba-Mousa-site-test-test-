@@ -41,7 +41,11 @@ export interface CopticDateResult {
  * Calculates accurate Coptic date from a Gregorian date.
  * Coptic year starts on Tout 1 (September 11 Gregorian, or Sept 12 in year before leap year).
  */
-export function getCopticDate(date: Date = new Date()): CopticDateResult {
+export function getCopticDate(dateInput: Date = new Date()): CopticDateResult {
+  // Authoritative liturgical timezone for Coptic calendar is Africa/Cairo
+  const cairoTimeStr = dateInput.toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
+  const date = new Date(cairoTimeStr);
+
   const gYear = date.getFullYear();
   const gMonth = date.getMonth(); // 0-indexed
   const gDay = date.getDate();

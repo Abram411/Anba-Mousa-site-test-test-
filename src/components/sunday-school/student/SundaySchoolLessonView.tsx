@@ -44,6 +44,11 @@ interface SundaySchoolLessonViewProps {
   onBack: () => void;
   onMarkSectionRead: (sectionId: string, totalSections: number) => void;
   onCompleteContent: () => void;
+  onFinishLesson?: () => Promise<void>;
+  isFinishing?: boolean;
+  finishError?: string | null;
+  finishSuccess?: boolean;
+  onNavigateHome?: () => void;
   onStartQuiz: () => void;
   onOpenSourceViewer?: (source: LessonSource) => void;
   targetSectionId?: string;
@@ -61,6 +66,11 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
   onBack,
   onMarkSectionRead,
   onCompleteContent,
+  onFinishLesson,
+  isFinishing = false,
+  finishError = null,
+  finishSuccess = false,
+  onNavigateHome,
   onStartQuiz,
   targetSectionId,
   lang = 'ar' as Language,
@@ -77,9 +87,19 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
   const rawSections = version.sections || [];
   const sections = [...rawSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const completedSections = progress?.sectionsCompleted || [];
+  const completionRatio = sections.length > 0 ? (completedSections.length / sections.length) : 1;
   const isAllSectionsRead = sections.length > 0 && completedSections.length >= sections.length;
-  const isContentCompleted = progress?.status === 'COMPLETED' || isAllSectionsRead;
+  const isSubstantiallyCompleted = completionRatio >= 0.9;
+  const isContentCompleted = progress?.status === 'COMPLETED' || finishSuccess || isAllSectionsRead;
   const latestQuizAttempt = quizAttempts[quizAttempts.length - 1];
+
+  const handleFinish = () => {
+    if (onFinishLesson) {
+      onFinishLesson();
+    } else {
+      onCompleteContent();
+    }
+  };
 
   // Learning materials: only show if provided
   const rawSlides = (version as any)?.slides || [];
@@ -119,27 +139,60 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-16" dir={isAr ? 'rtl' : 'ltr'}>
-      {/* Top Breadcrumb & Actions */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      {/* Top Breadcrumb & Actions with Clearly Visible Finish Lesson Action */}
+      <div className="flex items-center justify-between gap-4 flex-wrap bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] p-3.5 sm:p-4 rounded-3xl border-2 border-[var(--mousa-border-sand)] shadow-2xs">
         <button
           onClick={onBack}
-          className="px-4 py-2.5 bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] rounded-2xl text-xs font-black flex items-center gap-2 border-2 border-[var(--mousa-border-sand)] transition-all cursor-pointer shadow-2xs"
+          className="px-3.5 py-2 hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
         >
           {isAr ? <ChevronRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
           <span>{isAr ? 'الرجوع إلى محطات الدروس' : 'Back to Milestones'}</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Top Finish Lesson Action Button */}
+          <button
+            onClick={handleFinish}
+            disabled={isFinishing || isContentCompleted}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-xs cursor-pointer ${
+              isContentCompleted
+                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                : isFinishing
+                ? 'bg-amber-300 text-amber-950 opacity-80 cursor-wait'
+                : 'bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-105 text-white active:scale-95'
+            }`}
+          >
+            {isFinishing ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin"></div>
+                <span>{isAr ? 'جاري حفظ الإتمام...' : 'Saving...'}</span>
+              </>
+            ) : isContentCompleted ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>{isAr ? 'الدرس مكتمل ✅' : 'Lesson Completed ✅'}</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                <span>{isAr ? 'إنهاء محطة الدرس' : 'Finish Lesson'}</span>
+              </>
+            )}
+          </button>
+
           {isContentCompleted && (
-            <span className="text-xs px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-black flex items-center gap-1.5 shadow-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>{isAr ? 'تم إتمام المحطة بنجاح ✅' : 'Milestone Completed ✅'}</span>
-            </span>
+            <button
+              onClick={onNavigateHome || onBack}
+              className="px-3.5 py-2 bg-[var(--mousa-teal)] hover:bg-[var(--mousa-teal-deep)] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+            >
+              {isAr ? 'العودة للرئيسية' : 'Go Home'}
+            </button>
           )}
+
           {lesson.approvedServantName && (
-            <span className="text-xs px-3.5 py-1.5 rounded-full bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] border border-[var(--mousa-border-sand)] font-bold flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[var(--mousa-gold)]" />
-              <span>{isAr ? `إعداد واعتماد الخادم: ${lesson.approvedServantName}` : `Approved by ${lesson.approvedServantName}`}</span>
+            <span className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] border border-[var(--mousa-border-sand)] font-bold hidden sm:inline-flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-[var(--mousa-gold)]" />
+              <span>{isAr ? `إعداد: ${lesson.approvedServantName}` : `By ${lesson.approvedServantName}`}</span>
             </span>
           )}
         </div>
@@ -552,48 +605,80 @@ export const SundaySchoolLessonView: React.FC<SundaySchoolLessonViewProps> = ({
       )}
 
       {/* 8. Completion & Quiz Action Card */}
-      <div className="p-6 bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] border-2 border-[var(--mousa-gold)] rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
+      <div className="p-6 bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] border-2 border-[var(--mousa-gold)] rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
         <div className="space-y-1">
-          <h3 className="text-base font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
-            {isAr ? 'هل انتهيت من قراءة ومتابعة محطة الدرس؟' : 'Finished Reading the Milestone?'}
+          <h3 className="text-base sm:text-lg font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
+            {isContentCompleted
+              ? (isAr ? '🎉 مبروك! اكتملت محطة هذا الدرس بنجاح' : '🎉 Congratulations! Milestone Completed!')
+              : (isAr ? 'هل انتهيت من قراءة ومتابعة محطة الدرس؟' : 'Finished with this lesson milestone?')}
           </h3>
-          <p className="text-xs text-[var(--mousa-sand-500)]">
-            {isAr 
-              ? 'سجّل إتمام قراءة الدرس لتحصيل نقاط البركة والتقدم في وسام رحلة الأنبا موسى.'
-              : 'Mark your lesson content completed, then take the review quiz to earn your Journey Badge.'}
+          <p className="text-xs text-[var(--mousa-sand-500)] max-w-xl">
+            {isContentCompleted
+              ? (isAr 
+                  ? 'تم تسجيل إنجازك وحفظ النقاط بأمان. يمكنك مراجعة الأقسام أو العودة للرئيسية.' 
+                  : 'Your progress is reliably saved and points awarded. You can return home or take the review quiz.')
+              : (isAr 
+                  ? 'سجّل إتمام قراءة ومتابعة الدرس لتحصيل نقاط البركة والتقدم في وسام رحلة الأنبا موسى.' 
+                  : 'Mark your lesson completed to record your genuine progress and earn your blessing points.')}
           </p>
+          {finishError && (
+            <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-1">
+              ⚠️ {finishError}
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Finish Lesson Action Button */}
           <button
-            onClick={onCompleteContent}
-            disabled={sections.length > 0 && !isAllSectionsRead}
-            className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            onClick={handleFinish}
+            disabled={isFinishing || isContentCompleted}
+            className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 shadow-xs ${
               isContentCompleted
-                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow-xs'
-                : (sections.length === 0 || isAllSectionsRead)
-                ? 'bg-[var(--mousa-gold)] hover:bg-[var(--mousa-gold-light)] text-[var(--mousa-teal-deep)] cursor-pointer shadow-xs active:scale-95'
-                : 'bg-stone-200 dark:bg-stone-800 text-stone-500 border border-stone-300 dark:border-stone-700 cursor-not-allowed opacity-75'
+                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                : isFinishing
+                ? 'bg-amber-300 text-amber-950 opacity-80 cursor-wait'
+                : (sections.length === 0 || isSubstantiallyCompleted || isAllSectionsRead)
+                ? 'bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-105 text-white cursor-pointer active:scale-95'
+                : 'bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-105 text-white cursor-pointer active:scale-95'
             }`}
           >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>
-              {isContentCompleted
-                ? (isAr ? 'تم إتمام الدرس بالكامل (١٠٠٪) ✅' : 'Lesson Content Completed (100%) ✅')
-                : (sections.length === 0 || isAllSectionsRead)
-                ? (isAr ? 'تأكيد إتمام محطة الدرس' : 'Mark Lesson Complete')
-                : (isAr ? `اقرأ جميع الأقسام للإتمام (${completedSections.length}/${sections.length})` : `Read All Sections (${completedSections.length}/${sections.length})`)}
-            </span>
+            {isFinishing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-amber-950 border-t-transparent rounded-full animate-spin"></div>
+                <span>{isAr ? 'جاري حفظ الإتمام...' : 'Saving completion...'}</span>
+              </>
+            ) : isContentCompleted ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>{isAr ? 'تم إتمام الدرس بالكامل (١٠٠٪) ✅' : 'Lesson Completed (100%) ✅'}</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isAr ? 'إنهاء محطة الدرس' : 'Finish Lesson'}</span>
+              </>
+            )}
           </button>
+
+          {/* Clear Route Back Home upon completion */}
+          {isContentCompleted && (
+            <button
+              onClick={onNavigateHome || onBack}
+              className="px-4 py-2.5 bg-[var(--mousa-teal)] hover:bg-[var(--mousa-teal-deep)] text-white text-xs sm:text-sm font-black rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{isAr ? 'العودة للرئيسية' : 'Back to Home'}</span>
+            </button>
+          )}
 
           {/* Review Quiz button: ONLY IF QUIZ EXISTS */}
           {hasQuiz && (
             <button
               onClick={onStartQuiz}
-              className="px-5 py-2.5 bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] hover:brightness-105 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              className="px-5 py-2.5 bg-[var(--mousa-cream-surface)] hover:bg-[var(--mousa-sand-100)] text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] border-2 border-[var(--mousa-gold)] rounded-xl text-xs sm:text-sm font-black shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
-              <HelpCircle className="w-4 h-4" />
-              <span>{isAr ? 'بدء اختبار المراجعة' : 'Take Review Quiz'}</span>
+              <HelpCircle className="w-4 h-4 text-[var(--mousa-gold)]" />
+              <span>{isAr ? 'اختبار المراجعة' : 'Review Quiz'}</span>
               {isAr ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
           )}

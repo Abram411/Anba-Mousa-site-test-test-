@@ -27,14 +27,6 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
     churchDialect: 'English (Coptic Orthodox Liturgical)',
     flagSymbol: '🌐',
   },
-  {
-    code: 'cop' as Language,
-    label: 'Ϯⲁⲥⲡⲓ ⲛ̀ⲣⲉⲙⲛ̀ⲭⲏⲙⲓ',
-    sub: 'Ⲙⲉⲑⲣⲉⲙⲛ̀ⲭⲏⲙⲓ',
-    dir: 'ltr',
-    churchDialect: 'Bohairic Coptic (اللغة القبطية الكنسية البحيرية)',
-    flagSymbol: '☥',
-  },
 ];
 
 export const I18N_DICTIONARY: Record<string, { ar: string; en: string; copt: string; cop?: string }> = {

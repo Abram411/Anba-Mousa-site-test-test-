@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Medal, Lock, Trophy, Users, ChevronUp, History, Landmark, Gift, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Star, Medal, Lock, Trophy, Users, ChevronUp, History, Landmark, Gift, X, CheckCircle2, AlertCircle, Flame, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { mockBadges } from '../../data';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { submitRewardRequest } from '../../lib/supabaseDatabase';
 import { addRewardRequest } from '../../lib/parentChildService';
-import { getLeaderboard, getSavedPurchases, saveRewardPurchaseLocal } from '../../lib/pointsService';
+import { 
+  getLeaderboard, 
+  getStreakLeaderboard, 
+  StreakLeaderboardEntry,
+  getSavedPurchases, 
+  saveRewardPurchaseLocal 
+} from '../../lib/pointsService';
 import { LeaderboardEntry, Language } from '../../types';
 
 const REWARD_PRODUCTS = [
-  { id: '1', title: 'Small Saint Picture', titleAr: 'صورة قديس صغيرة', titleCopt: 'Ⲟⲩϩⲩⲕⲱⲛ ⲛ̀ⲧⲉ ⲟⲩⲁⲅⲓⲟⲥ', cost: 50, icon: '🖼️' },
-  { id: '2', title: 'Wooden Icon', titleAr: 'أيقونة خشبية', titleCopt: 'Ⲟⲩⲉⲓⲕⲱⲛ ⲛ̀ϣⲉ', cost: 100, icon: '🪵' },
-  { id: '3', title: 'Church Notebook', titleAr: 'كشكول الكنيسة', titleCopt: 'Ⲡⲓϫⲱⲙ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ', cost: 150, icon: '📓' },
-  { id: '4', title: 'Cross Necklace', titleAr: 'صليب الكنيسة', titleCopt: 'Ⲡⲓⲥⲧⲁⲩⲣⲟⲥ ⲛ̀ⲧⲉ ⲡⲓⲙⲟⲧ', cost: 200, icon: '✝️' },
+  { id: '1', title: 'Small Saint Picture', titleAr: 'صورة قديس صغيرة', cost: 50, icon: '🖼️' },
+  { id: '2', title: 'Wooden Icon', titleAr: 'أيقونة خشبية', cost: 100, icon: '🪵' },
+  { id: '3', title: 'Church Notebook', titleAr: 'كشكول الكنيسة', cost: 150, icon: '📓' },
+  { id: '4', title: 'Cross Necklace', titleAr: 'صليب الكنيسة', cost: 200, icon: '✝️' },
 ];
 
 export function PointsTab({ lang }: { lang: Language }) {
   const { userData, addPoints } = useAuth();
-  const [view, setView] = useState<'path' | 'leaderboard' | 'bank'>('path');
+  
+  // Section order:
+  // 1. Streak Stars (نجوم الستريك) — DEFAULT
+  // 2. My Trail (رحلتي)
+  // 3. Points Leaderboard (لوحة نقاط البركة)
+  // 4. Points Bazaar (بازار النقط)
+  const [view, setView] = useState<'streak' | 'trail' | 'leaderboard' | 'bazaar'>('streak');
   const [showStore, setShowStore] = useState(false);
   const [leaderboardList, setLeaderboardList] = useState<LeaderboardEntry[]>(() => getLeaderboard(userData));
+  const [streakList, setStreakList] = useState<StreakLeaderboardEntry[]>(() => getStreakLeaderboard(userData));
   const [purchases, setPurchases] = useState<any[]>(() => userData ? getSavedPurchases(userData.id) : []);
   const [confirmPurchaseItem, setConfirmPurchaseItem] = useState<{ id: string; name: string; cost: number } | null>(null);
   const [feedbackToast, setFeedbackToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -34,11 +47,17 @@ export function PointsTab({ lang }: { lang: Language }) {
 
   useEffect(() => {
     setLeaderboardList(getLeaderboard(userData));
+    setStreakList(getStreakLeaderboard(userData));
     const handleUpdate = () => {
       setLeaderboardList(getLeaderboard(userData));
+      setStreakList(getStreakLeaderboard(userData));
     };
     window.addEventListener('church_leaderboard_updated', handleUpdate);
-    return () => window.removeEventListener('church_leaderboard_updated', handleUpdate);
+    window.addEventListener('church_user_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('church_leaderboard_updated', handleUpdate);
+      window.removeEventListener('church_user_updated', handleUpdate);
+    };
   }, [userData]);
 
   useEffect(() => {
@@ -48,7 +67,7 @@ export function PointsTab({ lang }: { lang: Language }) {
       setPurchases(local);
     }
 
-    if (view === 'bank' && supabase) {
+    if (view === 'bazaar' && supabase) {
        const fetchPurchases = async () => {
           try {
             const { data } = await supabase
@@ -75,14 +94,12 @@ export function PointsTab({ lang }: { lang: Language }) {
     }
   }, [userData?.id, view, lang]);
 
-  const isCop = lang === 'copt' || lang === 'cop';
-
   const executePurchase = async () => {
     if (!userData || !confirmPurchaseItem) return;
     const { id: rewardId, cost, name } = confirmPurchaseItem;
     
     if (userData.points < cost) {
-       showNotification('error', isCop ? 'Ⲙ̀ⲙⲟⲛ ⲧⲁⲓⲟ ⲣⲱϣⲓ ⲉ̀ⲡⲁⲓⲧⲁⲓⲟ!' : lang === 'ar' ? 'رصيد نقاطك غير كافٍ لإتمام هذا الطلب!' : 'Not enough points for this reward!');
+       showNotification('error', lang === 'ar' ? 'رصيد نقاطك غير كافٍ لإتمام هذا الطلب!' : 'Not enough points for this reward!');
        setConfirmPurchaseItem(null);
        return;
     }
@@ -120,10 +137,10 @@ export function PointsTab({ lang }: { lang: Language }) {
 
        setConfirmPurchaseItem(null);
        setShowStore(false);
-       showNotification('success', isCop ? 'Ⲁⲩⲧⲱⲃϩ ⲉ̀ⲡⲓⲇⲱⲣⲟⲛ ϧⲉⲛ ⲟⲩϩⲓⲣⲏⲛⲏ! Ϭⲓ ⲡⲉⲕⲧⲁⲓⲟ ⲉ̀ⲃⲟⲗ ϩⲓⲧⲉⲛ ⲡⲓⲇⲓⲁⲕⲟⲛ ⲛ̀ϯⲕⲩⲣⲓⲁⲕⲏ.' : lang === 'ar' ? 'تم تقديم طلب الهدية بنجاح! يمكنك استلامها من خادم الفصل يوم الأحد.' : 'Request submitted successfully! Claim your reward from your servant on Sunday.');
+       showNotification('success', lang === 'ar' ? 'تم تقديم طلب الهدية بنجاح! يمكنك استلامها من خادم الفصل يوم الأحد.' : 'Request submitted successfully! Claim your reward from your servant on Sunday.');
     } catch(err: any) {
        console.error(err);
-       showNotification('error', isCop ? 'Ⲟⲩⲡⲁⲣⲁⲡⲧⲱⲙⲁ ⲁϥϣⲱⲡⲓ' : lang === 'ar' ? 'حدث خطأ أثناء إتمام الطلب' : 'Error during purchase.');
+       showNotification('error', lang === 'ar' ? 'حدث خطأ أثناء إتمام الطلب' : 'Error during purchase.');
        setConfirmPurchaseItem(null);
     }
   };
@@ -131,58 +148,183 @@ export function PointsTab({ lang }: { lang: Language }) {
   if (!userData) return null;
 
   return (
-    <div className="pb-24 pt-6 px-4 w-full max-w-7xl mx-auto space-y-8 overflow-hidden">
-      {/* View Toggle */}
-      <div className="flex bg-[var(--mousa-cream-surface)] dark:bg-[#1C1712] rounded-2xl p-1 shadow-xs border-2 border-[var(--mousa-border-sand)] relative z-10 text-xs sm:text-sm max-w-md mx-auto">
+    <div className="pb-24 pt-6 px-4 w-full max-w-7xl mx-auto space-y-8 overflow-hidden" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      {/* 4-Section View Toggle in Exact Required Order */}
+      <div className="flex flex-wrap bg-[var(--mousa-cream-surface)] dark:bg-[#1C1712] rounded-2xl p-1.5 shadow-sm border-2 border-[var(--mousa-border-sand)] relative z-10 text-xs sm:text-sm max-w-2xl mx-auto gap-1">
+        {/* 1. Streak Stars — Arabic: نجوم الستريك (DEFAULT) */}
         <button 
-          onClick={() => setView('path')}
-          className={`flex-1 py-2.5 sm:py-3 rounded-xl font-black transition-all z-10 cursor-pointer ${view === 'path' ? 'bg-[var(--mousa-teal)] text-white shadow-xs' : 'text-[var(--mousa-sand-500)] hover:text-[var(--mousa-teal)]'}`}
+          onClick={() => setView('streak')}
+          className={`flex-1 min-w-[120px] py-2.5 sm:py-3 px-2 rounded-xl font-black transition-all z-10 cursor-pointer flex items-center justify-center gap-1.5 ${
+            view === 'streak' 
+              ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] shadow-sm' 
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
         >
-          {lang === 'copt' ? 'Ⲡⲁⲙⲱⲓⲧ' : lang === 'ar' ? 'طريقي في البرية' : 'My Trail'}
+          <Flame size={16} className={view === 'streak' ? 'fill-current text-amber-700' : 'text-amber-500'} />
+          <span>{lang === 'ar' ? 'نجوم الستريك' : 'Streak Stars'}</span>
         </button>
+
+        {/* 2. My Trail — Arabic: رحلتي */}
+        <button 
+          onClick={() => setView('trail')}
+          className={`flex-1 min-w-[110px] py-2.5 sm:py-3 px-2 rounded-xl font-black transition-all z-10 cursor-pointer flex items-center justify-center gap-1.5 ${
+            view === 'trail' 
+              ? 'bg-[var(--mousa-teal)] text-white shadow-sm' 
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
+        >
+          <Trophy size={15} />
+          <span>{lang === 'ar' ? 'رحلتي' : 'My Trail'}</span>
+        </button>
+
+        {/* 3. Points Leaderboard — Arabic: لوحة نقاط البركة */}
         <button 
           onClick={() => setView('leaderboard')}
-          className={`flex-1 py-2.5 sm:py-3 rounded-xl font-black transition-all z-10 cursor-pointer ${view === 'leaderboard' ? 'bg-[var(--mousa-teal)] text-white shadow-xs' : 'text-[var(--mousa-sand-500)] hover:text-[var(--mousa-teal)]'}`}
+          className={`flex-1 min-w-[125px] py-2.5 sm:py-3 px-2 rounded-xl font-black transition-all z-10 cursor-pointer flex items-center justify-center gap-1.5 ${
+            view === 'leaderboard' 
+              ? 'bg-[var(--mousa-teal)] text-white shadow-sm' 
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
         >
-          {lang === 'copt' ? 'Ⲡⲓⲧⲁⲝⲓⲥ' : lang === 'ar' ? 'قافلة النور' : 'Caravan Rank'}
+          <Users size={15} />
+          <span>{lang === 'ar' ? 'لوحة نقاط البركة' : 'Points Leaderboard'}</span>
         </button>
+
+        {/* 4. Points Bazaar — Arabic: بازار النقط */}
         <button 
-          onClick={() => setView('bank')}
-          className={`flex-1 py-2.5 sm:py-3 rounded-xl font-black transition-all z-10 cursor-pointer ${view === 'bank' ? 'bg-[var(--mousa-teal)] text-white shadow-xs' : 'text-[var(--mousa-sand-500)] hover:text-[var(--mousa-teal)]'}`}
+          onClick={() => setView('bazaar')}
+          className={`flex-1 min-w-[110px] py-2.5 sm:py-3 px-2 rounded-xl font-black transition-all z-10 cursor-pointer flex items-center justify-center gap-1.5 ${
+            view === 'bazaar' 
+              ? 'bg-[var(--mousa-coral)] text-white shadow-sm' 
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
         >
-          {lang === 'copt' ? 'Ⲡⲓⲧⲣⲁⲡⲉⲍⲁ' : lang === 'ar' ? 'خزينة البركة' : 'Treasury'}
+          <Gift size={15} />
+          <span>{lang === 'ar' ? 'بازار النقط' : 'Points Bazaar'}</span>
         </button>
       </div>
 
-      {/* Header Stats */}
+      {/* Header Stats with High-Contrast Text */}
       <motion.div 
-        initial={{ scale: 0.8, opacity: 0 }}
+        initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", bounce: 0.5 }}
-        className="text-center space-y-2"
+        transition={{ type: "spring", bounce: 0.4 }}
+        className="text-center space-y-2 bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] p-6 rounded-3xl border-2 border-[var(--mousa-border-sand)] max-w-md mx-auto shadow-sm"
       >
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-tr from-[var(--mousa-gold)] to-[var(--mousa-coral)] rounded-3xl text-white shadow-lg shadow-[var(--mousa-gold)]/30 mb-2 border-2 border-white/20">
-          <Star size={38} fill="currentColor" className="text-[var(--mousa-gold-glow)]" />
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-[var(--mousa-gold)] to-[var(--mousa-coral)] rounded-2xl text-white shadow-md mb-2">
+          <Star size={34} fill="currentColor" className="text-white drop-shadow-xs" />
         </div>
-        <h1 className="text-4xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-5xl">{userData.points}</h1>
-        <p className="text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)] font-black uppercase tracking-widest text-xs sm:text-sm">
-          {lang === 'copt' ? 'Ⲡⲓⲧⲏⲣϥ ⲛ̀ⲧⲉ ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'إجمالي نقاط البركة في مسيرة الأنبا موسى' : 'Total Blessing Points'}
+        <div className="text-4xl md:text-5xl font-black text-stone-900 dark:text-stone-50 tracking-tight">
+          {userData.points}
+        </div>
+        <p className="text-stone-800 dark:text-stone-200 font-extrabold uppercase tracking-wider text-xs sm:text-sm">
+          {lang === 'ar' ? 'إجمالي نقاط البركة في مسيرة الأنبا موسى' : 'Total Blessing Points'}
         </p>
       </motion.div>
 
       <AnimatePresence mode="wait">
-        {view === 'path' ? (
+        {/* =========================================================================
+            SECTION 1: STREAK STARS (نجوم الستريك) — DEFAULT VISIBLE
+           ========================================================================= */}
+        {view === 'streak' && (
           <motion.div 
-            key="path"
-            initial={{ x: -50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -50, opacity: 0 }}
-            className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-border-sand)] relative md:max-w-4xl md:mx-auto"
+            key="streak"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-sm border-2 border-[var(--mousa-border-sand)] space-y-6 md:max-w-4xl md:mx-auto"
           >
-            <h2 className="text-xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] mb-6 flex items-center gap-2 md:text-2xl">
-              <Trophy size={24} className="text-[var(--mousa-gold)] md:w-8 md:h-8" />
-              {isCop ? 'Ⲛⲁⲭⲗⲟⲙ' : lang === 'ar' ? 'أوسمة طريق الأنبا موسى' : 'My Journey Badges'}
-            </h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-[var(--mousa-border-sand)]">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-stone-900 dark:text-stone-50 flex items-center gap-2">
+                  <Flame size={26} className="text-amber-500 fill-amber-500" />
+                  <span>{lang === 'ar' ? 'نجوم الستريك والمواظبة' : 'Streak Stars Leaderboard'}</span>
+                </h2>
+                <p className="text-xs sm:text-sm font-bold text-stone-700 dark:text-stone-300">
+                  {lang === 'ar' ? 'أبطال الحضور المستمر والصلوات اليومية ومحطات الدروس' : 'Champions of daily prayer, attendance & weekly milestones'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-xs font-black">
+                <Sparkles size={14} />
+                <span>{lang === 'ar' ? `سلسلتك: ${userData.currentStreak || 1} أيام` : `Your Streak: ${userData.currentStreak || 1} Days`}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {streakList.map((entry) => {
+                const isCurrentUser = entry.studentId === userData.id || (userData.id.startsWith('guest_') && entry.studentId === 'u1');
+                return (
+                  <motion.div 
+                    key={entry.id || entry.studentId}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={`flex items-center gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border-2 transition-all ${
+                      isCurrentUser 
+                        ? 'bg-amber-50/80 dark:bg-amber-950/40 border-[var(--mousa-gold)] shadow-sm' 
+                        : 'bg-white/60 dark:bg-stone-900/60 border-[var(--mousa-border-sand)] hover:border-stone-300'
+                    }`}
+                  >
+                    <div className="font-black text-lg sm:text-xl text-stone-700 dark:text-stone-300 w-8 text-center shrink-0">
+                      {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                    </div>
+                    <img 
+                      src={entry.avatarUrl} 
+                      alt={entry.studentName} 
+                      className="w-12 h-12 rounded-full border-2 border-[var(--mousa-gold)] shadow-xs object-cover bg-white shrink-0" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-stone-900 dark:text-stone-50 text-sm sm:text-base truncate">
+                          {isCurrentUser ? (lang === 'ar' ? `${entry.studentNameAr} (أنت)` : `${entry.studentName} (You)`) : (lang === 'ar' ? entry.studentNameAr : entry.studentName)}
+                        </h4>
+                        {isCurrentUser && (
+                          <span className="text-[10px] bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black px-2 py-0.5 rounded-full shrink-0">
+                            {lang === 'ar' ? 'أنت' : 'You'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-600 dark:text-stone-400 font-bold flex items-center gap-1 mt-0.5">
+                        <span>{lang === 'ar' ? `أطول ستريك: ${entry.longestStreak} يوم` : `Longest: ${entry.longestStreak} days`}</span>
+                      </p>
+                    </div>
+                    <div className="text-right px-2 shrink-0">
+                      <div className="flex items-center gap-1 justify-end">
+                        <Flame size={18} className="text-amber-500 fill-amber-500" />
+                        <span className="font-black text-xl sm:text-2xl text-amber-700 dark:text-amber-400">{entry.streakDays}</span>
+                      </div>
+                      <p className="text-[10px] sm:text-xs font-black text-stone-600 dark:text-stone-400 uppercase">
+                        {lang === 'ar' ? 'أيام متتالية' : 'Days Streak'}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* =========================================================================
+            SECTION 2: MY TRAIL (رحلتي) — HIGH-CONTRAST BADGES & TIMELINE
+           ========================================================================= */}
+        {view === 'trail' && (
+          <motion.div 
+            key="trail"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-sm border-2 border-[var(--mousa-border-sand)] relative md:max-w-4xl md:mx-auto"
+          >
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-[var(--mousa-border-sand)]">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-stone-900 dark:text-stone-50 flex items-center gap-2">
+                  <Trophy size={26} className="text-[var(--mousa-gold)]" />
+                  <span>{lang === 'ar' ? 'أوسمة رحلتي في طريق الأنبا موسى' : 'My Trail & Journey Badges'}</span>
+                </h2>
+                <p className="text-xs sm:text-sm font-bold text-stone-700 dark:text-stone-300">
+                  {lang === 'ar' ? 'الأوسمة التي تكتسبها مع كل محطة وتقدم في النقاط والصلوات' : 'Badges earned as you advance through milestones, prayer, and lessons'}
+                </p>
+              </div>
+            </div>
             
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-7 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-1 before:bg-[var(--mousa-border-sand)]">
               {mockBadges.map((badge, index) => {
@@ -190,40 +332,45 @@ export function PointsTab({ lang }: { lang: Language }) {
                 
                 return (
                   <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    transition={{ delay: index * 0.08 }}
                     key={badge.id} 
                     className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
                   >
                     {/* Icon Marker */}
                     <motion.div 
-                      whileHover={isUnlocked ? { scale: 1.15, rotate: 6 } : {}}
-                      className={`flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl border-2 border-white dark:border-[#1E1914] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-xs z-10 transition-transform ${
+                      whileHover={isUnlocked ? { scale: 1.12 } : {}}
+                      className={`flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl border-2 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 transition-transform ${
                       isUnlocked 
-                        ? 'bg-[var(--mousa-gold)] text-white ring-2 ring-[var(--mousa-gold-light)]' 
-                        : 'bg-[var(--mousa-sand-100)] dark:bg-stone-800 text-stone-400'
+                        ? 'bg-[var(--mousa-gold)] text-white border-white ring-2 ring-[var(--mousa-gold-light)]' 
+                        : 'bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-stone-300 dark:border-stone-700'
                     }`}>
-                      {isUnlocked ? <Medal size={24} className="md:w-8 md:h-8 drop-shadow-xs" /> : <Lock size={24} className="md:w-8 md:h-8" />}
+                      {isUnlocked ? <Medal size={26} className="drop-shadow-xs" /> : <Lock size={22} />}
                     </motion.div>
                     
-                    {/* Content Card */}
+                    {/* Content Card with Enhanced High-Contrast Styling */}
                     <div className={`w-[calc(100%-4.5rem)] md:w-[calc(50%-3rem)] p-4 md:p-6 rounded-2xl border-2 transition-all ${
                       isUnlocked 
-                        ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FAF5EB] to-[#F7EFE1] dark:from-[#251E17] dark:to-[#2B2218] border-[var(--mousa-gold)]/60 shadow-xs' 
-                        : 'bg-stone-50/70 dark:bg-stone-900/40 border-stone-200 dark:border-stone-800 opacity-60'
+                        ? 'bg-amber-50/90 dark:bg-stone-900 border-[var(--mousa-gold)] shadow-sm' 
+                        : 'bg-stone-100/90 dark:bg-stone-900/50 border-stone-300 dark:border-stone-800'
                     }`}>
-                      <h3 className={`font-black md:text-lg ${isUnlocked ? 'text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]' : 'text-stone-500'}`}>
+                      <h3 className={`font-black text-base md:text-lg ${isUnlocked ? 'text-stone-900 dark:text-stone-50' : 'text-stone-700 dark:text-stone-300'}`}>
                         {badge.title}
                       </h3>
-                      <p className="text-xs md:text-sm text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] font-bold">
-                        +{badge.pointsThreshold} {lang === 'copt' ? 'ⲧⲁⲓⲟ' : lang === 'ar' ? 'نقطة بركة' : 'pts'}
+                      <p className={`text-xs md:text-sm font-bold mt-1 ${isUnlocked ? 'text-stone-800 dark:text-stone-200' : 'text-stone-600 dark:text-stone-400'}`}>
+                        +{badge.pointsThreshold} {lang === 'ar' ? 'نقطة بركة لازمة للفتح' : 'points required'}
                       </p>
-                      {badge.unlockedAt && (
-                        <p className="text-xs md:text-sm text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)] mt-2 font-black flex items-center gap-1">
-                          <span>★</span>
-                          <span>{isCop ? 'Ⲁⲩⲟⲩⲱⲛ ϧⲉⲛ' : lang === 'ar' ? 'وسام مفتوح' : 'Unlocked'}</span>
-                        </p>
+                      {isUnlocked ? (
+                        <div className="mt-2 text-xs font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 size={14} />
+                          <span>{lang === 'ar' ? 'وسام مفتوح ومكتسب ✅' : 'Unlocked & Earned ✅'}</span>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs font-bold text-stone-600 dark:text-stone-400 flex items-center gap-1">
+                          <Lock size={12} />
+                          <span>{lang === 'ar' ? `متبقي ${badge.pointsThreshold - userData.points} نقطة للفتح` : `${badge.pointsThreshold - userData.points} pts left to unlock`}</span>
+                        </div>
                       )}
                     </div>
                   </motion.div>
@@ -231,171 +378,148 @@ export function PointsTab({ lang }: { lang: Language }) {
               })}
             </div>
           </motion.div>
-        ) : view === 'leaderboard' ? (
+        )}
+
+        {/* =========================================================================
+            SECTION 3: POINTS LEADERBOARD (لوحة نقاط البركة)
+           ========================================================================= */}
+        {view === 'leaderboard' && (
           <motion.div 
             key="leaderboard"
-            initial={{ x: 50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 50, opacity: 0 }}
-            className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-border-sand)] space-y-6 md:max-w-4xl md:mx-auto"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-sm border-2 border-[var(--mousa-border-sand)] space-y-6 md:max-w-4xl md:mx-auto"
           >
-             <div className="flex justify-between items-end mb-2">
-               <h2 className="text-xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] flex items-center gap-2 md:text-2xl">
-                 <Users size={24} className="text-[var(--mousa-gold)] md:w-8 md:h-8" />
-                 {isCop ? 'Ⲛⲓⲅⲉⲛⲛⲉⲟⲥ ⲛ̀ϯⲉⲃⲇⲟⲙⲁⲥ' : lang === 'ar' ? 'فرسان قافلة النور' : 'Caravan Companions'}
-               </h2>
-               <p className="text-xs md:text-sm font-bold text-[var(--mousa-sand-500)] bg-[var(--mousa-sand-100)] dark:bg-stone-800 px-3 py-1 rounded-full border border-[var(--mousa-border-sand)]">Ages 8-10</p>
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-[var(--mousa-border-sand)]">
+               <div>
+                 <h2 className="text-xl md:text-2xl font-black text-stone-900 dark:text-stone-50 flex items-center gap-2">
+                   <Users size={26} className="text-[var(--mousa-gold)]" />
+                   <span>{lang === 'ar' ? 'لوحة نقاط البركة الأسبوعية' : 'Weekly Points Leaderboard'}</span>
+                 </h2>
+                 <p className="text-xs sm:text-sm font-bold text-stone-700 dark:text-stone-300">
+                   {lang === 'ar' ? 'ترتيب رفقاء المسيرة بنقاط البركة الحقيقية' : 'Official rankings based on earned milestone blessing points'}
+                 </p>
+               </div>
+               <span className="text-xs font-black px-3 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border border-[var(--mousa-border-sand)]">
+                 {userData?.grade || (lang === 'ar' ? 'مرحلة ابتدائي' : 'Elementary')}
+               </span>
              </div>
              
              <div className="space-y-3">
-                {leaderboardList.map((entry, idx) => (
-                   <motion.div 
-                     key={entry.id || entry.studentId}
-                     initial={{ opacity: 0, x: 20 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     transition={{ delay: idx * 0.05, type: 'spring' }}
-                     className={`flex items-center gap-4 p-3 md:p-4 rounded-2xl border-2 transition-all ${entry.studentId === userData.id ? 'bg-[#FAF3E5] dark:bg-[#2F241A] border-[var(--mousa-gold)] shadow-xs' : 'hover:bg-[var(--mousa-sand-50)] dark:hover:bg-stone-900 border-transparent'}`}
-                   >
-                     <div className="font-black text-lg md:text-xl text-[var(--mousa-sand-500)] w-8 text-center">
-                       {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
-                     </div>
-                     <img src={entry.avatarUrl} alt={entry.studentName} className="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-[var(--mousa-gold)] shadow-xs object-cover" />
-                     <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-lg">
-                            {entry.studentId === userData.id ? (isCop ? 'Ⲛ̀ⲑⲟⲕ' : lang === 'ar' ? 'أنت' : 'You') : entry.studentName}
-                          </h4>
-                          {entry.studentId === userData.id && (
-                            <span className="text-[10px] bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black px-2 py-0.5 rounded-full">
-                              {isCop ? 'Ⲛ̀ⲑⲟⲕ' : lang === 'ar' ? 'أنت' : 'You'}
-                            </span>
-                          )}
-                        </div>
-                        {idx > 0 && <span className="text-[10px] md:text-xs text-[var(--mousa-teal)] dark:text-[var(--mousa-teal-glow)] font-bold flex items-center"><ChevronUp size={12}/> {isCop ? 'Ⲉϥⲓ̀ ⲉ̀ⲡϣⲱⲓ' : lang === 'ar' ? 'صاعد' : 'Rising'}</span>}
-                     </div>
-                     <div className="text-right pr-2">
-                        <p className="font-black text-xl md:text-2xl text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)]">{entry.pointsThisWeek}</p>
-                        <p className="text-[10px] md:text-xs font-bold text-[var(--mousa-sand-500)] uppercase">Pts</p>
-                     </div>
-                   </motion.div>
-                ))}
+                {leaderboardList.map((entry) => {
+                  const isCurrentUser = entry.studentId === userData.id;
+                  return (
+                    <motion.div 
+                      key={entry.id || entry.studentId}
+                      className={`flex items-center gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border-2 transition-all ${
+                        isCurrentUser 
+                          ? 'bg-[#FAF3E5] dark:bg-[#2F241A] border-[var(--mousa-gold)] shadow-sm' 
+                          : 'bg-white/60 dark:bg-stone-900/60 border-[var(--mousa-border-sand)]'
+                      }`}
+                    >
+                      <div className="font-black text-lg sm:text-xl text-stone-700 dark:text-stone-300 w-8 text-center shrink-0">
+                        {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                      </div>
+                      <img 
+                        src={entry.avatarUrl} 
+                        alt={entry.studentName} 
+                        className="w-12 h-12 rounded-full border-2 border-[var(--mousa-gold)] shadow-xs object-cover bg-white shrink-0" 
+                      />
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2">
+                           <h4 className="font-black text-stone-900 dark:text-stone-50 text-sm sm:text-base truncate">
+                             {isCurrentUser ? (lang === 'ar' ? `${entry.studentName} (أنت)` : `${entry.studentName} (You)`) : entry.studentName}
+                           </h4>
+                           {isCurrentUser && (
+                             <span className="text-[10px] bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] font-black px-2 py-0.5 rounded-full shrink-0">
+                               {lang === 'ar' ? 'أنت' : 'You'}
+                             </span>
+                           )}
+                         </div>
+                         <p className="text-xs text-stone-600 dark:text-stone-400 font-bold mt-0.5">
+                           {lang === 'ar' ? 'مواظب في مسيرة الأنبا موسى' : 'Active in the Journey'}
+                         </p>
+                      </div>
+                      <div className="text-right px-2 shrink-0">
+                         <p className="font-black text-xl sm:text-2xl text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)]">{entry.pointsThisWeek}</p>
+                         <p className="text-[10px] font-black text-stone-600 dark:text-stone-400 uppercase">{lang === 'ar' ? 'نقطة' : 'Pts'}</p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
              </div>
              
-             <div className="mt-6 text-center bg-blue-50 text-[var(--color-church-blue)] p-4 md:p-6 rounded-xl md:text-lg">
-               <p className="font-bold">{isCop ? 'Ⲁⲣⲓϩⲟⲧⲡ! Ϫⲱⲕ ⲛ̀ⲛⲓⲥⲃⲱ ⲉ̀ⲓ̀ ⲉ̀ⲧⲡⲉ ϧⲉⲛ ⲡⲓⲧⲁⲝⲓⲥ.' : lang === 'ar' ? 'عاش! استمر عشان تطلع في الترتيب.' : 'Keep going! Complete lessons to climb the board.'}</p>
-             </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="bank"
-            initial={{ x: 50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 50, opacity: 0 }}
-            className="md:grid md:grid-cols-2 md:gap-8 space-y-6 md:space-y-0"
-          >
-             {/* Points Bank */}
-             <div className="bg-gradient-to-br from-[var(--mousa-teal-deep)] via-[#144E5B] to-[#103D46] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-gold)]/40 text-white relative h-fit">
-                <div className="flex items-center gap-3 mb-4 text-[var(--mousa-gold-glow)]">
-                   <Landmark size={28} className="md:w-10 md:h-10 text-[var(--mousa-gold-glow)]" />
-                   <h2 className="text-xl md:text-2xl font-black">{isCop ? 'Ⲡⲓⲧⲣⲁⲡⲉⲍⲁ ⲛ̀ⲧⲉ ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'خزينة بركة الأنبا موسى' : 'Points Treasury'}</h2>
-                </div>
-                <p className="text-sm md:text-base text-stone-200 mb-6">{isCop ? 'Ϣⲉⲃⲓⲱ ⲛ̀ⲛⲉⲕⲧⲁⲓⲟ ⲉ̀ϩⲁⲛⲇⲱⲣⲟⲛ ⲛ̀ⲧⲁⲫⲙⲏⲓ ⲉ̀ⲃⲟⲗ ϧⲉⲛ ϯⲉⲕⲕⲗⲏⲥⲓⲁ.' : lang === 'ar' ? 'استخدم نقاطك للحصول على هدايا وأيقونات وبركات حقيقية من الكنيسة.' : 'Redeem your points for real gifts and icons at church.'}</p>
-                <div className="flex flex-col gap-3">
-                   {REWARD_PRODUCTS.slice(0,2).map(prod => (
-                     <button key={prod.id} onClick={() => setShowStore(true)} className="bg-white/10 hover:bg-white/20 px-4 py-3 md:px-5 md:py-4 rounded-xl flex justify-between font-bold items-center transition-colors md:text-lg cursor-pointer border border-white/10">
-                        <span>{prod.icon} {lang === 'ar' ? prod.titleAr : prod.title}</span>
-                        <span className="flex items-center gap-2 bg-white/20 px-2.5 py-1 rounded-lg text-sm font-black">+{prod.cost} pts <ChevronUp className={lang === 'ar' ? 'rotate-180' : 'rotate-90'} size={18}/></span>
-                     </button>
-                   ))}
-                   <button onClick={() => setShowStore(true)} className="bg-gradient-to-r from-[var(--mousa-gold)] to-[var(--mousa-coral)] text-white hover:brightness-105 px-4 py-3 md:px-5 md:py-4 rounded-xl font-black shadow-xs text-center mt-4 flex items-center justify-center gap-2 md:text-lg cursor-pointer">
-                      <Gift size={20} className="md:w-6 md:h-6" />
-                      {isCop ? 'Ⲟⲩⲱⲛ ⲙ̀ⲡⲓⲙⲁⲛ̀ϣⲱⲡ ⲛ̀ⲧⲉ ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'عرض متجر البركات والهدايا' : 'Open Reward Treasury'}
-                   </button>
-                </div>
-             </div>
-
-             <div className="space-y-6 md:space-y-8">
-               {/* All Time Best */}
-               <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-border-sand)]">
-                  <div className="flex items-center gap-3 mb-6">
-                     <History size={24} className="text-[var(--mousa-teal)] dark:text-[var(--mousa-gold-glow)] md:w-8 md:h-8" />
-                     <h2 className="text-xl md:text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">{isCop ? 'Ⲡⲓⲛⲓϣϯ ⲛ̀ⲥⲏⲟⲩ ⲛⲓⲃⲉⲛ' : lang === 'ar' ? 'سجل الإنجاز والمسيرة' : 'All-Time Record'}</h2>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 p-4 md:p-6 rounded-2xl text-center border border-[var(--mousa-border-sand)]">
-                       <p className="text-3xl md:text-4xl font-black text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)] mb-2">{userData.longestStreak}</p>
-                       <p className="text-xs md:text-sm text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] font-black uppercase">{isCop ? 'Ⲡⲓϩⲟⲩⲟ̀ ⲛ̀ⲉϩⲟⲟⲩ' : lang === 'ar' ? 'أطول سلسلة أيام' : 'Longest Streak'}</p>
-                     </div>
-                     <div className="bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 p-4 md:p-6 rounded-2xl text-center border border-[var(--mousa-border-sand)]">
-                       <p className="text-3xl md:text-4xl font-black text-[var(--mousa-gold)] dark:text-[var(--mousa-gold-light)] mb-2">45</p>
-                       <p className="text-xs md:text-sm text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] font-black uppercase">{isCop ? 'Ⲛⲓⲥⲃⲱ ⲉⲧϫⲏⲕ' : lang === 'ar' ? 'محطات مكتملة' : 'Milestones Done'}</p>
-                     </div>
-                  </div>
-               </div>
-
-               {/* Purchase History */}
-               {purchases.length > 0 && (
-                 <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] rounded-3xl p-6 md:p-8 shadow-xs border-2 border-[var(--mousa-border-sand)]">
-                    <h3 className="font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-xl mb-4">{isCop ? 'Ⲛⲁϣⲱⲡ' : lang === 'ar' ? 'طلبات البركات السابقة' : 'Redemption History'}</h3>
-                    <div className="space-y-3">
-                      {purchases.map((p, i) => (
-                         <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-[var(--mousa-sand-50)] dark:bg-stone-900/60 rounded-xl border border-[var(--mousa-border-sand)]">
-                            <div>
-                               <p className="font-bold text-sm md:text-base text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">{p.itemName}</p>
-                               <p className="text-xs text-[var(--mousa-sand-500)]">{new Date(p.createdAt).toLocaleDateString()}</p>
-                            </div>
-                            <span className="font-black md:text-lg text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)]">-{p.cost} pts</span>
-                         </div>
-                      ))}
-                    </div>
-                 </div>
-               )}
+             <div className="mt-6 text-center bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 p-4 rounded-2xl border border-amber-200 dark:border-amber-800">
+               <p className="font-bold text-xs sm:text-sm">
+                 {lang === 'ar' ? 'عاش! استمر في إنهاء محطات الدروس والتسبيح للارتقاء في الترتيب.' : 'Keep going! Complete lesson milestones and hymns to climb the leaderboard.'}
+               </p>
              </div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showStore && (
-           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-             <motion.div 
-               initial={{ opacity: 0, scale: 0.9, y: 20 }}
-               animate={{ opacity: 1, scale: 1, y: 0 }}
-               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-               className="bg-[var(--mousa-cream-surface)] dark:bg-[#1E1914] w-full max-w-lg md:max-w-2xl max-h-[80vh] overflow-y-auto rounded-3xl p-6 md:p-8 shadow-2xl relative border-2 border-[var(--mousa-border-sand)]"
-             >
-               <button onClick={() => setShowStore(false)} className="absolute top-4 right-4 text-[var(--mousa-sand-500)] hover:text-[var(--mousa-coral)] bg-[var(--mousa-sand-100)] p-2 rounded-full cursor-pointer">
-                 <X size={20} />
-               </button>
-               <h2 className="text-2xl md:text-3xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] mb-2 flex items-center gap-2">
-                 <Gift size={24} className="text-[var(--mousa-gold)] md:w-8 md:h-8" />
-                 {isCop ? 'Ⲡⲓⲙⲁⲛ̀ϣⲱⲡ ⲛ̀ⲧⲉ ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'متجر بركات الأنبا موسى' : 'Blessing Store'}
-               </h2>
-               <p className="text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] text-sm md:text-base mb-6 font-bold">
-                 {isCop ? `Ⲡⲉⲕⲧⲁⲓⲟ ⲧⲛⲟⲩ: ${userData.points} ⲧⲁⲓⲟ` : lang === 'ar' ? `رصيدك الحالي: ${userData.points} نقطة بركة` : `Your balance: ${userData.points} pts`}
-               </p>
-
-               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                   {REWARD_PRODUCTS.map(prod => (
-                    <div key={prod.id} className="border-2 border-[var(--mousa-border-sand)] rounded-2xl p-4 text-center hover:border-[var(--mousa-gold)] transition-colors flex flex-col justify-between bg-[var(--mousa-cream-surface)] dark:bg-[#251E17]">
-                       <div className="text-4xl md:text-5xl mb-3">{prod.icon}</div>
-                       <h3 className="font-bold text-sm md:text-base text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] mb-4">{lang === 'ar' ? prod.titleAr : prod.title}</h3>
-                       <button 
-                         onClick={() => setConfirmPurchaseItem({ id: prod.id, cost: prod.cost, name: lang === 'ar' ? prod.titleAr : prod.title })}
-                         disabled={userData.points < prod.cost}
-                         className={`w-full font-bold py-2 md:py-3 rounded-xl transition-all mt-auto cursor-pointer shadow-xs ${
-                           userData.points >= prod.cost 
-                             ? 'bg-[var(--mousa-teal)] text-white hover:bg-[var(--mousa-teal-deep)]' 
-                             : 'bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-600 cursor-not-allowed'
-                         }`}
-                       >
-                         {prod.cost} {lang === 'copt' ? 'ⲧⲁⲓⲟ' : lang === 'ar' ? 'نقطة بركة' : 'pts'}
-                       </button>
+        {/* =========================================================================
+            SECTION 4: POINTS BAZAAR (بازار النقط) — BLURRED WITH COMING SOON OVERLAY
+           ========================================================================= */}
+        {view === 'bazaar' && (
+          <motion.div 
+            key="bazaar"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="relative md:max-w-4xl md:mx-auto"
+          >
+            {/* The Blurred Underlying Treasury Content */}
+            <div className="filter blur-md select-none pointer-events-none opacity-40 space-y-6">
+              <div className="bg-gradient-to-br from-[var(--mousa-teal-deep)] via-[#144E5B] to-[#103D46] rounded-3xl p-6 md:p-8 text-white">
+                <div className="flex items-center gap-3 mb-4">
+                  <Landmark size={28} />
+                  <h2 className="text-xl md:text-2xl font-black">{lang === 'ar' ? 'خزينة بركة الأنبا موسى' : 'Points Treasury'}</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {REWARD_PRODUCTS.map(prod => (
+                    <div key={prod.id} className="p-4 bg-white/10 rounded-2xl">
+                      <div className="text-2xl">{prod.icon}</div>
+                      <div className="font-bold mt-2">{prod.titleAr}</div>
+                      <div className="text-xs mt-1">+{prod.cost} pts</div>
                     </div>
                   ))}
-               </div>
-             </motion.div>
-           </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Clearly Visible Brand-Consistent Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center p-4 z-20">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white/95 dark:bg-[#1E1914]/95 backdrop-blur-md rounded-3xl p-8 max-w-md w-full text-center space-y-4 border-2 border-[var(--mousa-gold)] shadow-2xl"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border-2 border-amber-300 dark:border-amber-700 flex items-center justify-center mx-auto text-3xl shadow-sm">
+                  🎁
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-stone-900 dark:text-stone-50">
+                    حجات جديدة قريبا!!
+                  </h3>
+                  <h4 className="text-lg font-black text-[var(--mousa-coral-dark)] dark:text-[var(--mousa-coral-glow)] mt-1 tracking-wide">
+                    Coming Soon!!
+                  </h4>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-stone-700 dark:text-stone-300 leading-relaxed">
+                  {lang === 'ar'
+                    ? 'يقوم الخدام بتجهيز بازار هدايا وأيقونات وبركات الأنبا موسى الكنسية قريباً لتكريم الطلاب المتميزين.'
+                    : 'Our Sunday School servants are currently preparing the rewards bazaar with blessed church icons and gifts.'}
+                </p>
+                <div className="pt-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-black border border-amber-200 dark:border-stone-700">
+                    <Sparkles size={14} className="text-amber-500" />
+                    <span>{lang === 'ar' ? 'حافظ على نقاطك واستمر في التعلم' : 'Keep earning points & stay tuned'}</span>
+                  </span>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -413,12 +537,10 @@ export function PointsTab({ lang }: { lang: Language }) {
                 🎁
               </div>
               <h3 className="text-xl font-bold text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB]">
-                {isCop ? 'Ⲧⲁϫⲣⲟ ⲙ̀ⲡⲓⲧⲱⲃϩ ⲛ̀ⲧⲁⲓⲟ' : lang === 'ar' ? 'تأكيد طلب الهدية' : 'Confirm Reward Request'}
+                {lang === 'ar' ? 'تأكيد طلب الهدية' : 'Confirm Reward Request'}
               </h3>
               <p className="text-sm text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)]">
-                {isCop
-                  ? `Ⲭⲟⲩⲱϣ ⲉ̀ϣⲉⲃⲓⲱ ${confirmPurchaseItem.cost} ⲧⲁⲓⲟ ⲉ̀ "${confirmPurchaseItem.name}";`
-                  : lang === 'ar' 
+                {lang === 'ar' 
                   ? `هل ترغب في استبدال ${confirmPurchaseItem.cost} نقطة بـ "${confirmPurchaseItem.name}"؟` 
                   : `Redeem ${confirmPurchaseItem.cost} points for "${confirmPurchaseItem.name}"?`}
               </p>
@@ -427,13 +549,13 @@ export function PointsTab({ lang }: { lang: Language }) {
                   onClick={() => setConfirmPurchaseItem(null)}
                   className="flex-1 py-2.5 rounded-xl border-2 border-[var(--mousa-border-sand)] text-[var(--mousa-sand-600)] font-bold hover:bg-[var(--mousa-sand-100)] transition-colors cursor-pointer"
                 >
-                  {isCop ? 'Ⲭⲱ ⲉ̀ⲃⲟⲗ' : lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   onClick={executePurchase}
                   className="flex-1 py-2.5 rounded-xl bg-[var(--mousa-teal)] text-white font-bold hover:bg-[var(--mousa-teal-deep)] transition-colors cursor-pointer shadow-xs"
                 >
-                  {isCop ? 'Ⲧⲁϫⲣⲟ' : lang === 'ar' ? 'تأكيد الطلب' : 'Confirm'}
+                  {lang === 'ar' ? 'تأكيد الطلب' : 'Confirm'}
                 </button>
               </div>
             </motion.div>
@@ -466,7 +588,6 @@ export function PointsTab({ lang }: { lang: Language }) {
           </motion.div>
         )}
       </AnimatePresence>
-      
     </div>
   );
 }

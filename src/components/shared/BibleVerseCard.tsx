@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Mic, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import { VerseRecitalModal } from '../student/VerseRecitalModal';
 import { Language } from '../../types';
 
 const fallbackVerses = [
@@ -46,7 +45,6 @@ const fallbackVerses = [
 export function BibleVerseCard({ lang }: { lang: Language }) {
   const [verse, setVerse] = useState(fallbackVerses[0]);
   const [loading, setLoading] = useState(true);
-  const [showRecitalModal, setShowRecitalModal] = useState(false);
 
   useEffect(() => {
     // Pick random verse
@@ -70,17 +68,8 @@ export function BibleVerseCard({ lang }: { lang: Language }) {
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-950">
               <BookOpen size={16} />
-              <span>{lang === 'copt' ? 'Ϯⲣⲏϯ ⲛ̀ⲧⲉ ⲡⲓⲉϩⲟⲟⲩ' : lang === 'ar' ? 'آية اليوم للحفظ والتأمل' : 'Verse of the Day'}</span>
+              <span>{lang === 'ar' ? 'آية اليوم للحفظ والتأمل' : 'Verse of the Day'}</span>
             </div>
-
-            {/* AI Verse Recital Trigger Button */}
-            <button
-              onClick={() => setShowRecitalModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 hover:bg-white text-[var(--color-church-burgundy)] font-extrabold text-xs shadow-xs transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Mic size={14} className="text-[var(--color-church-burgundy)] animate-pulse" />
-              <span>{lang === 'copt' ? 'Ⲧⲁϫⲣⲟ ⲛ̀ϯⲣⲏϯ (+١٠٠)' : lang === 'ar' ? 'تسميع الآية بالذكاء الاصطناعي (+١٠٠)' : 'AI Voice Recital (+100)'}</span>
-            </button>
           </div>
 
           {loading ? (
@@ -91,30 +80,15 @@ export function BibleVerseCard({ lang }: { lang: Language }) {
           ) : (
             <div>
               <p className="font-bold leading-relaxed text-base sm:text-lg italic text-amber-950">
-                "{lang === 'copt' ? verse.copt : lang === 'ar' ? verse.ar : verse.en}"
+                "{lang === 'ar' ? verse.ar : verse.en}"
               </p>
               <span className="inline-block mt-1 font-extrabold text-xs text-amber-900">
-                ({lang === 'copt' ? verse.referenceCopt : lang === 'ar' ? verse.referenceAr : verse.referenceEn})
+                ({lang === 'ar' ? verse.referenceAr : verse.referenceEn})
               </span>
             </div>
           )}
         </div>
       </motion.div>
-
-      {/* Autonomous AI Recital Modal */}
-      <VerseRecitalModal
-        isOpen={showRecitalModal}
-        onClose={() => setShowRecitalModal(false)}
-        targetVerse={{
-          ar: verse.ar,
-          en: verse.en,
-          copt: verse.copt,
-          referenceAr: verse.referenceAr,
-          referenceEn: verse.referenceEn,
-          referenceCopt: verse.referenceCopt,
-        }}
-        lang={lang}
-      />
     </>
   );
 }

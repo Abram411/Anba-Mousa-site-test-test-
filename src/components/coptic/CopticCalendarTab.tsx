@@ -6,8 +6,6 @@ import {
   COPTIC_MONTHS, 
   COPTIC_FEASTS, 
   CopticFeast, 
-  getSynaxariumForDate, 
-  SynaxariumStory,
   CopticDateResult 
 } from '../../data/copticCalendarData';
 import { Language } from '../../types';
@@ -15,7 +13,6 @@ import { Language } from '../../types';
 export function CopticCalendarTab({ lang }: { lang: Language }) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [copticDate, setCopticDate] = useState<CopticDateResult>(getCopticDate(new Date()));
-  const [selectedStory, setSelectedStory] = useState<SynaxariumStory>(getSynaxariumForDate(getCopticDate(new Date())));
   const [activeFilter, setActiveFilter] = useState<'all' | 'feasts' | 'fasts'>('all');
 
   // Real-time countdown calculation
@@ -59,7 +56,6 @@ export function CopticCalendarTab({ lang }: { lang: Language }) {
     setCurrentDate(next);
     const newCoptic = getCopticDate(next);
     setCopticDate(newCoptic);
-    setSelectedStory(getSynaxariumForDate(newCoptic));
   };
 
   const filteredFeasts = COPTIC_FEASTS.filter(f => {
@@ -136,60 +132,6 @@ export function CopticCalendarTab({ lang }: { lang: Language }) {
               {lang === 'ar' ? 'العودة لليوم' : 'Today'}
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* Daily Saint & Synaxarium Story Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-amber-200/70 dark:border-slate-800 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-2xl bg-amber-500 text-white shadow-xs">
-              <BookOpen size={22} />
-            </span>
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                {lang === 'ar' ? 'سنكسار اليوم وقصة القديس' : 'Daily Synaxarium & Saint of the Day'}
-              </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-church-blue)] dark:text-amber-100">
-                {lang === 'ar' ? selectedStory.saintNameAr : selectedStory.saintNameEn}
-              </h2>
-            </div>
-          </div>
-
-          <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 font-bold text-xs border border-amber-300/60 dark:border-amber-800">
-            {lang === 'ar' ? selectedStory.titleAr : selectedStory.titleEn}
-          </span>
-        </div>
-
-        {/* Virtue & Memory Verse Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-          <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-slate-800/80 border border-amber-200/50 dark:border-slate-700">
-            <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-1">
-              ✨ {lang === 'ar' ? 'الفضيلة الروحية التي نتعلمها:' : 'Spiritual Virtue to Learn:'}
-            </p>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {lang === 'ar' ? selectedStory.virtueAr : selectedStory.virtueEn}
-            </p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-sky-50/70 dark:bg-slate-800/80 border border-sky-200/50 dark:border-slate-700">
-            <p className="text-xs font-bold text-sky-800 dark:text-sky-400 mb-1">
-              📖 {lang === 'ar' ? 'آية اليوم الذهبية:' : 'Golden Memory Verse:'}
-            </p>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 italic">
-              {lang === 'ar' ? selectedStory.memoryVerseAr : selectedStory.memoryVerseEn}
-            </p>
-          </div>
-        </div>
-
-        {/* Story Text */}
-        <div className="bg-gray-50/80 dark:bg-slate-800/50 rounded-2xl p-5 border border-gray-200/60 dark:border-slate-700/60 leading-relaxed text-sm sm:text-base text-gray-800 dark:text-gray-200 space-y-3 whitespace-pre-line font-medium">
-          {lang === 'ar' ? selectedStory.storyAr : selectedStory.storyEn}
-        </div>
-
-        <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 font-bold pt-2">
-          <span>{lang === 'ar' ? `بركة صلوات ${selectedStory.saintNameAr} فلتكن معنا جميعاً. آمين.` : 'May their holy prayers be with us all. Amen.'}</span>
-          <span className="text-amber-600 dark:text-amber-400">{lang === 'ar' ? selectedStory.patronageAr : ''}</span>
         </div>
       </div>
 

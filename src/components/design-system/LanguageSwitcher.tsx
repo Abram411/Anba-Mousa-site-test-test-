@@ -54,13 +54,6 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
       sub: 'English',
       symbol: '🌐',
       dialect: 'English (Coptic Orthodox Liturgical Standard)'
-    },
-    {
-      code: 'cop',
-      label: 'Ϯⲁⲥⲡⲓ ⲛ̀ⲣⲉⲙⲛ̀ⲭⲏⲙⲓ',
-      sub: 'Ⲙⲉⲑⲣⲉⲙⲛ̀ⲭⲏⲙⲓ',
-      symbol: '☥',
-      dialect: 'Bohairic Coptic (اللغة القبطية الكنسية البحيرية)'
     }
   ];
 

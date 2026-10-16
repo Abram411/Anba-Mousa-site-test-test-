@@ -213,11 +213,14 @@ export async function completeSectionProgress(
  */
 export async function completeLessonProgress(
   input: CompleteLessonProgressInput
-): Promise<{ data: StudentContentProgress | null; error: Error | null }> {
+): Promise<{ data: StudentContentProgress | null; error: Error | null; isFirstCompletion?: boolean; pointsEarned?: number }> {
   const { lessonId, versionId, studentId } = input;
   if (!lessonId || !versionId) {
     return { data: null, error: new Error('lessonId and versionId are required') };
   }
+
+  const sId = studentId || 'u1';
+  const key = `${sId}_${lessonId}`;
 
   const headers = await getAuthHeader();
   try {
@@ -229,15 +232,18 @@ export async function completeLessonProgress(
 
     const json = await res.json().catch(() => null);
     if (!res.ok || !json?.success) {
+      const errorMsg = json?.message || json?.error || `HTTP ${res.status}: Failed to save lesson completion`;
       return {
         data: null,
-        error: new Error(json?.message || json?.error || `HTTP ${res.status}: Failed to complete lesson`)
+        error: new Error(errorMsg)
       };
     }
 
     const prog: StudentContentProgress = json.progress;
-    const key = `${prog.studentId}_${lessonId}`;
     LOCAL_PROGRESS_STORE[key] = prog;
+    try {
+      localStorage.setItem(`church_progress_${key}`, JSON.stringify(prog));
+    } catch (e) {}
 
     if (supabase && isSupabaseConfigured) {
       try {
@@ -252,18 +258,38 @@ export async function completeLessonProgress(
       }
     }
 
-    return { data: prog, error: null };
+    return { 
+      data: prog, 
+      error: null,
+      isFirstCompletion: json.isFirstCompletion ?? true,
+      pointsEarned: json.pointsEarned ?? (json.isFirstCompletion ? 50 : 0)
+    };
   } catch (err: any) {
-    // Pure offline demo fallback
-    const sId = studentId || 'u1';
-    const key = `${sId}_${lessonId}`;
-    const existing = LOCAL_PROGRESS_STORE[key];
-    if (existing) {
-      existing.status = 'COMPLETED';
-      existing.completionPercent = 100;
-      existing.completedAt = new Date().toISOString();
-      return { data: existing, error: null };
-    }
-    return { data: null, error: new Error('Progress record not found') };
+    // Pure offline fallback
+    const existing = LOCAL_PROGRESS_STORE[key] || {
+      studentId: sId,
+      lessonId,
+      versionId,
+      status: 'IN_PROGRESS',
+      sectionsCompleted: ['sec-1'],
+      totalSections: 1,
+      completionPercent: 0,
+      startedAt: new Date().toISOString()
+    };
+    const wasAlreadyCompleted = existing.status === 'COMPLETED';
+    existing.status = 'COMPLETED';
+    existing.completionPercent = 100;
+    existing.completedAt = existing.completedAt || new Date().toISOString();
+    LOCAL_PROGRESS_STORE[key] = existing;
+    try {
+      localStorage.setItem(`church_progress_${key}`, JSON.stringify(existing));
+    } catch (e) {}
+
+    return { 
+      data: existing, 
+      error: null,
+      isFirstCompletion: !wasAlreadyCompleted,
+      pointsEarned: !wasAlreadyCompleted ? 50 : 0
+    };
   }
 }

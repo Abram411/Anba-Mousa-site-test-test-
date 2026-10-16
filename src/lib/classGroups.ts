@@ -610,3 +610,69 @@ export function getNextGrade(gradeRaw?: string | null): {
   };
 }
 
+// ============================================================================
+// HYMNS SCHOOL CLASS LEVELS (مدرسة الشمامسة والألحان)
+// Explicit verified 3-level canonical mapping from Sunday School grades
+// Level 1: Angels & Primary 1–3
+// Level 2: Primary 4–6
+// Level 3: Preparatory, Secondary & University
+// ============================================================================
+
+export type HymnLevelId = 'level_1' | 'level_2' | 'level_3';
+
+export interface HymnLevelInfo {
+  id: HymnLevelId;
+  numericLevel: number;
+  nameEn: string;
+  nameAr: string;
+  stageEn: string;
+  stageAr: string;
+  classGroupIds: ClassGroupId[];
+}
+
+export const HYMN_LEVELS: Record<HymnLevelId, HymnLevelInfo> = {
+  level_1: {
+    id: 'level_1',
+    numericLevel: 1,
+    nameEn: 'Level 1',
+    nameAr: 'مستوى أول',
+    stageEn: 'Angels & Primary 1–3',
+    stageAr: 'حضانة وابتدائي صغرى (١-٣)',
+    classGroupIds: ['angels', 'primary_1']
+  },
+  level_2: {
+    id: 'level_2',
+    numericLevel: 2,
+    nameEn: 'Level 2',
+    nameAr: 'مستوى ثاني',
+    stageEn: 'Primary 4–6',
+    stageAr: 'ابتدائي كبرى (٤-٦)',
+    classGroupIds: ['primary_2']
+  },
+  level_3: {
+    id: 'level_3',
+    numericLevel: 3,
+    nameEn: 'Level 3',
+    nameAr: 'مستوى ثالث',
+    stageEn: 'Preparatory, Secondary & University',
+    stageAr: 'إعدادي وثانوي وجامعة',
+    classGroupIds: ['preparatory', 'secondary', 'university']
+  }
+};
+
+export function getHymnLevelForStudent(gradeRaw?: string | null, classGroupId?: ClassGroupId | null): HymnLevelInfo {
+  if (classGroupId) {
+    if (classGroupId === 'angels' || classGroupId === 'primary_1') return HYMN_LEVELS.level_1;
+    if (classGroupId === 'primary_2') return HYMN_LEVELS.level_2;
+    return HYMN_LEVELS.level_3;
+  }
+  const canonical = findCanonicalGrade(gradeRaw);
+  if (canonical) {
+    if (canonical.classGroupId === 'angels' || canonical.classGroupId === 'primary_1') return HYMN_LEVELS.level_1;
+    if (canonical.classGroupId === 'primary_2') return HYMN_LEVELS.level_2;
+    return HYMN_LEVELS.level_3;
+  }
+  return HYMN_LEVELS.level_2; // default
+}
+
+

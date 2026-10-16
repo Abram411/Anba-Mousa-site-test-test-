@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Star, MessageCircle, User, Sparkles, Users } from 'lucide-react';
+import { Home, Trophy, MessageCircle, User, Sparkles, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { playSound } from '../../utils/audio';
 import { mockLessons } from '../../data';
@@ -22,26 +22,24 @@ export function BottomNav({ activeTab, setActiveTab, lang, userRole }: BottomNav
   const isTeacher = userRole === 'teacher' || userRole === 'admin';
   const isParent = userRole === 'parent' || userRole === 'admin';
 
-  const isCoptic = lang === 'copt' || lang === 'cop';
-
   const navItems = [
-    { id: 'home', label: isCoptic ? 'Ⲡⲓⲏⲓ' : lang === 'ar' ? 'الرئيسية' : 'Home', icon: Home },
-    { id: 'lessons', label: isCoptic ? 'Ⲛⲓⲥⲃⲱ' : lang === 'ar' ? 'الدروس' : 'Lessons', icon: Sparkles, hasBadge: hasNewLessons },
-    { id: 'feed', label: isCoptic ? 'Ϯⲕⲟⲓⲛⲱⲛⲓⲁ' : lang === 'ar' ? 'المنشورات' : 'Feed', icon: MessageCircle },
+    { id: 'home', label: lang === 'ar' ? 'الرئيسية' : 'Home', icon: Home },
+    { id: 'lessons', label: lang === 'ar' ? 'الدروس' : 'Lessons', icon: Sparkles, hasBadge: hasNewLessons },
+    { id: 'feed', label: lang === 'ar' ? 'المنشورات' : 'Feed', icon: MessageCircle },
     ...(isTeacher ? [{
       id: 'studio',
-      label: isCoptic ? 'Ⲡⲓⲇⲓⲁⲕⲟⲛⲟⲥ' : lang === 'ar' ? 'الخادم' : 'Servant',
+      label: lang === 'ar' ? 'الخادم' : 'Servant',
       icon: Users,
       highlight: true
     }] : []),
     ...(isParent && (!isTeacher || userRole === 'admin') ? [{
       id: 'family',
-      label: isCoptic ? 'Ⲛⲓⲓⲟϯ' : lang === 'ar' ? 'الأهل' : 'Family',
+      label: lang === 'ar' ? 'الأهل' : 'Family',
       icon: Users,
       highlight: true
     }] : []),
-    { id: 'points', label: isCoptic ? 'Ⲛⲓⲧⲁⲓⲟ' : lang === 'ar' ? 'النقاط' : 'Points', icon: Star },
-    { id: 'profile', label: isCoptic ? 'Ⲡⲁⲣⲁⲛ' : lang === 'ar' ? 'حسابي' : 'Profile', icon: User },
+    { id: 'points', label: lang === 'ar' ? 'الترتيب' : 'Ranking', icon: Trophy },
+    { id: 'profile', label: lang === 'ar' ? 'حسابي' : 'Profile', icon: User },
   ];
 
   return (
@@ -126,4 +124,3 @@ export function BottomNav({ activeTab, setActiveTab, lang, userRole }: BottomNav
     </nav>
   );
 }
-

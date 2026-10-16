@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BookOpen, CheckCircle, Clock, Search, Plus, Sparkles, Edit3, Eye, Filter } from 'lucide-react';
+import { BookOpen, CheckCircle, Clock, Search, Plus, Sparkles, Edit3, Eye, Filter, Music, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLessons } from '../../context/LessonsContext';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import { LessonEditModal } from '../teacher/LessonEditModal';
 import { ExpressLessonPublishModal } from '../teacher/ExpressLessonPublishModal';
 import { formatStudentClassDisplay } from '../../lib/classGroups';
 import { StudentOnboardingModal } from '../auth/StudentOnboardingModal';
+import { HymnsSchoolTab } from '../hymns/HymnsSchoolTab';
 
 interface LessonsTabProps {
   onStartLesson: (id: string) => void;
@@ -18,6 +19,7 @@ interface LessonsTabProps {
 export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: LessonsTabProps) {
   const { userData } = useAuth();
   const { lessons, updateLesson, refreshCurriculum } = useLessons();
+  const [selectedSchool, setSelectedSchool] = useState<'sunday_school' | 'hymns'>('sunday_school');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'published' | 'drafts'>('all');
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -60,21 +62,70 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
       className="pb-24 pt-6 px-4 w-full max-w-7xl mx-auto space-y-6" 
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
     >
-      {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-[var(--mousa-teal)] p-2.5 md:p-3 rounded-2xl text-[var(--mousa-gold-glow)] shadow-xs">
-            <BookOpen size={24} className="md:w-8 md:h-8" />
+      {/* 2-School Switcher: Sunday School (Coming Soon) & Hymns School */}
+      <div className="flex bg-[var(--mousa-cream-surface)] dark:bg-[#1C1712] rounded-2xl p-1.5 shadow-xs border-2 border-[var(--mousa-border-sand)] max-w-xl mx-auto gap-1">
+        <button
+          onClick={() => setSelectedSchool('sunday_school')}
+          className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            selectedSchool === 'sunday_school'
+              ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] shadow-xs'
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
+        >
+          <BookOpen size={16} />
+          <span>{lang === 'ar' ? 'مدارس الأحد' : 'Sunday School'}</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--mousa-coral)] text-white font-extrabold shadow-2xs">
+            {lang === 'ar' ? 'قريباً' : 'Coming Soon'}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedSchool('hymns')}
+          className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            selectedSchool === 'hymns'
+              ? 'bg-[var(--mousa-teal)] text-white shadow-xs'
+              : 'text-[var(--mousa-sand-600)] dark:text-[var(--mousa-sand-400)] hover:text-[var(--mousa-teal)]'
+          }`}
+        >
+          <Music size={16} />
+          <span>{lang === 'ar' ? 'مدرسة الألحان' : 'Hymns School'}</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-900 dark:text-amber-200 border border-amber-400/40 font-bold">
+            {lang === 'ar' ? 'متاحة الآن' : 'Available'}
+          </span>
+        </button>
+      </div>
+
+      {selectedSchool === 'hymns' ? (
+        <HymnsSchoolTab lang={lang} />
+      ) : (
+        <>
+          {/* Sunday School Coming Soon Announcement Banner */}
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="text-xs sm:text-sm text-stone-800 dark:text-stone-200 font-bold">
+              <span>
+                {lang === 'ar' 
+                  ? '📅 يجري حالياً استكمال منهج دروس مدارس الأحد الأسبوعي لجميع الفصول بواسطة الخدام — الدروس المنشورة لمرحلتك متاحة أدناه للمعاينة والدراسة.' 
+                  : '📅 The Sunday School weekly curriculum for each class is being finalized by servants — published lessons for your class are available below.'}
+              </span>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-3xl">
-              {lang === 'copt' ? 'Ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ' : lang === 'ar' ? 'محطات دروس مدارس الأحد' : 'Sunday School Milestones'}
-            </h1>
-            <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
-              {lang === 'copt' ? 'Ϩⲁⲛⲥⲃⲱ ⲙ̀ⲡⲛⲉⲩⲙⲁⲧⲓⲕⲟⲛ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'مسيرة الأنبا موسى الروحية، قصص كتابية واختبارات تفاعلية' : 'Journey of Moses spiritual trail, Bible stories & interactive quizzes'}
-            </p>
-          </div>
-        </div>
+
+          {/* Top Banner & Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-[var(--mousa-teal)] p-2.5 md:p-3 rounded-2xl text-[var(--mousa-gold-glow)] shadow-xs">
+                <BookOpen size={24} className="md:w-8 md:h-8" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-[var(--mousa-teal-deep)] dark:text-[#FAF5EB] md:text-3xl">
+                  {lang === 'copt' ? 'Ⲛⲓⲥⲃⲱ ⲛ̀ⲧⲉ ϯⲉⲕⲕⲗⲏⲥⲓⲁ' : lang === 'ar' ? 'محطات دروس مدارس الأحد' : 'Sunday School Milestones'}
+                </h1>
+                <p className="text-xs md:text-sm text-[var(--mousa-sand-500)] dark:text-[var(--mousa-sand-400)]">
+                  {lang === 'copt' ? 'Ϩⲁⲛⲥⲃⲱ ⲙ̀ⲡⲛⲉⲩⲙⲁⲧⲓⲕⲟⲛ ⲛⲉⲙ ⲛⲓⲇⲟⲕⲓⲙⲏ' : lang === 'ar' ? 'مسيرة الأنبا موسى الروحية، قصص كتابية واختبارات تفاعلية' : 'Journey of Moses spiritual trail, Bible stories & interactive quizzes'}
+                </p>
+              </div>
+            </div>
 
         {/* Teacher Action Controls: Primary Publish Lesson Funnel */}
         {isTeacher && (
@@ -329,6 +380,8 @@ export function LessonsTab({ onStartLesson, onOpenTeacherStudio, lang }: Lessons
           }
         }}
       />
+        </>
+      )}
     </motion.div>
   );
 }

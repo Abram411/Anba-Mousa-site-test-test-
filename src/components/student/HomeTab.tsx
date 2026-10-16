@@ -14,7 +14,6 @@ import {
   MosesDuneHeroBanner,
   MosesStreakCard,
   MosesPointsTreasuryCard,
-  MosesJourneyTrail,
   MosesJourneyBadge
 } from './JourneyOfMosesVisuals';
 import { MosesLessonProgressBar } from './MosesLessonProgressBar';
@@ -76,28 +75,12 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
       className="pb-24 pt-6 px-4 w-full max-w-7xl mx-auto space-y-6"
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
     >
-      {/* 0. Authoritative Total Lesson Progress Sunrise Component (Placed at the very top of HomeTab) */}
+      {/* 1. Welcome Section: Illustrated Desert Dune Hero Banner ("Welcome, [name]") */}
       <motion.div 
         initial={{ y: -15, opacity: 0 }} 
         animate={{ y: 0, opacity: 1 }} 
-        transition={{ duration: 0.25 }}
-      >
-        <MosesLessonProgressBar
-          totalLessons={totalLessonsCount}
-          completedLessons={completedCount}
-          isLoading={isOnlineAuth && curriculumLoading}
-          error={isOnlineAuth ? curriculumError : null}
-          lang={lang}
-          onExploreLessons={() => onNavigate('lessons')}
-        />
-      </motion.div>
-
-      {/* 1. The Journey of Moses: Illustrated Desert Dune Hero Banner */}
-      <motion.div 
-        initial={{ y: -20, opacity: 0 }} 
-        animate={{ y: 0, opacity: 1 }} 
         exit={{ y: -10, opacity: 0 }}
-        transition={{ duration: 0.25, delay: 0.05 }}
+        transition={{ duration: 0.25 }}
       >
         <MosesDuneHeroBanner
           studentName={userData.fullName}
@@ -109,6 +92,22 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
           avatarUrl={userData.avatarUrl}
           streakDays={userData.currentStreak}
           totalPoints={userData.points}
+        />
+      </motion.div>
+
+      {/* 2. Curriculum Milestones Completion (Placed directly below Welcome section) */}
+      <motion.div 
+        initial={{ y: -10, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ duration: 0.25, delay: 0.05 }}
+      >
+        <MosesLessonProgressBar
+          totalLessons={totalLessonsCount}
+          completedLessons={completedCount}
+          isLoading={isOnlineAuth && curriculumLoading}
+          error={isOnlineAuth ? curriculumError : null}
+          lang={lang}
+          onExploreLessons={() => onNavigate('lessons')}
         />
       </motion.div>
 
@@ -136,7 +135,7 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
         </motion.div>
       )}
 
-      {/* 2. Streak & Points Row: Desert Flame & Blessing Treasury */}
+      {/* 3. Streak & Points Row: Desert Flame & Blessing Treasury */}
       <motion.div 
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
@@ -151,22 +150,6 @@ export function HomeTab({ onNavigate, onOpenTeacherStudio, onOpenParentPortal, l
         <MosesPointsTreasuryCard
           points={userData.points}
           onNavigatePoints={() => onNavigate('points')}
-          lang={lang}
-        />
-      </motion.div>
-
-      {/* 3. The Journey of Moses: 5-Milestone Desert Trail Map with Restrained Gold Pulse on Next Node */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.25, delay: 0.15 }}
-      >
-        <MosesJourneyTrail
-          currentStreak={userData.currentStreak}
-          totalPoints={userData.points}
-          completedLessonsCount={completedCount}
-          totalLessonsCount={totalLessonsCount}
           lang={lang}
         />
       </motion.div>

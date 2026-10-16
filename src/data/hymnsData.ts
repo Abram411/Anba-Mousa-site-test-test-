@@ -21,6 +21,7 @@ export interface CopticHymnItem {
   seasonEn: string;
   occasionTag: 'annual' | 'kiahk' | 'lent' | 'pascha' | 'resurrection' | 'st_mary';
   difficulty: 'easy' | 'medium' | 'advanced';
+  level: 1 | 2 | 3;
   audioUrl: string;
   durationSec: number;
   hazatExplanationAr: string;
@@ -38,7 +39,8 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     seasonEn: 'Annual & Festive / Conclusion of Praises',
     occasionTag: 'annual',
     difficulty: 'easy',
-    audioUrl: 'https://archive.org/download/CopticHymnsCollection/Eporo_Annual.mp3',
+    level: 1,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     durationSec: 135,
     hazatExplanationAr: 'لحن شجي مريح بهزات ثلاثية هادئة (٣ هزات ناعمة على كلمة Ⲉⲡⲟⲩⲣⲟ ومقطع ⲙⲟⲓ ⲛⲁⲛ). يُرتل في ختام الصلوات لطلب السلام.',
     hazatExplanationEn: 'A comforting, melodic hymn with gentle 3-beat rhythm pauses on "Ep-Oro" and "Moi Nan" asking the King of Peace for tranquility.',
@@ -78,6 +80,31 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     ]
   },
   {
+    id: 'khen_efran',
+    titleAr: 'لحن خين إفران (باسم الآب والابن والروح القدس)',
+    titleEn: 'Khen Efran (In the Name of the Father)',
+    titleCoptic: 'Ϧⲉⲛ ⲫ̀ⲣⲁⲛ ⲙ̀Ⲫⲓⲱⲧ',
+    seasonAr: 'مقدمة التبريك والصلوات الكنسية ومدارس الشمامسة للمبتدئين',
+    seasonEn: 'Opening of prayers and deacon initiation',
+    occasionTag: 'annual',
+    difficulty: 'easy',
+    level: 1,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    durationSec: 85,
+    hazatExplanationAr: 'اللحن الأساسي الأول لكل شماس مبتدئ. نغمة واضحة لتمكين النطق القبطي الأرثوذكسي السليم.',
+    hazatExplanationEn: 'The foundational liturgical initiation hymn for every novice deacon, ensuring pure Bohairic Coptic pronunciation.',
+    lines: [
+      {
+        id: 1,
+        coptic: 'Ϧⲉⲛ ⲫ̀ⲣⲁⲛ ⲙ̀Ⲫⲓⲱⲧ: ⲛⲉⲙ Ⲡ̀ϣⲏⲣⲓ: ⲛⲉⲙ Ⲡⲓⲡ̀ⲛⲉⲩⲙⲁ Ⲉⲑⲟⲩⲁⲃ: ⲟⲩⲛⲟⲩϯ ⲛ̀ⲟⲩⲱⲧ: ⲁ̀ⲙⲏⲛ.',
+        arabized: 'خين إفران إمفيوت: نيم بشيري: نيم بي بنيفما إثؤواب: أونوتي إن أوأوت: أمين.',
+        arabic: 'باسم الآب والابن والروح القدس، إله واحد، آمين.',
+        hazatNotes: 'مد رخيم هادئ عند خين إفرااان',
+        startTimeSec: 0
+      }
+    ]
+  },
+  {
     id: 'agios',
     titleAr: 'لحن أجيوس الثلاث تقديسات (قدوس الله)',
     titleEn: 'Agios (The Thrice-Holy Hymn)',
@@ -85,8 +112,9 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     seasonAr: 'يُصلى في كل قداس إلهي قبل قراءة الإنجيل المقدس',
     seasonEn: 'Every Divine Liturgy before Gospel',
     occasionTag: 'annual',
-    difficulty: 'easy',
-    audioUrl: 'https://archive.org/download/CopticHymnsCollection/Agios_Annual.mp3',
+    difficulty: 'medium',
+    level: 2,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
     durationSec: 120,
     hazatExplanationAr: 'لحن خاشع مقدس يُعلن لاهوت وتجسد وفداء ربنا يسوع المسيح. في كل ربع هزتان خشوعيتان مع إحناء الرأس.',
     hazatExplanationEn: 'Solemn hymn proclaiming Christ divinity, incarnation, crucifixion, and resurrection. Sung with deep reverence.',
@@ -126,7 +154,8 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     seasonEn: 'Introduction of Praises',
     occasionTag: 'annual',
     difficulty: 'easy',
-    audioUrl: 'https://archive.org/download/CopticHymnsCollection/Teno-oosht.mp3',
+    level: 1,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     durationSec: 90,
     hazatExplanationAr: 'لحن سجود وتسبيح للثالوث القدوس. هزات انسيابية رقيقة.',
     hazatExplanationEn: 'Reverent prostration hymn honoring the Holy Trinity.',
@@ -158,7 +187,8 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     seasonEn: 'Midnight Praises (Three Holy Youths)',
     occasionTag: 'kiahk',
     difficulty: 'medium',
-    audioUrl: 'https://archive.org/download/CopticHymnsCollection/Hos_Erof_Third_Canticle.mp3',
+    level: 2,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
     durationSec: 180,
     hazatExplanationAr: 'تسبحة الفتية الثلاثة في أتون النار. إيقاع بهيج بالدف والمثلث يملأ الروح حماساً وفرحاً.',
     hazatExplanationEn: 'Praise of the Three Saintly Youths in the fiery furnace with joyous cymbals and triangle.',
@@ -182,6 +212,31 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     ]
   },
   {
+    id: 'asomen',
+    titleAr: 'لحن آصومن (فلنسبح الرب لأنه بالمجد قد تمجد)',
+    titleEn: 'Asomen (Let Us Praise the Lord)',
+    titleCoptic: 'Ⲁ̀ⲥⲱⲙⲉⲛ ⲧⲱ Ⲕⲩⲣⲓⲱ',
+    seasonAr: 'الهوس الأول ومقدمة تسابيح العبور والانتصار',
+    seasonEn: 'First Canticle / Triumph of the Red Sea',
+    occasionTag: 'annual',
+    difficulty: 'medium',
+    level: 2,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+    durationSec: 140,
+    hazatExplanationAr: 'تسبحة الخلاص والعبور العظيم في البحر الأحمر. نغمة تسبيح جهيرة حماسية بالدف.',
+    hazatExplanationEn: 'Chant of Exodus victory by Moses and the congregation praising God who triumphed gloriously.',
+    lines: [
+      {
+        id: 1,
+        coptic: 'Ⲁ̀ⲥⲱⲙⲉⲛ ⲧⲱ Ⲕⲩⲣⲓⲱ: ⲉⲛⲇⲟⲝⲱⲥ ⲅⲁⲣ ⲇⲉⲇⲟⲝⲁⲥⲧⲉ.',
+        arabized: 'آصومن تو كيريو: إندوكسوس غار ديذوكساستي.',
+        arabic: 'فلنسبح الرب، لأنه بالمجد قد تمجد.',
+        hazatNotes: 'نبرات متلاحقة قوية مع إيقاع الدف',
+        startTimeSec: 0
+      }
+    ]
+  },
+  {
     id: 'pek_thronos',
     titleAr: 'لحن بيك إثرونوس (كرسيك يا الله إلى دهر الدهور)',
     titleEn: 'Pek-Thronos (Your Throne, O God)',
@@ -190,7 +245,8 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
     seasonEn: 'Good Friday (12th Hour)',
     occasionTag: 'pascha',
     difficulty: 'advanced',
-    audioUrl: 'https://archive.org/download/CopticHymnsCollection/Pek_Thronos.mp3',
+    level: 3,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
     durationSec: 210,
     hazatExplanationAr: 'من أروع وأطول ألحان الكنيسة القبطية على الإطلاق بالنغمة الحزايني المؤثرة. يعلن ملوكية المسيح حتى وهو على الصليب.',
     hazatExplanationEn: 'One of the deepest masterworks of Coptic hymnology chanted on Good Friday, declaring the eternal Kingship of Christ.',
@@ -201,6 +257,56 @@ export const COPTIC_HYMNS_COLLECTION: CopticHymnItem[] = [
         arabized: 'بيك إثرونوس إفنوتي: شا إينيه إنتي بي إينيه: بي إشفوت إنتي بيك ميثمي.',
         arabic: 'كرسيك يا الله إلى دهر الدهور، قضيب الاستقامة هو قضيب ملكك.',
         hazatNotes: 'هزات بطيئة خاشعة تتصاعد بنغمة الآلام المهيبة',
+        startTimeSec: 0
+      }
+    ]
+  },
+  {
+    id: 'golgotha',
+    titleAr: 'لحن غولغوثا (في الموضع الذي صلبوك فيه)',
+    titleEn: 'Golgotha (At the Place of the Skull)',
+    titleCoptic: 'Ⲅⲟⲗⲅⲟⲑⲁ ⲉ̀ⲧⲉ ⲡⲓⲙⲁ ⲙ̀ⲡⲓⲕⲣⲁⲛⲓⲟⲛ',
+    seasonAr: 'دفن المخلص في ختام الجمعة العظيمة المقدسة',
+    seasonEn: 'Burial Rite on Good Friday',
+    occasionTag: 'pascha',
+    difficulty: 'advanced',
+    level: 3,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    durationSec: 240,
+    hazatExplanationAr: 'لحن فرعوني أثري قبطي أصيل تم تعميده لصلوات دفن المخلص. هزات متقنة عميقة تمس الوجدان.',
+    hazatExplanationEn: 'Ancient liturgical burial hymn with deep Coptic pharaonic heritage chanted during the icon burial of Christ on Good Friday.',
+    lines: [
+      {
+        id: 1,
+        coptic: 'Ⲅⲟⲗⲅⲟⲑⲁ ⲉ̀ⲧⲉ ⲡⲓⲙⲁ ⲙ̀ⲡⲓⲕⲣⲁⲛⲓⲟⲛ: ⲡⲓⲙⲁ ⲉ̀ⲧⲁⲩⲁϣⲕ ⲉ̀ⲣⲟϥ Ⲡϭⲟⲓⲥ.',
+        arabized: 'غولغوثا إيتي بيما إمبي كران يون: بيما إيتاف أشك إيروف إبشويس.',
+        arabic: 'الجلجثة أي موضع الجمجمة، الموضع الذي صلبوك فيه يا رب.',
+        hazatNotes: 'هزات وقورة خاشعة مع سكب البخور',
+        startTimeSec: 0
+      }
+    ]
+  },
+  {
+    id: 'tai_shouri',
+    titleAr: 'لحن تي شوري (المجمرة الذهب النقي)',
+    titleEn: 'Tai-Shouri (The Golden Censer)',
+    titleCoptic: 'Ⲧⲁⲓϣⲟⲩⲣⲏ ⲛ̀ⲛⲟⲩⲃ ⲛ̀ⲕⲁⲑⲁⲣⲟⲥ',
+    seasonAr: 'صوم نينوى والصوم الكبير المقدس والقداس الإلهي',
+    seasonEn: 'Great Lent and Liturgical Incense Service',
+    occasionTag: 'lent',
+    difficulty: 'advanced',
+    level: 3,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+    durationSec: 195,
+    hazatExplanationAr: 'من أعمق ألحان التجسد الإلهي والصوم الكبير. هزات مركبة طويلة تشبه تصاعد البخور إلى عرش النعمة.',
+    hazatExplanationEn: 'Reverent Great Lent theological hymn comparing the Theotokos to the golden censer carrying the divine coal.',
+    lines: [
+      {
+        id: 1,
+        coptic: 'Ⲧⲁⲓϣⲟⲩⲣⲏ ⲛ̀ⲛⲟⲩⲃ ⲛ̀ⲕⲁⲑⲁⲣⲟⲥ: ⲉⲧϥⲁⲓ ϧⲁ ⲡⲓϫⲉⲃⲥ ⲛ̀ⲭ̀ⲣⲱⲙ: ⲉ̀ⲧⲁ Ⲫⲓⲱⲧ ϣⲟⲡϥ ⲉ̀ⲣⲟϥ ⲉ̀ⲃⲟⲗ.',
+        arabized: 'تاي شوري إن نوب إن كاثا روس: إت فاي خا بي جيفس إن إكروم: إيتا إفيوت شوبف إيروف إيفول.',
+        arabic: 'هذه المجمرة الذهب النقي، الحاملة جمر النار، التي اشتمها الآب الصالح.',
+        hazatNotes: 'مد لاهوتي خاشع في تاااي شووووري',
         startTimeSec: 0
       }
     ]

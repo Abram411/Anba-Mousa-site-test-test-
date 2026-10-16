@@ -32,6 +32,7 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [seasonFilter, setSeasonFilter] = useState<string>('all');
+  const [levelFilter, setLevelFilter] = useState<'all' | 1 | 2 | 3>('all');
   
   // Practice voice recording
   const [isRecordingPractice, setIsRecordingPractice] = useState(false);
@@ -160,6 +161,7 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
   };
 
   const filteredHymns = COPTIC_HYMNS_COLLECTION.filter(h => {
+    if (levelFilter !== 'all' && h.level !== levelFilter) return false;
     if (seasonFilter === 'all') return true;
     return h.occasionTag === seasonFilter;
   });
@@ -195,9 +197,40 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
           </h1>
           <p className="text-xs sm:text-base text-gray-200 leading-relaxed max-w-2xl font-medium">
             {lang === 'ar'
-              ? 'تعلّم ألحان وتسابيح الكنيسة القبطية الأصيلة بـ ٣ لغات (قبطي، معرب، عربي)، مع التحكم في سرعة الصوت وتدريب الهزات وتسجيل صوتك للتقييم.'
-              : 'Master ancient Coptic hymns with 3-way synchronized lyrics, melodic hazat guidance, adjustable playback speed, and voice rehearsal.'}
+              ? 'تعلّم ألحان وتسابيح الكنيسة القبطية الأصيلة بـ ٣ لغات (قبطي، معرب، عربي)، عبر المستويات الثلاثة مع التحكم في سرعة الصوت وتدريب الهزات وتسجيل صوتك للتقييم.'
+              : 'Master ancient Coptic hymns across 3 class levels with 3-way synchronized lyrics, melodic hazat guidance, adjustable playback speed, and voice rehearsal.'}
           </p>
+        </div>
+      </div>
+
+      {/* 3 Class Levels Selector Bar */}
+      <div className="bg-[var(--mousa-cream-surface)] dark:bg-[#1C1712] p-3 rounded-2xl border-2 border-[var(--mousa-border-sand)] space-y-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-xs font-black text-stone-800 dark:text-stone-200 uppercase tracking-wider flex items-center gap-1.5">
+            <Award size={15} className="text-amber-500" />
+            <span>{lang === 'ar' ? 'المستويات الدراسية للألحان:' : 'Hymn Class Levels:'}</span>
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { id: 'all' as const, labelAr: 'جميع المستويات', labelEn: 'All Levels', subAr: 'كامل الألحان', subEn: 'Complete' },
+            { id: 1 as const, labelAr: 'المستوى الأول', labelEn: 'Level 1: Novice', subAr: 'تمهيدي ومبتدئين', subEn: 'Foundational' },
+            { id: 2 as const, labelAr: 'المستوى الثاني', labelEn: 'Level 2: Intermediate', subAr: 'متوسط وشمامسة', subEn: 'Deacon Service' },
+            { id: 3 as const, labelAr: 'المستوى الثالث', labelEn: 'Level 3: Advanced', subAr: 'متقدم والمناسبات الكبرى', subEn: 'Solemn Rites' },
+          ].map(lvl => (
+            <button
+              key={lvl.id}
+              onClick={() => setLevelFilter(lvl.id)}
+              className={`p-2.5 rounded-xl text-start transition-all cursor-pointer border ${
+                levelFilter === lvl.id
+                  ? 'bg-[var(--mousa-gold)] text-[var(--mousa-teal-deep)] border-[var(--mousa-gold)] shadow-xs font-black'
+                  : 'bg-white/70 dark:bg-stone-900/60 text-stone-700 dark:text-stone-300 border-[var(--mousa-border-sand)] hover:border-amber-300 font-bold'
+              }`}
+            >
+              <div className="text-xs sm:text-sm font-black truncate">{lang === 'ar' ? lvl.labelAr : lvl.labelEn}</div>
+              <div className="text-[10px] opacity-80 truncate">{lang === 'ar' ? lvl.subAr : lvl.subEn}</div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -205,7 +238,7 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{lang === 'ar' ? 'المناسبة الطقسية:' : 'Liturgical Season:'}</span>
         {[
-          { id: 'all', labelAr: 'كل الألحان', labelEn: 'All' },
+          { id: 'all', labelAr: 'كل الألحان', labelEn: 'All Seasons' },
           { id: 'annual', labelAr: 'سنوي وللقداس', labelEn: 'Annual' },
           { id: 'kiahk', labelAr: 'كيهك وتسابيح', labelEn: 'Kiahk' },
           { id: 'lent', labelAr: 'الصوم الكبير', labelEn: 'Great Lent' },
@@ -248,7 +281,10 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
                   }`}
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-1.5 mb-1">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300/40">
+                        {lang === 'ar' ? `المستوى ${hymn.level}` : `Level ${hymn.level}`}
+                      </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300">
                         {hymn.seasonAr}
                       </span>
@@ -277,9 +313,14 @@ export function HymnsSchoolTab({ lang }: { lang: Language }) {
             {/* Top Bar of Active Hymn */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-gray-100 dark:border-slate-800">
               <div>
-                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block mb-0.5">
-                  {selectedHymn.seasonAr}
-                </span>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-400/40">
+                    {lang === 'ar' ? `المستوى ${selectedHymn.level}` : `Level ${selectedHymn.level}`}
+                  </span>
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                    {selectedHymn.seasonAr}
+                  </span>
+                </div>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-[var(--color-church-blue)] dark:text-amber-100">
                   {lang === 'ar' ? selectedHymn.titleAr : selectedHymn.titleEn}
                 </h2>

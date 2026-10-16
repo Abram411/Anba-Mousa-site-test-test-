@@ -161,3 +161,70 @@ export function awardPoints(
   }
   return pointsToAdd;
 }
+
+export interface StreakLeaderboardEntry {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentNameAr: string;
+  avatarUrl: string;
+  streakDays: number;
+  longestStreak: number;
+  rank: number;
+}
+
+const DEFAULT_STREAK_LEADERBOARD: StreakLeaderboardEntry[] = [
+  { id: 'st-1', studentId: 's-mina', studentName: 'Mina Shenouda', studentNameAr: 'مينا شنودة', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mina', streakDays: 14, longestStreak: 18, rank: 1 },
+  { id: 'st-2', studentId: 's-mary', studentName: 'Mary George', studentNameAr: 'مريم جورج', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mary', streakDays: 10, longestStreak: 12, rank: 2 },
+  { id: 'st-3', studentId: 'u1', studentName: 'Youssef Mina', studentNameAr: 'يوسف مينا', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef', streakDays: 4, longestStreak: 12, rank: 3 },
+  { id: 'st-4', studentId: 's-marina', studentName: 'Marina Hany', studentNameAr: 'مارينا هاني', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marina', streakDays: 6, longestStreak: 8, rank: 4 },
+  { id: 'st-5', studentId: 's-david', studentName: 'David Emad', studentNameAr: 'ديفيد عماد', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David', streakDays: 5, longestStreak: 9, rank: 5 },
+  { id: 'st-6', studentId: 's-kirollos', studentName: 'Kirollos Bassem', studentNameAr: 'كيرلس باسم', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kirollos', streakDays: 3, longestStreak: 5, rank: 6 },
+  { id: 'st-7', studentId: 's-mark', studentName: 'Mark Fady', studentNameAr: 'مارك فادي', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mark', streakDays: 2, longestStreak: 4, rank: 7 },
+];
+
+export function getStreakLeaderboard(currentUser?: User | null): StreakLeaderboardEntry[] {
+  let list = [...DEFAULT_STREAK_LEADERBOARD];
+
+  if (currentUser) {
+    const userStreak = currentUser.currentStreak ?? 1;
+    const userLongest = currentUser.longestStreak ?? userStreak;
+
+    const existingIdx = list.findIndex(
+      (e) => e.studentId === currentUser.id || (currentUser.id.startsWith('guest_') && e.studentId === 'u1')
+    );
+
+    if (existingIdx >= 0) {
+      list[existingIdx] = {
+        ...list[existingIdx],
+        studentId: currentUser.id,
+        studentName: currentUser.fullName,
+        studentNameAr: currentUser.fullName,
+        avatarUrl: currentUser.avatarUrl || list[existingIdx].avatarUrl,
+        streakDays: userStreak,
+        longestStreak: Math.max(userLongest, userStreak)
+      };
+    } else {
+      list.push({
+        id: 'st_' + currentUser.id,
+        studentId: currentUser.id,
+        studentName: currentUser.fullName,
+        studentNameAr: currentUser.fullName,
+        avatarUrl: currentUser.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}`,
+        streakDays: userStreak,
+        longestStreak: userLongest,
+        rank: list.length + 1
+      });
+    }
+
+    // Sort descending by streakDays
+    list.sort((a, b) => b.streakDays - a.streakDays);
+    list = list.map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+  }
+
+  return list;
+}
+
