@@ -3239,7 +3239,8 @@ function checkStudentLessonAccess(studentId: string, lessonRecord: any): { allow
   const enrolledClassGroups = new Set<string>();
 
   // 1. Check primary studentClasses
-  const studentClass = serverReviewState.studentClasses[studentId];
+  const studentClass = serverReviewState.studentClasses[studentId] || 
+    (studentId === 'david' ? serverReviewState.studentClasses['student-david'] : undefined);
   if (studentClass?.classGroupId) {
     enrolledClassGroups.add(studentClass.classGroupId);
   }
@@ -3247,13 +3248,13 @@ function checkStudentLessonAccess(studentId: string, lessonRecord: any): { allow
   // 2. Check classMemberships (supporting multi-class memberships)
   const memberships = Object.values(serverReviewState.classMemberships || {});
   for (const m of memberships as any[]) {
-    if (m.studentId === studentId && (m.status === 'active' || m.status === 'APPROVED' || !m.status)) {
+    if ((m.studentId === studentId || (studentId === 'david' && m.studentId === 'student-david')) && (m.status === 'active' || m.status === 'APPROVED' || !m.status)) {
       if (m.classGroupId) enrolledClassGroups.add(m.classGroupId);
     }
   }
 
   // 3. Fallback for demo student 'u1' or guest baseline (Primary 2)
-  if (studentId === 'u1' || studentId.startsWith('guest_') || studentId === 'user_student_mark_101' || studentId === 'mark') {
+  if (studentId === 'u1' || studentId.startsWith('guest_') || studentId === 'user_student_mark_101' || studentId === 'mark' || studentId === 'david' || studentId === 'student-david') {
     enrolledClassGroups.add('primary_2');
   }
 
@@ -3575,6 +3576,15 @@ app.get("/api/church/student-quiz", async (req, res) => {
     const lessonId = String(req.query.lessonId || '');
     if (!lessonId) {
       return res.status(400).json({ success: false, error: "MISSING_PARAMS", message: "lessonId is required" });
+    }
+
+    const rawLesson = serverReviewState.lessons[lessonId];
+    if (rawLesson && (!rawLesson.active_version_id || rawLesson.status !== 'published')) {
+      return res.status(400).json({
+        success: false,
+        error: "UNPUBLISHED_LESSON",
+        message: "Quizzes are only available for published lessons with an active version."
+      });
     }
 
     const { lessonRecord, targetVersion } = ensurePublishedLessonAndVersion(lessonId);

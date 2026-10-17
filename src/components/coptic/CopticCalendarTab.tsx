@@ -125,7 +125,6 @@ export function CopticCalendarTab({ lang }: { lang: Language }) {
                 setCurrentDate(now);
                 const curCoptic = getCopticDate(now);
                 setCopticDate(curCoptic);
-                setSelectedStory(getSynaxariumForDate(curCoptic));
               }}
               className="text-xs font-bold text-amber-300 hover:text-white underline ml-auto mr-0 px-2 py-1"
             >

@@ -146,7 +146,7 @@ export async function getLiveNotificationsForUser(
   if (currentUser.role === 'teacher' || currentUser.role === 'admin') {
     try {
       const reqRes = await getPendingActivationRequests();
-      const pendingCount = (reqRes.data || []).length;
+      const pendingCount = (reqRes.requests || []).length;
       if (pendingCount > 0) {
         const rosterNotifId = `roster_${todayDateStr}_${pendingCount}`;
         notifications.push({
