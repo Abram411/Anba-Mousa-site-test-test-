@@ -1742,7 +1742,10 @@ const serverReviewState = {
   sources: {} as Record<string, any[]>,
   generatedMaterials: {} as Record<string, any>,
   activationRequests: {} as Record<string, any>,
-  classServants: {} as Record<string, any[]>
+  classServants: {} as Record<string, any[]>,
+  hymnsMemberships: {} as Record<string, any>,
+  hymnsCollection: {} as Record<string, any>,
+  taxisCollection: {} as Record<string, any>
 };
 
 const CLASS_STATE_FILE = path.join(uploadsDir, "class_roster_persistence.json");
@@ -1761,7 +1764,10 @@ function savePersistentClassState() {
       teacherStudentRelationships: serverReviewState.teacherStudentRelationships,
       parentChildRelationships: serverReviewState.parentChildRelationships,
       activationRequests: serverReviewState.activationRequests,
-      classServants: serverReviewState.classServants
+      classServants: serverReviewState.classServants,
+      hymnsMemberships: serverReviewState.hymnsMemberships,
+      hymnsCollection: serverReviewState.hymnsCollection,
+      taxisCollection: serverReviewState.taxisCollection
     };
     fs.writeFileSync(CLASS_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
     fs.writeFileSync(CHURCH_YEAR_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
@@ -1816,6 +1822,24 @@ function loadPersistentClassState() {
         serverReviewState.classServants = {
           ...serverReviewState.classServants,
           ...parsed.classServants
+        };
+      }
+      if (parsed.hymnsMemberships && typeof parsed.hymnsMemberships === 'object') {
+        serverReviewState.hymnsMemberships = {
+          ...serverReviewState.hymnsMemberships,
+          ...parsed.hymnsMemberships
+        };
+      }
+      if (parsed.hymnsCollection && typeof parsed.hymnsCollection === 'object') {
+        serverReviewState.hymnsCollection = {
+          ...serverReviewState.hymnsCollection,
+          ...parsed.hymnsCollection
+        };
+      }
+      if (parsed.taxisCollection && typeof parsed.taxisCollection === 'object') {
+        serverReviewState.taxisCollection = {
+          ...serverReviewState.taxisCollection,
+          ...parsed.taxisCollection
         };
       }
     }
@@ -1990,14 +2014,12 @@ function resolveStudentByIdentifier(identifier?: string | null) {
     };
   }
 
-  // 4. Dynamic fallback for any student code (e.g., ST-xxxx, CH-xxxx, or entered identifier)
-  if (clean.length >= 2) {
-    const isCode = /^(ST|CH)-/i.test(clean) || clean.startsWith('student-') || clean.startsWith('user_');
-    const dynamicId = isCode ? clean.toLowerCase() : `student-${clean.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+  // 4. Dynamic fallback for any valid student code format (e.g., ST-xxxx, CH-xxxx)
+  if (/^(ST|CH)-\d+/i.test(clean)) {
     return {
-      id: dynamicId,
-      nameEn: isCode ? `Student (${clean.toUpperCase()})` : clean,
-      nameAr: isCode ? `طالب (${clean.toUpperCase()})` : clean,
+      id: `student-${clean.toLowerCase()}`,
+      nameEn: `Student (${clean.toUpperCase()})`,
+      nameAr: `طالب (${clean.toUpperCase()})`,
       gradeEn: 'Grade 4',
       classGroupId: 'primary_2',
       linkCode: clean
@@ -2591,6 +2613,278 @@ function resetServerReviewState() {
         uploadedAt: new Date().toISOString()
       }
     ]
+  };
+
+  serverReviewState.hymnsMemberships = {
+    'mem_student_david': {
+      id: 'mem_student_david',
+      studentId: 'student-david',
+      studentName: 'David N.',
+      level: 1,
+      rosterGroup: 'primary_choir',
+      status: 'approved',
+      requestedAt: '2026-09-01T08:00:00.000Z',
+      reviewedBy: 'Servant Mina',
+      reviewedAt: '2026-09-02T08:00:00.000Z'
+    },
+    'mem_student_mark': {
+      id: 'mem_student_mark',
+      studentId: 'student_mark',
+      studentName: 'Mark',
+      level: 1,
+      rosterGroup: 'primary_choir',
+      status: 'approved',
+      requestedAt: '2026-09-01T08:00:00.000Z',
+      reviewedBy: 'Servant Mina',
+      reviewedAt: '2026-09-02T08:00:00.000Z'
+    }
+  };
+
+  serverReviewState.hymnsCollection = {
+    'ep_oro': {
+      id: 'ep_oro',
+      titleAr: 'لحن إبؤورو (يا ملك السلام)',
+      titleEn: 'Ep-Oro (O King of Peace)',
+      titleCoptic: 'Ⲉⲡⲟⲩⲣⲟ ⲛ̀ⲧⲉ ϯϩⲓⲣⲏⲛⲏ',
+      seasonAr: 'طقس سنوي وفرايحي وخاتمة الصلوات',
+      seasonEn: 'Annual & Festive / Conclusion of Praises',
+      occasionTag: 'annual',
+      difficulty: 'easy',
+      level: 1,
+      status: 'published',
+      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      durationSec: 135,
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+      hazatExplanationAr: 'لحن شجي مريح بهزات ثلاثية هادئة لطلب السلام.',
+      hazatExplanationEn: 'A comforting melodic hymn with gentle 3-beat rhythm pauses.',
+      lines: [
+        { id: 1, coptic: 'Ⲉⲡⲟⲩⲣⲟ ⲛ̀ⲧⲉ ϯϩⲓⲣⲏⲛⲏ', arabized: 'إبـؤورو إنتي تي هيريني', arabic: 'يا ملك السلام، أعطنا سلامك', hazatNotes: '٣ هزات متدرجة', startTimeSec: 0 }
+      ],
+      history: []
+    },
+    'khen_efran': {
+      id: 'khen_efran',
+      titleAr: 'لحن خين إفران (باسم الآب والابن والروح القدس)',
+      titleEn: 'Khen Efran (In the Name of the Father)',
+      titleCoptic: 'Ϧⲉⲛ ⲫ̀ⲣⲁⲛ ⲙ̀Ⲫⲓⲱⲧ',
+      seasonAr: 'مقدمة التبريك والصلوات الكنسية',
+      seasonEn: 'Opening of prayers and deacon initiation',
+      occasionTag: 'annual',
+      difficulty: 'easy',
+      level: 1,
+      status: 'published',
+      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+      durationSec: 85,
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+      hazatExplanationAr: 'اللحن الأساسي الأول لكل شماس مبتدئ.',
+      hazatExplanationEn: 'The foundational liturgical initiation hymn for novice deacons.',
+      lines: [
+        { id: 1, coptic: 'Ϧⲉⲛ ⲫ̀ⲣⲁⲛ ⲙ̀Ⲫⲓⲱⲧ', arabized: 'خين إفران إمفيوت', arabic: 'باسم الآب والابن والروح القدس', startTimeSec: 0 }
+      ],
+      history: []
+    },
+    'agios': {
+      id: 'agios',
+      titleAr: 'لحن أجيوس أوثيئوس (قدوس الله باللحن السنوي)',
+      titleEn: 'Agios O-Theos (Holy God)',
+      titleCoptic: 'Ⲁⲅⲓⲟⲥ ⲟ̀ Ⲑⲉⲟⲥ',
+      seasonAr: 'القداس الباسيلي وطقس سنوي',
+      seasonEn: 'Liturgy of the Faithful & Annual',
+      occasionTag: 'annual',
+      difficulty: 'medium',
+      level: 2,
+      status: 'published',
+      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+      durationSec: 160,
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+      hazatExplanationAr: 'لحن متوسط الشهرة يرتل قبل قراءة الإنجيل المقدس.',
+      hazatExplanationEn: 'The Trisagion chanted before the Holy Gospel.',
+      lines: [
+        { id: 1, coptic: 'Ⲁⲅⲓⲟⲥ ⲟ̀ Ⲑⲉⲟⲥ: Ⲁⲅⲓⲟⲥ Ⲓⲥⲭⲩⲣⲟⲥ: Ⲁⲅⲓⲟⲥ Ⲁ̀ⲑⲁⲛⲁⲧⲟⲥ', arabized: 'أجيوس أوثيئوس: أجيوس إسشيروس: أجيوس أثاناتوس', arabic: 'قدوس الله، قدوس القوي، قدوس الحي الذي لا يموت', startTimeSec: 0 }
+      ],
+      history: []
+    },
+    'pek_ethronos': {
+      id: 'pek_ethronos',
+      titleAr: 'لحن بيك إثرونوس (كرسيك يا الله إلى دهر الدهور)',
+      titleEn: 'Pek-Thronos (Your Throne, O God)',
+      titleCoptic: 'Ⲡⲉⲕⲑ̀ⲣⲟⲛⲟⲥ Ⲫ̀ⲛⲟⲩϯ',
+      seasonAr: 'ساعة الدفنة من يوم الجمعة العظيمة',
+      seasonEn: '12th Hour of Holy Good Friday (Burial of Christ)',
+      occasionTag: 'pascha',
+      difficulty: 'advanced',
+      level: 3,
+      status: 'published',
+      audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+      durationSec: 240,
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+      hazatExplanationAr: 'قمة ألحان الجمعة العظيمة الحزايني بهزات خشوعية عميقة.',
+      hazatExplanationEn: 'The crowning masterpiece of Good Friday Burial liturgy.',
+      lines: [
+        { id: 1, coptic: 'Ⲡⲉⲕⲑ̀ⲣⲟⲛⲟⲥ Ⲫ̀ⲛⲟⲩϯ: ϣⲁ ⲉ̀ⲛⲉϩ ⲛ̀ⲧⲉ ⲡⲓⲉ̀ⲛⲉϩ', arabized: 'بيك إثرونوس إفنوتي: شا إينيه إنتي بي إينيه', arabic: 'كرسيك يا الله إلى دهر الدهور، قضيب الاستقامة هو قضيب ملكك', startTimeSec: 0 }
+      ],
+      history: []
+    },
+    'draft_hymn_01': {
+      id: 'draft_hymn_01',
+      titleAr: 'مسودة لحن التوزيع الكيهكي',
+      titleEn: 'Draft Kiahk Psalmody Hymn',
+      titleCoptic: 'Ⲡⲓⲯⲁⲗⲙⲟⲥ ⲛ̀Ⲭⲟⲓⲁⲕ',
+      seasonAr: 'شهر كيهك المبارك',
+      seasonEn: 'Month of Kiahk',
+      occasionTag: 'kiahk',
+      difficulty: 'medium',
+      level: 1,
+      status: 'draft',
+      audioUrl: '/uploads/sample_cross_lesson_audio.mp3',
+      durationSec: 90,
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdAt: '2026-09-10T08:00:00.000Z',
+      updatedAt: '2026-09-10T08:00:00.000Z',
+      hazatExplanationAr: 'مسودة قيد الإعداد',
+      hazatExplanationEn: 'Draft under preparation',
+      lines: [],
+      history: []
+    }
+  };
+
+  serverReviewState.taxisCollection = {
+    'taxis_incense_matins_vespers': {
+      id: 'taxis_incense_matins_vespers',
+      titleAr: 'طقس رفع بخور عشية وباكر',
+      titleEn: 'Offering of Incense (Matins & Vespers)',
+      titleCopt: 'Ⲡⲓⲧⲁⲝⲓⲥ ⲛ̀ⲧⲉ ⲡⲓⲟⲩⲱϣⲧ ⲛ̀ϣⲱⲡ ⲛⲉⲙ ⲣⲟⲩϩⲓ',
+      category: 'incense',
+      audience: 'all',
+      status: 'published',
+      summaryAr: 'الترتيب الطقسي الكامل لصلوات رفع بخور عشية وباكر مع أدوار الكاهن، مردات الشماس، وألحان الخورس.',
+      summaryEn: 'Complete liturgical order for Matins & Vespers Incense service.',
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdByName: 'الخادم مينا',
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z',
+      publishedBy: 'user_teacher_mina_101',
+      publishedAt: '2026-09-01T08:00:00.000Z',
+      references: ['كتاب طقس الكنيسة القبطية الأرثوذكسية - الأنبا متاؤس', 'الخلاجي المقدس'],
+      documents: [
+        {
+          id: 'doc_incense_guide',
+          title: 'دليل الشمامسة في رفع بخور عشية وباكر (PDF)',
+          fileUrl: '/uploads/sample_cross_lesson_handout.pdf',
+          fileType: 'pdf',
+          mimeType: 'application/pdf'
+        }
+      ],
+      sections: [
+        {
+          id: 'sec_1',
+          order: 1,
+          titleAr: 'صلاة الشكر وفتح الستر',
+          titleEn: 'Thanksgiving Prayer & Unveiling of the Sanctuary',
+          titleCopt: 'Ⲡⲓϣⲗⲏⲗ ⲛ̀ϯϣⲉⲡϩ̀ⲙⲟⲧ',
+          contentAr: 'يقف الكاهن أمام الهيكل خاشعاً، ويفتح الستر قائلاً: "إرحمنا يا الله الآب ضابط الكل..." ثم يتلو صلاة الشكر.',
+          contentEn: 'The priest stands reverently before the sanctuary, opening the veil and praying the Thanksgiving Prayer.',
+          priestAction: 'يسجد الكاهن أمام باب الهيكل، ثم يفتح الستر ويرشم الشعب بالصليب.',
+          deaconResponse: 'مرد الشماس: "صلوا من أجل صلاة الشكر المقدسة لكي ينعم الرب بإحسانه..."'
+        },
+        {
+          id: 'sec_2',
+          order: 2,
+          titleAr: 'دورة البخور وأواشي الصغار والكبار',
+          titleEn: 'Circuits of Incense & Petitions',
+          titleCopt: 'Ⲡⲓⲕⲱϯ ⲛ̀ⲧⲉ ⲡⲓⲥ̀ⲑⲟⲓⲛⲟⲩϥⲓ',
+          contentAr: 'يضع الكاهن يد البخور في المجمرة ويرفع البخور أمام المذبح ۳ دفعات.',
+          contentEn: 'The priest places incense in the censer, offers 3 circuits before the altar.',
+          rubricNotes: 'في أيام الآحاد والأعياد السيدية لا تقال أوشية المسافرين وتستبدل بأوشية القرابين.'
+        }
+      ],
+      history: []
+    },
+    'taxis_liturgy_st_basil': {
+      id: 'taxis_liturgy_st_basil',
+      titleAr: 'طقس القداس الباسيلي المقدس',
+      titleEn: 'The Divine Liturgy of St. Basil',
+      titleCopt: 'Ϯⲁ̀ⲛⲁⲫⲟⲣⲁ ⲛ̀ⲧⲉ ⲡⲓⲁ̀ⲅⲓⲟⲥ Ⲃⲁⲥⲓⲗⲓⲟⲥ',
+      category: 'liturgy',
+      audience: 'all',
+      status: 'published',
+      summaryAr: 'طقس قداس المؤمنين من صلاة الصلح، والأنافورا، والاستدعاء، والتقديس، والمجمع، وقسمة الجسد والدم الطاهرين.',
+      summaryEn: 'The sacred order of the Liturgy of the Believers: Prayer of Reconciliation, Anaphora, Epiclesis, Commemoration, and Holy Fraction.',
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdByName: 'الخادم مينا',
+      createdAt: '2026-09-05T09:00:00.000Z',
+      updatedAt: '2026-09-05T09:00:00.000Z',
+      publishedBy: 'user_teacher_mina_101',
+      publishedAt: '2026-09-05T09:00:00.000Z',
+      references: ['كتاب القداسات الثلاثة - دير السريان العامر', 'التقليد الليتورجي السكندري'],
+      documents: [
+        {
+          id: 'doc_basil_anaphora',
+          title: 'نص الأنافورا الباسيلية بالقبطي والعربي (PDF)',
+          fileUrl: '/uploads/sample_cross_lesson_handout.pdf',
+          fileType: 'pdf',
+          mimeType: 'application/pdf'
+        }
+      ],
+      sections: [
+        {
+          id: 'sec_b1',
+          order: 1,
+          titleAr: 'صلاة الصلح ومرد القبلة المقدسة',
+          titleEn: 'Prayer of Reconciliation & Holy Kiss',
+          titleCopt: 'Ⲡⲓϣⲗⲏⲗ ⲛ̀ⲧⲉ ϯϩⲓⲣⲏⲛⲏ',
+          contentAr: 'يصلي الكاهن صلاة الصلح طالباً السلام السمائي، وعند ختامها ينادي الشماس: "قبلوا بعضكم بعضاً بقبلة مقدسة..." ويرفع الإبروسفارين.',
+          contentEn: 'The priest petitions for heavenly peace, followed by the deacon proclamation to greet one another with a holy kiss while lifting the Prospherin.',
+          deaconResponse: 'مرد الشماس: "قبلوا بعضكم بعضاً بقبلة مقدسة يا رب ارحم..."'
+        }
+      ],
+      history: []
+    },
+    'taxis_draft_sacrament': {
+      id: 'taxis_draft_sacrament',
+      titleAr: 'مسودة طقس سر المعمودية والميرون المقدس',
+      titleEn: 'Draft Sacrament of Holy Baptism & Chrismation',
+      titleCopt: 'Ⲡⲓⲧⲁⲝⲓⲥ ⲛ̀ⲧⲉ ⲡⲓⲱⲙⲥ ⲉⲑⲟⲩⲃ ⲛⲉⲙ ⲡⲓⲙⲩⲣⲟⲛ',
+      category: 'sacraments',
+      audience: 'all',
+      status: 'draft',
+      summaryAr: 'مسودة قيد المراجعة لطقس سر المعمودية وتغطيس المعمد في جرن المعمودية ورشمه بالميرون المقدس.',
+      summaryEn: 'Draft under review for Baptism & Holy Chrismation.',
+      version: 1,
+      createdBy: 'user_teacher_mina_101',
+      createdByName: 'الخادم مينا',
+      createdAt: '2026-09-08T10:00:00.000Z',
+      updatedAt: '2026-09-08T10:00:00.000Z',
+      references: ['كتاب المعمودية والميرون - الكنيسة القبطية الأرثوذكسية'],
+      documents: [],
+      sections: [
+        {
+          id: 'sec_bap_1',
+          order: 1,
+          titleAr: 'صلوات تحليل المرأة وصلاة تجنيد المعمد',
+          titleEn: 'Absolution of the Mother & Enlistment',
+          contentAr: 'يصلي الكاهن على المعمد صلوات الإيمان وجحد الشيطان متجهاً نحو الغرب.',
+          priestAction: 'ينفخ الكاهن في وجه المعمد ۳ مرات قائلاً: "اخرج أيتها الروح النجسة..."',
+          deaconResponse: 'مرد الشماس: "أجحدك يا شيطان وكل أعمالك الشريرة..."'
+        }
+      ],
+      history: []
+    }
   };
 }
 
@@ -5035,14 +5329,11 @@ app.post("/api/church/student/class", async (req, res) => {
     }
 
     if (!existing && !resolvedFromDir) {
-      existing = {
-        studentId,
-        fullName: studentName || `Student ${inputIdentifier}`,
-        grade: targetGrade,
-        classGroupId,
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${studentId}`
-      };
-      serverReviewState.studentClasses[studentId] = existing;
+      return res.status(404).json({
+        success: false,
+        error: "STUDENT_NOT_FOUND",
+        message: `Student "${inputIdentifier}" was not found in the student directory or active rosters.`
+      });
     }
 
     serverReviewState.studentClasses[studentId] = {
@@ -5263,12 +5554,14 @@ app.get("/api/church/onboarding/requests", async (req, res) => {
       }
 
       if (authContext.role === 'teacher') {
-        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+        const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || 
+          (authContext.userId === 'mina' || authContext.userId === 'user_teacher_mina_101' ? ['primary_2'] : ['preparatory']);
         if (targetClassGroupId && !assignedClasses.includes(targetClassGroupId)) {
-          serverReviewState.teacherAssignments[authContext.userId] = [
-            ...assignedClasses,
-            targetClassGroupId
-          ];
+          return res.status(403).json({
+            success: false,
+            error: "FORBIDDEN",
+            message: `Servant ${authContext.userId} is not assigned to class "${targetClassGroupId}".`
+          });
         }
         if (!targetClassGroupId) {
           targetClassGroupId = assignedClasses[0] || 'primary_2';
@@ -5343,12 +5636,14 @@ app.post("/api/church/onboarding/review", async (req, res) => {
     }
 
     if (authContext.isAuthenticated && authContext.role === 'teacher') {
-      const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || ['primary_2'];
+      const assignedClasses = serverReviewState.teacherAssignments[authContext.userId] || 
+        (authContext.userId === 'mina' || authContext.userId === 'user_teacher_mina_101' ? ['primary_2'] : ['preparatory']);
       if (!assignedClasses.includes(targetRequest.requestedClassGroupId)) {
-        serverReviewState.teacherAssignments[authContext.userId] = [
-          ...assignedClasses,
-          targetRequest.requestedClassGroupId
-        ];
+        return res.status(403).json({
+          success: false,
+          error: "FORBIDDEN",
+          message: `Servant ${authContext.userId} is not assigned to class "${targetRequest.requestedClassGroupId}".`
+        });
       }
     }
 

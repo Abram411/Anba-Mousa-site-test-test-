@@ -765,3 +765,129 @@ export interface LeaderboardEntry {
   pointsThisWeek: number;
   rank: number;
 }
+
+// ==============================================================================
+// HYMNS SCHOOL ROSTER & ENROLLMENT TYPES
+// ==============================================================================
+export type HymnsRosterStatus = 'pending' | 'approved' | 'rejected' | 'transferred' | 'revoked';
+
+export interface HymnsRosterMembership {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentAvatarUrl?: string;
+  level: 1 | 2 | 3;
+  rosterGroup: string; // e.g., 'primary_choir', 'deacons_prep', 'general_parish'
+  status: HymnsRosterStatus;
+  requestedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  transferredFromLevel?: 1 | 2 | 3;
+  transferReason?: string;
+  rejectionReason?: string;
+  revocationReason?: string;
+  notes?: string;
+}
+
+export interface HymnsEnrollmentRequestPayload {
+  level: 1 | 2 | 3;
+  rosterGroup?: string;
+  notes?: string;
+}
+
+// ==============================================================================
+// COPTIC RITUALS / TAXIS DOMAIN & EXPLICIT PERMISSION MODEL
+// ==============================================================================
+export type TaxisAudience = 'all' | 'deacons' | 'preparatory' | 'servants' | 'clergy';
+export type TaxisCategory = 'liturgy' | 'incense' | 'sacraments' | 'feasts' | 'pascha' | 'occasions';
+export type TaxisStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'unpublished';
+
+export type TaxisCapability = 
+  | 'view'
+  | 'create'
+  | 'edit'
+  | 'submit_review'
+  | 'review'
+  | 'approve'
+  | 'publish'
+  | 'unpublish'
+  | 'restore'
+  | 'manage_permissions';
+
+export interface TaxisSection {
+  id: string;
+  order: number;
+  titleAr: string;
+  titleEn: string;
+  titleCopt?: string;
+  contentAr: string;
+  contentEn?: string;
+  contentCopt?: string;
+  rubricNotes?: string;
+  priestAction?: string;
+  deaconResponse?: string;
+}
+
+export interface TaxisAttachment {
+  id: string;
+  title: string;
+  fileUrl: string;
+  fileType: 'pdf' | 'audio' | 'image' | 'doc';
+  fileSize?: number;
+  mimeType?: string;
+}
+
+export interface TaxisVersionSnapshot {
+  version: number;
+  status: TaxisStatus;
+  titleAr: string;
+  titleEn: string;
+  sectionsCount: number;
+  savedBy: string;
+  savedByName: string;
+  savedAt: string;
+  notes?: string;
+}
+
+export interface TaxisItem {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  titleCopt?: string;
+  category: TaxisCategory;
+  audience: TaxisAudience;
+  status: TaxisStatus;
+  summaryAr: string;
+  summaryEn: string;
+  sections: TaxisSection[];
+  references: string[];
+  documents: TaxisAttachment[];
+  version: number;
+  history?: TaxisVersionSnapshot[];
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  publishedBy?: string;
+  publishedAt?: string;
+  unpublishedBy?: string;
+  unpublishedAt?: string;
+  assignedEditors?: string[];
+  assignedReviewers?: string[];
+}
+
+export interface TaxisUserPermissions {
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canSubmitReview: boolean;
+  canReview: boolean;
+  canApprove: boolean;
+  canPublish: boolean;
+  canUnpublish: boolean;
+  canRestore: boolean;
+  canManagePermissions: boolean;
+}
+
